@@ -5,9 +5,15 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [Medicine::class], version = 1, exportSchema = false)
+@Database(
+    entities = [Medicine::class, Schedule::class, DoseEvent::class],
+    version = 2,
+    exportSchema = false
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun medicineDao(): MedicineDao
+    abstract fun scheduleDao(): ScheduleDao
+    abstract fun doseEventDao(): DoseEventDao
 
     companion object {
         @Volatile
@@ -19,7 +25,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "medremind.db"
-                ).build().also { instance = it }
+                ).fallbackToDestructiveMigration().build().also { instance = it }
             }
     }
 }

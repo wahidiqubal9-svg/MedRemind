@@ -13,30 +13,26 @@ import com.medremind.app.data.Medicine
 fun AppRoot(vm: MedicineViewModel = viewModel()) {
     val medicines by vm.medicines.collectAsState()
     var showEditor by remember { mutableStateOf(false) }
+    var showPermissions by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Medicine?>(null) }
 
-    if (showEditor) {
-        AddEditMedicineScreen(
+    when {
+        showPermissions -> PermissionScreen(onBack = { showPermissions = false })
+
+        showEditor -> AddEditMedicineScreen(
             initial = editing,
+            vm = vm,
             onCancel = {
                 showEditor = false
                 editing = null
             },
-            onSave = { medicine ->
-                vm.save(medicine) {
-                    showEditor = false
-                    editing = null
-                }
-            },
-            onDelete = { medicine ->
-                vm.delete(medicine) {
-                    showEditor = false
-                    editing = null
-                }
+            onDone = {
+                showEditor = false
+                editing = null
             }
         )
-    } else {
-        HomeScreen(
+
+        else -> HomeScreen(
             medicines = medicines,
             onAdd = {
                 editing = null
@@ -45,7 +41,8 @@ fun AppRoot(vm: MedicineViewModel = viewModel()) {
             onEdit = { medicine ->
                 editing = medicine
                 showEditor = true
-            }
+            },
+            onOpenSetup = { showPermissions = true }
         )
     }
 }

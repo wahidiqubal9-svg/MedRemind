@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -26,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,22 +42,31 @@ import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.medremind.app.data.Medicine
 import com.medremind.app.data.PhotoStorage
+import com.medremind.app.data.Schedule
+import com.medremind.app.data.ScheduleType
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditMedicineScreen(
     initial: Medicine?,
+    vm: MedicineViewModel,
     onCancel: () -> Unit,
-    onSave: (Medicine) -> Unit,
-    onDelete: (Medicine) -> Unit
+    onDone: () -> Unit
 ) {
     val context = LocalContext.current
     var name by rememberSaveable { mutableStateOf(initial?.name ?: "") }
     var strength by rememberSaveable { mutableStateOf(initial?.strength ?: "") }
     var notes by rememberSaveable { mutableStateOf(initial?.notes ?: "") }
     var photoPath by rememberSaveable { mutableStateOf(initial?.photoPath) }
+    var schedules by remember { mutableStateOf<List<Schedule>>(emptyList()) }
+    var editingSchedule by remember { mutableStateOf<Schedule?>(null) }
+    var showScheduleEditor by remember { mutableStateOf(false) }
     var pendingFile by remember { mutableStateOf<File?>(null) }
+
+    LaunchedEffect(initial?.id) {
+        schedules = if (initial != null) vm.schedulesFor(initial.id) else emptyList()
+    }
 
     val takePicture = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
@@ -160,17 +171,50 @@ fun AddEditMedicineScreen(
 
             Spacer(Modifier.height(24.dp))
 
+            Text("Reminders", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+
+            schedules.forEach { schedule ->
+                Card(
+                    onClick = {
+                        editingSchedule = schedule
+                        showScheduleEditor = true
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(scheduleSummary(schedule), style = MaterialTheme.typography.bodyLarge)
+                        if (!schedule.enabled) {
+                            Text("Disabled", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+
+            OutlinedButton(
+                onClick = {
+                    editingSchedule = null
+                    showScheduleEditor = true
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Add reminder")
+            }
+
+            Spacer(Modifier.height(24.dp))
+
             Button(
                 onClick = {
                     val base = initial ?: Medicine(name = "")
-                    onSave(
-                        base.copy(
-                            name = name.trim(),
-                            strength = strength.trim(),
-                            notes = notes.trim(),
-                            photoPath = photoPath
-                        )
+                    val medicine = base.copy(
+                        name = name.trim(),
+                        strength = strength.trim(),
+                        notes = notes.trim(),
+                        photoPath = photoPath
                     )
+                    vm.saveMedicine(medicine, schedules) { onDone() }
                 },
                 enabled = name.isNotBlank(),
                 modifier = Modifier.fillMaxWidth()
@@ -181,10 +225,10 @@ fun AddEditMedicineScreen(
             if (initial != null) {
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(
-                    onClick = { onDelete(initial) },
+                    onClick = { vm.deleteMedicine(initial) { onDone() } },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Delete")
+                    Text("Delete medicine")
                 }
             }
 
@@ -199,4 +243,43 @@ fun AddEditMedicineScreen(
             Spacer(Modifier.height(24.dp))
         }
     }
+
+    if (showScheduleEditor) {
+        ScheduleEditorDialog(
+            initial = editingSchedule,
+            onDismiss = {
+                showScheduleEditor = false
+                editingSchedule = null
+            },
+            onSave = { schedule ->
+                val existing = editingSchedule
+                schedules = if (existing == null) {
+                    schedules + schedule
+                } else {
+                    schedules.map { if (it === existing) schedule else it }
+                }
+                showScheduleEditor = false
+                editingSchedule = null
+            },
+            onDelete = {
+                val existing = editingSchedule
+                if (existing != null) schedules = schedules.filter { it !== existing }
+                showScheduleEditor = false
+                editingSchedule = null
+            }
+        )
+    }
+}
+
+private val dayNames = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+fun scheduleSummary(schedule: Schedule): String = when (schedule.type) {
+    ScheduleType.WEEKDAYS -> {
+        val days = dayNames.filterIndexed { index, _ -> (schedule.daysMask and (1 shl index)) != 0 }
+        val dayText = if (days.isEmpty()) "No days" else days.joinToString(", ")
+        "$dayText at ${schedule.times}"
+    }
+    ScheduleType.INTERVAL -> "Every ${schedule.intervalHours} hours"
+    ScheduleType.COURSE -> "${schedule.times} (course)"
+    else -> "Daily at ${schedule.times}"
 }
