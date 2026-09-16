@@ -81,6 +81,42 @@ object ReminderScheduler {
         return null
     }
 
+    fun occurrencesOn(schedule: Schedule, date: LocalDate): List<Long> {
+        if (!schedule.enabled) return emptyList()
+        val startDate = if (schedule.startDate > 0) dateOf(schedule.startDate) else null
+        val endDate = schedule.endDate?.let { dateOf(it) }
+        if (startDate != null && date.isBefore(startDate)) return emptyList()
+        if (endDate != null && date.isAfter(endDate)) return emptyList()
+
+        val dayStart = date.atStartOfDay(zone).toInstant().toEpochMilli()
+        val dayEnd = dayStart + 86_400_000L
+
+        return when (schedule.type) {
+            ScheduleType.INTERVAL -> {
+                val anchor = schedule.startDate
+                if (anchor <= 0L) return emptyList()
+                val step = schedule.intervalHours.coerceAtLeast(1) * 3_600_000L
+                val result = mutableListOf<Long>()
+                var k = if (dayStart <= anchor) 0L else (dayStart - anchor) / step
+                var t = anchor + k * step
+                var guard = 0
+                while (t < dayEnd && guard < 200) {
+                    if (t >= dayStart) result.add(t)
+                    k++
+                    t = anchor + k * step
+                    guard++
+                }
+                result
+            }
+            ScheduleType.WEEKDAYS -> {
+                val bit = 1 shl (date.dayOfWeek.value - 1)
+                if ((schedule.daysMask and bit) == 0) emptyList()
+                else parseTimes(schedule.times).map { toMillis(date, it) }
+            }
+            else -> parseTimes(schedule.times).map { toMillis(date, it) }
+        }
+    }
+
     private fun showAppIntent(context: Context): PendingIntent =
         PendingIntent.getActivity(
             context,

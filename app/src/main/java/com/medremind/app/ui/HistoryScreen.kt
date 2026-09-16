@@ -1,5 +1,6 @@
 package com.medremind.app.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,18 +19,26 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.medremind.app.data.DoseStatus
@@ -40,7 +49,7 @@ import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
 
-private data class DayStat(val label: String, val taken: Int, val missed: Int)
+private data class DayStat(val date: LocalDate, val taken: Int, val missed: Int)
 
 @Composable
 fun HistoryContent(
@@ -51,45 +60,62 @@ fun HistoryContent(
 
     LaunchedEffect(Unit) { vm.markOverdueAsMissed() }
 
-    val zone = remember { ZoneId.systemDefault() }
-    val todayStart = remember {
-        LocalDate.now().atStartOfDay(zone).toInstant().toEpochMilli()
-    }
-    val todayItems = history.filter { it.event.scheduledAt >= todayStart }
-    val takenToday = todayItems.count { it.event.status == DoseStatus.TAKEN }
-    val skippedToday = todayItems.count { it.event.status == DoseStatus.SKIPPED }
-    val missedToday = todayItems.count { it.event.status == DoseStatus.MISSED }
-    val pendingToday = todayItems.count { it.event.status == DoseStatus.PENDING }
+    var rangeDays by remember { mutableIntStateOf(7) }
 
-    val last7 = remember(history) {
-        (6 downTo 0).map { offset ->
-            val date = LocalDate.now().minusDays(offset.toLong())
+    val zone = remember { ZoneId.systemDefault() }
+    val today = LocalDate.now()
+
+    val rangeItems = remember(history, rangeDays) {
+        val start = today.minusDays((rangeDays - 1).toLong())
+            .atStartOfDay(zone).toInstant().toEpochMilli()
+        history.filter { it.event.scheduledAt >= start }
+    }
+
+    val taken = rangeItems.count { it.event.status == DoseStatus.TAKEN }
+    val missed = rangeItems.count { it.event.status == DoseStatus.MISSED }
+    val skipped = rangeItems.count { it.event.status == DoseStatus.SKIPPED }
+    val actionable = taken + missed + skipped
+    val percent = if (actionable == 0) 0 else taken * 100 / actionable
+
+    val chartDays = remember(history, rangeDays) {
+        (rangeDays - 1 downTo 0).map { offset ->
+            val date = today.minusDays(offset.toLong())
             val dayStart = date.atStartOfDay(zone).toInstant().toEpochMilli()
-            val dayEnd = dayStart + 24L * 60 * 60 * 1000
+            val dayEnd = dayStart + 86_400_000L
             val items = history.filter { it.event.scheduledAt in dayStart until dayEnd }
             DayStat(
-                label = date.dayOfWeek.name.take(1) + date.dayOfWeek.name.drop(1).take(2).lowercase(),
+                date = date,
                 taken = items.count { it.event.status == DoseStatus.TAKEN },
                 missed = items.count { it.event.status == DoseStatus.MISSED }
             )
         }
     }
 
-    val weekTaken = last7.sumOf { it.taken }
-    val weekMissed = last7.sumOf { it.missed }
-    val weekTotal = weekTaken + weekMissed
-    val adherence = if (weekTotal == 0) 0 else (weekTaken * 100) / weekTotal
-
-    val grouped = remember(history) {
-        history.groupBy { dateKey(it.event.scheduledAt) }
+    val grouped = remember(rangeItems) {
+        rangeItems.groupBy { dateKey(it.event.scheduledAt) }
     }
     val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
+    val primary = MaterialTheme.colorScheme.primary
+    val errorColor = MaterialTheme.colorScheme.error
+    val trackColor = MaterialTheme.colorScheme.surfaceVariant
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(7, 30, 90).forEach { days ->
+                    FilterChip(
+                        selected = rangeDays == days,
+                        onClick = { rangeDays = days },
+                        label = { Text("$days days") }
+                    )
+                }
+            }
+        }
+
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -98,67 +124,151 @@ fun HistoryContent(
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text("TODAY", style = MaterialTheme.typography.labelMedium)
-                    Spacer(Modifier.height(4.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Canvas(modifier = Modifier.size(180.dp)) {
+                            val stroke = 20.dp.toPx()
+                            val diameter = size.minDimension - stroke
+                            val topLeft = Offset(
+                                (size.width - diameter) / 2f,
+                                (size.height - diameter) / 2f
+                            )
+                            drawArc(
+                                color = trackColor,
+                                startAngle = -90f,
+                                sweepAngle = 360f,
+                                useCenter = false,
+                                topLeft = topLeft,
+                                size = Size(diameter, diameter),
+                                style = Stroke(width = stroke, cap = StrokeCap.Round)
+                            )
+                            drawArc(
+                                color = primary,
+                                startAngle = -90f,
+                                sweepAngle = 360f * (percent / 100f),
+                                useCenter = false,
+                                topLeft = topLeft,
+                                size = Size(diameter, diameter),
+                                style = Stroke(width = stroke, cap = StrokeCap.Round)
+                            )
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                "$percent%",
+                                style = MaterialTheme.typography.displaySmall
+                            )
+                            Text("adherence", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
                     Text(
-                        "Taken: $takenToday    Missed: $missedToday",
+                        "Last $rangeDays days",
                         style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        "Skipped: $skippedToday    Pending: $pendingToday",
-                        style = MaterialTheme.typography.bodyMedium
                     )
                 }
             }
         }
 
         item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                StatCard(
+                    modifier = Modifier.weight(1f),
+                    label = "Taken",
+                    value = taken,
+                    color = Color(0xFF2E7D32)
+                )
+                StatCard(
+                    modifier = Modifier.weight(1f),
+                    label = "Missed",
+                    value = missed,
+                    color = Color(0xFFC62828)
+                )
+                StatCard(
+                    modifier = Modifier.weight(1f),
+                    label = "Skipped",
+                    value = skipped,
+                    color = Color(0xFF757575)
+                )
+            }
+        }
+
+        item {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    Text("Last 7 days", style = MaterialTheme.typography.titleMedium)
+                    Text("Adherence trend", style = MaterialTheme.typography.titleMedium)
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Adherence: $adherence%  ($weekTaken taken, $weekMissed missed)",
-                        style = MaterialTheme.typography.bodyMedium
+                        "Green = taken, red = missed",
+                        style = MaterialTheme.typography.labelSmall
                     )
                     Spacer(Modifier.height(12.dp))
-                    val maxTotal = last7.maxOfOrNull { it.taken + it.missed }?.coerceAtLeast(1) ?: 1
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Bottom
+                    val maxTotal = chartDays.maxOfOrNull { it.taken + it.missed }?.coerceAtLeast(1) ?: 1
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp)
                     ) {
-                        last7.forEach { day ->
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Row(verticalAlignment = Alignment.Bottom) {
-                                    Box(
-                                        modifier = Modifier
-                                            .width(10.dp)
-                                            .height((64f * day.taken / maxTotal).dp)
-                                            .background(MaterialTheme.colorScheme.primary)
-                                    )
-                                    Spacer(Modifier.width(3.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .width(10.dp)
-                                            .height((64f * day.missed / maxTotal).dp)
-                                            .background(MaterialTheme.colorScheme.error)
-                                    )
-                                }
-                                Spacer(Modifier.height(4.dp))
-                                Text(day.label, style = MaterialTheme.typography.labelSmall)
+                        val count = chartDays.size
+                        if (count == 0) return@Canvas
+                        val gap = if (count > 30) 1.dp.toPx() else 3.dp.toPx()
+                        val barWidth = ((size.width - gap * (count - 1)) / count).coerceAtLeast(1f)
+                        chartDays.forEachIndexed { index, day ->
+                            val x = index * (barWidth + gap)
+                            val total = day.taken + day.missed
+                            val totalHeight = size.height * total / maxTotal
+                            val takenHeight = size.height * day.taken / maxTotal
+                            val missedHeight = totalHeight - takenHeight
+                            val baseY = size.height
+                            if (takenHeight > 0f) {
+                                drawRect(
+                                    color = primary,
+                                    topLeft = Offset(x, baseY - takenHeight),
+                                    size = Size(barWidth, takenHeight)
+                                )
                             }
+                            if (missedHeight > 0f) {
+                                drawRect(
+                                    color = errorColor,
+                                    topLeft = Offset(x, baseY - takenHeight - missedHeight),
+                                    size = Size(barWidth, missedHeight)
+                                )
+                            }
+                        }
+                    }
+                    if (rangeDays > 7) {
+                        Spacer(Modifier.height(6.dp))
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            val first = chartDays.firstOrNull()?.date
+                            val last = chartDays.lastOrNull()?.date
+                            val fmt = SimpleDateFormat("d MMM", Locale.getDefault())
+                            Text(
+                                first?.let { fmt.format(dateToMillis(it)) } ?: "",
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                last?.let { fmt.format(dateToMillis(it)) } ?: "",
+                                style = MaterialTheme.typography.labelSmall
+                            )
                         }
                     }
                 }
             }
         }
 
-        if (history.isEmpty()) {
+        if (rangeItems.isEmpty()) {
             item {
                 Text(
-                    "No doses recorded yet. When a reminder fires and you mark it, it will appear here.",
+                    "No doses recorded in this period.",
+                    style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(8.dp)
                 )
             }
@@ -214,6 +324,33 @@ fun HistoryContent(
         }
     }
 }
+
+@Composable
+private fun StatCard(
+    modifier: Modifier = Modifier,
+    label: String,
+    value: Int,
+    color: Color
+) {
+    Card(modifier = modifier) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                value.toString(),
+                style = MaterialTheme.typography.headlineMedium,
+                color = color
+            )
+            Text(label, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
+        }
+    }
+}
+
+private fun dateToMillis(date: LocalDate): Long =
+    date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
 private fun dateKey(millis: Long): String =
     SimpleDateFormat("EEEE, d MMM yyyy", Locale.getDefault()).format(Date(millis))

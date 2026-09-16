@@ -18,6 +18,7 @@ fun AppRoot(
     val medicines by vm.medicines.collectAsState()
     var tab by remember { mutableIntStateOf(0) }
     var showEditor by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
     var showPermissions by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Medicine?>(null) }
     var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -40,6 +41,12 @@ fun AppRoot(
             }
         )
 
+        showSettings -> SettingsScreen(
+            settings = settings,
+            onBack = { showSettings = false },
+            onOpenPermissions = { showPermissions = true }
+        )
+
         showPermissions -> PermissionScreen(
             onBack = { showPermissions = false },
             vm = vm
@@ -50,7 +57,6 @@ fun AppRoot(
             onTabChange = { tab = it },
             medicines = medicines,
             vm = vm,
-            settings = settings,
             onAdd = {
                 guarded {
                     editing = null
@@ -63,7 +69,7 @@ fun AppRoot(
                     showEditor = true
                 }
             },
-            onOpenPermissions = { showPermissions = true }
+            onOpenSettings = { showSettings = true }
         )
     }
 

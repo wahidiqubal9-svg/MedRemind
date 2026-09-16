@@ -1,5 +1,6 @@
 package com.medremind.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -23,6 +25,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+
+@Composable
+fun SettingsScreen(
+    settings: SettingsViewModel,
+    onBack: () -> Unit,
+    onOpenPermissions: () -> Unit
+) {
+    BackHandler { onBack() }
+    Scaffold(
+        topBar = { MedTopAppBar(title = "Settings") }
+    ) { padding ->
+        SettingsContent(
+            modifier = Modifier.padding(padding),
+            settings = settings,
+            onOpenPermissions = onOpenPermissions
+        )
+    }
+}
 
 @Composable
 fun SettingsContent(

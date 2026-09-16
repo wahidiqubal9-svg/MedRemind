@@ -21,6 +21,9 @@ interface MedicineDao {
     @Query("SELECT * FROM medicines ORDER BY id ASC LIMIT 1")
     suspend fun first(): Medicine?
 
+    @Query("SELECT * FROM medicines ORDER BY name COLLATE NOCASE ASC")
+    suspend fun getAllOnce(): List<Medicine>
+
     @Insert
     suspend fun insert(medicine: Medicine): Long
 

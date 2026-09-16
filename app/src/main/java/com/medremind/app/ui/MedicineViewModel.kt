@@ -7,8 +7,10 @@ import com.medremind.app.alarm.ReminderScheduler
 import com.medremind.app.data.AppDatabase
 import com.medremind.app.data.Medicine
 import com.medremind.app.data.DoseEvent
+import com.medremind.app.data.DoseStatus
 import com.medremind.app.data.PhotoStorage
 import com.medremind.app.data.Schedule
+import com.medremind.app.data.ScheduleType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +18,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.LocalDate
+import java.time.ZoneId
+import kotlin.math.abs
 
 class MedicineViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -69,7 +74,10 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                 }
 
                 schedules.forEach { schedule ->
-                    val toSave = schedule.copy(medicineId = medicineId)
+                    val normalized = if (schedule.type == ScheduleType.INTERVAL && schedule.startDate == 0L) {
+                        schedule.copy(startDate = System.currentTimeMillis())
+                    } else schedule
+                    val toSave = normalized.copy(medicineId = medicineId)
                     if (toSave.id == 0L) {
                         val newId = db.scheduleDao().insert(toSave)
                         ReminderScheduler.schedule(app, toSave.copy(id = newId))
@@ -108,6 +116,28 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
             .sortedBy { it.triggerAt }
     }
 
+    suspend fun dosesOn(date: LocalDate): List<TodayDose> = withContext(Dispatchers.IO) {
+        val zone = ZoneId.systemDefault()
+        val dayStart = date.atStartOfDay(zone).toInstant().toEpochMilli()
+        val dayEnd = dayStart + 86_400_000L
+        val schedules = db.scheduleDao().getAllOnce().filter { it.enabled }
+        val medicinesById = db.medicineDao().getAllOnce().associateBy { it.id }
+        val events = db.doseEventDao().between(dayStart, dayEnd)
+        val now = System.currentTimeMillis()
+        val result = mutableListOf<TodayDose>()
+        schedules.forEach { schedule ->
+            val medicine = medicinesById[schedule.medicineId] ?: return@forEach
+            ReminderScheduler.occurrencesOn(schedule, date).forEach { trigger ->
+                val event = events.firstOrNull {
+                    it.medicineId == schedule.medicineId && abs(it.scheduledAt - trigger) < 90_000L
+                }
+                val status = event?.status ?: if (trigger < now) DoseStatus.MISSED else DoseStatus.PENDING
+                result.add(TodayDose(trigger, medicine, status))
+            }
+        }
+        result.sortedBy { it.timeMillis }
+    }
+
     fun triggerTestAlarm() {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
@@ -135,6 +165,12 @@ data class DoseHistoryItem(
     val event: DoseEvent,
     val medicineName: String,
     val photoPath: String?
+)
+
+data class TodayDose(
+    val timeMillis: Long,
+    val medicine: Medicine,
+    val status: String
 )
 
 private const val MISSED_AFTER_MILLIS = 2 * 60 * 60 * 1000L
