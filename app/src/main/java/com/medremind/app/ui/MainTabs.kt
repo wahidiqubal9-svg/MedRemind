@@ -1,5 +1,6 @@
 package com.medremind.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
@@ -34,6 +35,8 @@ fun MainTabs(
         1 -> "History"
         else -> "Settings"
     }
+
+    BackHandler(enabled = tab != 0) { onTabChange(0) }
 
     Scaffold(
         topBar = { MedTopAppBar(title = title) },

@@ -1,5 +1,6 @@
 package com.medremind.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -67,6 +68,8 @@ fun AddEditMedicineScreen(
     LaunchedEffect(initial?.id) {
         schedules = if (initial != null) vm.schedulesFor(initial.id) else emptyList()
     }
+
+    BackHandler(enabled = !showScheduleEditor) { onCancel() }
 
     val takePicture = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
@@ -230,14 +233,6 @@ fun AddEditMedicineScreen(
                 ) {
                     Text("Delete medicine")
                 }
-            }
-
-            Spacer(Modifier.height(8.dp))
-            TextButton(
-                onClick = onCancel,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Cancel")
             }
 
             Spacer(Modifier.height(24.dp))

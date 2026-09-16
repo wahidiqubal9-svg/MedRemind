@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -80,8 +81,10 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
         ActivityResultContracts.RequestPermission()
     ) { tick++ }
 
+    BackHandler { onBack() }
+
     Scaffold(
-        topBar = { MedTopAppBar(title = "Alarm setup", onBack = onBack) }
+        topBar = { MedTopAppBar(title = "Alarm setup") }
     ) { padding ->
         Column(
             modifier = Modifier
