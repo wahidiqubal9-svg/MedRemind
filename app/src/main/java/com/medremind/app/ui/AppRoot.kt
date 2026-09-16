@@ -10,17 +10,32 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.medremind.app.data.Medicine
 
 @Composable
-fun AppRoot(vm: MedicineViewModel = viewModel()) {
+fun AppRoot(
+    settings: SettingsViewModel,
+    vm: MedicineViewModel = viewModel()
+) {
     val medicines by vm.medicines.collectAsState()
     var showEditor by remember { mutableStateOf(false) }
     var showPermissions by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Medicine?>(null) }
+    var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    fun guarded(action: () -> Unit) {
+        if (settings.pin.isNullOrEmpty()) action() else pendingAction = action
+    }
 
     when {
         showPermissions -> PermissionScreen(onBack = { showPermissions = false }, vm = vm)
 
         showHistory -> HistoryScreen(onBack = { showHistory = false }, vm = vm)
+
+        showSettings -> SettingsScreen(
+            settings = settings,
+            onBack = { showSettings = false },
+            onOpenPermissions = { showPermissions = true }
+        )
 
         showEditor -> AddEditMedicineScreen(
             initial = editing,
@@ -37,16 +52,34 @@ fun AppRoot(vm: MedicineViewModel = viewModel()) {
 
         else -> HomeScreen(
             medicines = medicines,
+            vm = vm,
             onAdd = {
-                editing = null
-                showEditor = true
+                guarded {
+                    editing = null
+                    showEditor = true
+                }
             },
             onEdit = { medicine ->
-                editing = medicine
-                showEditor = true
+                guarded {
+                    editing = medicine
+                    showEditor = true
+                }
             },
-            onOpenSetup = { showPermissions = true },
+            onOpenSettings = { showSettings = true },
             onOpenHistory = { showHistory = true }
+        )
+    }
+
+    val action = pendingAction
+    if (action != null) {
+        PinDialog(
+            title = "Enter PIN",
+            expected = settings.pin,
+            onDismiss = { pendingAction = null },
+            onSuccess = {
+                pendingAction = null
+                action()
+            }
         )
     }
 }

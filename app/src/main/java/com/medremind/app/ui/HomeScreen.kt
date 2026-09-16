@@ -24,6 +24,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,23 +38,33 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.medremind.app.data.Medicine
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     medicines: List<Medicine>,
+    vm: MedicineViewModel,
     onAdd: () -> Unit,
     onEdit: (Medicine) -> Unit,
-    onOpenSetup: () -> Unit,
+    onOpenSettings: () -> Unit,
     onOpenHistory: () -> Unit
 ) {
+    var upcoming by remember { mutableStateOf<UpcomingAlarm?>(null) }
+
+    LaunchedEffect(medicines, medicines.size) {
+        upcoming = vm.upcomingAlarms().firstOrNull()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("MedRemind") },
                 actions = {
                     TextButton(onClick = onOpenHistory) { Text("History") }
-                    TextButton(onClick = onOpenSetup) { Text("Setup") }
+                    TextButton(onClick = onOpenSettings) { Text("Settings") }
                 }
             )
         },
@@ -59,68 +74,91 @@ fun HomeScreen(
             }
         }
     ) { padding ->
-        if (medicines.isEmpty()) {
-            Box(
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            val next = upcoming
+            Card(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(16.dp)
             ) {
-                Text(
-                    text = "No medicines yet.\nTap \"+\" to add one.",
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyLarge
-                )
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Next dose", style = MaterialTheme.typography.titleMedium)
+                    if (next == null) {
+                        Text("No reminders scheduled.", style = MaterialTheme.typography.bodyMedium)
+                    } else {
+                        Text(next.medicineName, style = MaterialTheme.typography.headlineSmall)
+                        Text(
+                            SimpleDateFormat("EEE d MMM, h:mm a", Locale.getDefault())
+                                .format(Date(next.triggerAt)),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(medicines, key = { it.id }) { medicine ->
-                    Card(
-                        onClick = { onEdit(medicine) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+
+            if (medicines.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No medicines yet.\nTap \"+\" to add one.",
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(medicines, key = { it.id }) { medicine ->
+                        Card(
+                            onClick = { onEdit(medicine) },
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            val photo = medicine.photoPath
-                            if (photo != null) {
-                                AsyncImage(
-                                    model = File(photo),
-                                    contentDescription = medicine.name,
-                                    modifier = Modifier
-                                        .size(56.dp)
-                                        .clip(RoundedCornerShape(8.dp)),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .size(56.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("?")
-                                }
-                            }
-                            Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = medicine.name,
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                                if (medicine.strength.isNotBlank()) {
-                                    Text(
-                                        text = medicine.strength,
-                                        style = MaterialTheme.typography.bodyMedium
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val photo = medicine.photoPath
+                                if (photo != null) {
+                                    AsyncImage(
+                                        model = File(photo),
+                                        contentDescription = medicine.name,
+                                        modifier = Modifier
+                                            .size(56.dp)
+                                            .clip(RoundedCornerShape(8.dp)),
+                                        contentScale = ContentScale.Crop
                                     )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(56.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("?")
+                                    }
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = medicine.name,
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                    if (medicine.strength.isNotBlank()) {
+                                        Text(
+                                            text = medicine.strength,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
                                 }
                             }
                         }
