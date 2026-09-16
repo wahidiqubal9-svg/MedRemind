@@ -11,20 +11,12 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.BarChart
-import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Medication
-import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Favorite
-import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.Medication
-import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,23 +32,24 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import com.medremind.app.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.medremind.app.data.Medicine
 
 private data class NavSpec(
     val label: String,
-    val selectedIcon: ImageVector,
-    val unselectedIcon: ImageVector
+    val icon: Int
 )
 
 private val navSpecs = listOf(
-    NavSpec("Today", Icons.Rounded.Home, Icons.Outlined.Home),
-    NavSpec("Med", Icons.Rounded.Medication, Icons.Outlined.Medication),
-    NavSpec("Progress", Icons.Rounded.BarChart, Icons.Outlined.BarChart),
-    NavSpec("Health", Icons.Rounded.Favorite, Icons.Outlined.FavoriteBorder),
-    NavSpec("Me", Icons.Rounded.Person, Icons.Outlined.Person)
+    NavSpec("Today", R.drawable.ic_nav_today),
+    NavSpec("Med", R.drawable.ic_nav_med),
+    NavSpec("Progress", R.drawable.ic_nav_progress),
+    NavSpec("Health", R.drawable.ic_nav_health),
+    NavSpec("Me", R.drawable.ic_nav_me)
 )
 
 @Composable
@@ -164,15 +157,17 @@ private fun MedBottomBar(
                 onClick = { onTabChange(index) },
                 icon = {
                     Icon(
-                        imageVector = if (tab == index) spec.selectedIcon else spec.unselectedIcon,
-                        contentDescription = spec.label
+                        painter = painterResource(spec.icon),
+                        contentDescription = spec.label,
+                        tint = Color.Unspecified,
+                        modifier = Modifier.size(if (tab == index) 30.dp else 27.dp)
                     )
                 },
                 label = { Text(spec.label) },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = MaterialTheme.colorScheme.onSurface,
                     selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                    indicatorColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    indicatorColor = Color.Transparent,
                     unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
