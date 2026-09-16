@@ -36,7 +36,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     var profileHeight by mutableStateOf(prefs.getString("profile_height", "") ?: "")
         private set
 
-    var profileDiseases by mutableStateOf(prefs.getString("profile_diseases", "") ?: "")
+    var profileDiseases by mutableStateOf(
+        (prefs.getString("profile_diseases", "") ?: "")
+            .split("|")
+            .filter { it.isNotBlank() }
+    )
         private set
 
     var profilePhoto by mutableStateOf(prefs.getString("profile_photo", null))
@@ -67,9 +71,20 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit().putString("profile_height", value).apply()
     }
 
-    fun updateProfileDiseases(value: String) {
-        profileDiseases = value
-        prefs.edit().putString("profile_diseases", value).apply()
+    fun addDisease(value: String) {
+        val trimmed = value.trim()
+        if (trimmed.isEmpty()) return
+        if (profileDiseases.size >= MAX_DISEASES) return
+        if (profileDiseases.contains(trimmed)) return
+        val updated = profileDiseases + trimmed
+        profileDiseases = updated
+        prefs.edit().putString("profile_diseases", updated.joinToString("|")).apply()
+    }
+
+    fun removeDisease(value: String) {
+        val updated = profileDiseases - value
+        profileDiseases = updated
+        prefs.edit().putString("profile_diseases", updated.joinToString("|")).apply()
     }
 
     fun updateProfilePhoto(path: String?) {
@@ -96,3 +111,5 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit().putBoolean("high_contrast", value).apply()
     }
 }
+
+const val MAX_DISEASES = 10

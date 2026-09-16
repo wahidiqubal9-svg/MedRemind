@@ -104,6 +104,19 @@ fun MedTopAppBar(
 }
 
 @Composable
+fun ScreenHeader(title: String, modifier: Modifier = Modifier) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.headlineLarge,
+        fontWeight = FontWeight.Bold,
+        modifier = modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(start = 4.dp, end = 4.dp, top = 12.dp, bottom = 4.dp)
+    )
+}
+
+@Composable
 fun MedTopBarAction(text: String, onClick: () -> Unit) {
     TextButton(
         onClick = onClick,

@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -89,6 +91,7 @@ fun TodayContent(
 
     Column(modifier = modifier.fillMaxSize()) {
         TodayHeader(
+            selectedDate = selectedDate,
             expanded = expanded,
             onToggleCalendar = { expanded = !expanded },
             onOpenSettings = onOpenSettings
@@ -159,10 +162,17 @@ fun TodayContent(
 
 @Composable
 private fun TodayHeader(
+    selectedDate: LocalDate,
     expanded: Boolean,
     onToggleCalendar: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
+    val isToday = selectedDate == LocalDate.now()
+    val title = if (isToday) {
+        "Today"
+    } else {
+        SimpleDateFormat("MMMM", Locale.getDefault()).format(dateToMillis(selectedDate))
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -171,7 +181,7 @@ private fun TodayHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "Today",
+            text = title,
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f)
@@ -196,35 +206,35 @@ private fun WeekStrip(
     onSelect: (LocalDate) -> Unit
 ) {
     val today = LocalDate.now()
-    var drag by remember { mutableStateOf(0f) }
-    val weekStart = selectedDate.minusDays((selectedDate.dayOfWeek.value % 7).toLong())
+    val baseWeekStart = weekStartOf(today)
+    val pageCount = 1201
+    val center = pageCount / 2
+    val pagerState = rememberPagerState(
+        initialPage = (center + weeksBetween(baseWeekStart, selectedDate)).coerceIn(0, pageCount - 1),
+        pageCount = { pageCount }
+    )
 
-    Box(
+    LaunchedEffect(pagerState.settledPage) {
+        val start = baseWeekStart.plusDays(((pagerState.settledPage - center) * 7).toLong())
+        val candidate = start.plusDays((selectedDate.dayOfWeek.value % 7).toLong())
+        if (candidate != selectedDate) onSelect(candidate)
+    }
+
+    LaunchedEffect(selectedDate) {
+        val target = (center + weeksBetween(baseWeekStart, selectedDate)).coerceIn(0, pageCount - 1)
+        if (target != pagerState.currentPage && !pagerState.isScrollInProgress) {
+            pagerState.animateScrollToPage(target)
+        }
+    }
+
+    HorizontalPager(
+        state = pagerState,
         modifier = Modifier
             .fillMaxWidth()
-            .pointerInput(selectedDate) {
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        val total = drag
-                        drag = 0f
-                        if (total <= -48f) onSelect(selectedDate.plusDays(7))
-                        else if (total >= 48f) onSelect(selectedDate.minusDays(7))
-                    },
-                    onHorizontalDrag = { _, amount -> drag += amount }
-                )
-            }
-    ) {
-        AnimatedContent(
-            targetState = weekStart,
-            transitionSpec = {
-                val forward = targetState > initialState
-                val dir = if (forward) 1 else -1
-                (slideInHorizontally(tween(260)) { w -> dir * w } + fadeIn(tween(220))) togetherWith
-                    (slideOutHorizontally(tween(200)) { w -> -dir * w } + fadeOut(tween(160)))
-            },
-            label = "weekStrip"
-        ) { start ->
-            Row(
+            .height(78.dp)
+    ) { page ->
+        val start = baseWeekStart.plusDays(((page - center) * 7).toLong())
+        Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 6.dp)
@@ -284,7 +294,7 @@ private fun WeekStrip(
             }
         }
     }
-}
+
 
 @Composable
 private fun MonthGrid(
@@ -495,6 +505,12 @@ private fun formatDoseTime(millis: Long): String =
 
 private fun weekdayLetter(date: LocalDate): String =
     date.dayOfWeek.getDisplayName(java.time.format.TextStyle.NARROW, Locale.getDefault())
+
+private fun weekStartOf(date: LocalDate): LocalDate =
+    date.minusDays((date.dayOfWeek.value % 7).toLong())
+
+private fun weeksBetween(base: LocalDate, date: LocalDate): Int =
+    ((weekStartOf(date).toEpochDay() - base.toEpochDay()) / 7).toInt()
 
 private fun dateToMillis(date: LocalDate): Long =
     date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()

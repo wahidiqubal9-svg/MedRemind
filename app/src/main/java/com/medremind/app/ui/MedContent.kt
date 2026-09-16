@@ -62,34 +62,38 @@ fun MedContent(
     onAdd: () -> Unit
 ) {
     if (medicines.isEmpty()) {
-        Box(
-            modifier = modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            MedEmptyState(
-                icon = Icons.Outlined.Medication,
-                title = "No medicines yet",
-                message = "Add your first medicine to start tracking doses.",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp),
-                action = {
-                    GradientPillButton(
-                        text = "Add medicine",
-                        icon = Icons.Rounded.Add,
-                        onClick = onAdd
-                    )
-                }
-            )
+        Column(modifier = modifier.fillMaxSize()) {
+            ScreenHeader("Medicines", modifier = Modifier.padding(horizontal = 16.dp))
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                MedEmptyState(
+                    icon = Icons.Outlined.Medication,
+                    title = "No medicines yet",
+                    message = "Add your first medicine to start tracking doses.",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 32.dp),
+                    action = {
+                        GradientPillButton(
+                            text = "Add medicine",
+                            icon = Icons.Rounded.Add,
+                            onClick = onAdd
+                        )
+                    }
+                )
+            }
         }
         return
     }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 120.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        item(key = "med_header") { ScreenHeader("Medicines") }
         items(medicines, key = { it.id }) { medicine ->
             MedicineCard(
                 medicine = medicine,

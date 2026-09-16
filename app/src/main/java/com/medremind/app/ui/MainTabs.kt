@@ -8,31 +8,49 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
-import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.medremind.app.R
@@ -51,6 +69,17 @@ private val navSpecs = listOf(
     NavSpec("Me", R.drawable.ic_nav_me)
 )
 
+private val commonDiseases = listOf(
+    "Diabetes", "High blood pressure", "High cholesterol", "Asthma", "COPD",
+    "Heart disease", "Stroke", "Thyroid disorder", "Arthritis", "Osteoporosis",
+    "Depression", "Anxiety", "Epilepsy", "Migraine", "Kidney disease",
+    "Liver disease", "Anemia", "Asthma (exercise-induced)", "Sleep apnea", "Obesity",
+    "Acid reflux (GERD)", "Peptic ulcer", "Irritable bowel syndrome", "Crohn's disease",
+    "Ulcerative colitis", "Celiac disease", "Psoriasis", "Eczema", "Glaucoma",
+    "Cataract", "Cancer", "Tuberculosis", "HIV/AIDS", "Dementia", "Parkinson's disease",
+    "Pregnancy", "Allergy", "Osteoarthritis"
+)
+
 @Composable
 fun MainTabs(
     tab: Int,
@@ -65,30 +94,10 @@ fun MainTabs(
 ) {
     val schedulesByMedicine by vm.schedulesByMedicine.collectAsState()
 
-    val title = when (tab) {
-        0 -> "Today"
-        1 -> "Medicines"
-        2 -> "Progress"
-        3 -> "Health"
-        else -> "Me"
-    }
-
     BackHandler(enabled = tab != 0) { onTabChange(0) }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0.dp),
-        topBar = {
-            if (tab != 0) {
-                MedTopAppBar(
-                    title = title,
-                    actions = {
-                        IconButton(onClick = onOpenSettings) {
-                            Icon(Icons.Rounded.Settings, contentDescription = "Settings")
-                        }
-                    }
-                )
-            }
-        },
         bottomBar = { MedBottomBar(tab = tab, onTabChange = onTabChange) },
         floatingActionButton = {
             when (tab) {
@@ -136,7 +145,10 @@ fun MainTabs(
                     modifier = Modifier.padding(padding),
                     vm = vm
                 )
-                3 -> HealthScreen(modifier = Modifier.padding(padding))
+                3 -> HealthScreen(
+                    modifier = Modifier.padding(padding),
+                    settings = settings
+                )
                 else -> MeScreen(
                     modifier = Modifier.padding(padding),
                     settings = settings,
@@ -190,18 +202,127 @@ private fun MedBottomBar(
 }
 
 @Composable
-private fun HealthScreen(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+private fun HealthScreen(
+    modifier: Modifier = Modifier,
+    settings: SettingsViewModel
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selected = settings.profileDiseases
+    val atMax = selected.size >= MAX_DISEASES
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .navigationBarsPadding()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        MedEmptyState(
-            icon = Icons.Rounded.Favorite,
-            title = "Health",
-            message = "Health insights and trends are coming soon.",
+        ScreenHeader("Health")
+
+        MedCard(modifier = Modifier.fillMaxWidth()) {
+            Text("Your conditions", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Add the conditions you have (up to $MAX_DISEASES).",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(12.dp))
+
+            Box {
+                OutlinedButton(
+                    onClick = { expanded = true },
+                    enabled = !atMax,
+                    shape = RoundedCornerShape(50)
+                ) {
+                    Icon(
+                        Icons.Rounded.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Add disease")
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    commonDiseases.forEach { disease ->
+                        val already = selected.contains(disease)
+                        DropdownMenuItem(
+                            text = { Text(disease) },
+                            enabled = !already,
+                            onClick = {
+                                settings.addDisease(disease)
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            if (selected.isEmpty()) {
+                Text(
+                    "No conditions added yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    selected.forEach { disease ->
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(start = 16.dp, end = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = disease,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(onClick = { settings.removeDisease(disease) }) {
+                                    Icon(
+                                        Icons.Rounded.Close,
+                                        contentDescription = "Remove $disease",
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (atMax) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Maximum of $MAX_DISEASES conditions reached.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 32.dp)
-        )
+                .padding(top = 24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            MedEmptyState(
+                icon = Icons.Rounded.Favorite,
+                title = "Health insights",
+                message = "Trends and insights are coming soon.",
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }

@@ -100,6 +100,8 @@ fun HistoryContent(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item(key = "progress_header") { ScreenHeader("Progress") }
+
         item(key = "range") {
             MedSegmentedButtons(
                 options = listOf("7 days", "30 days", "90 days"),
