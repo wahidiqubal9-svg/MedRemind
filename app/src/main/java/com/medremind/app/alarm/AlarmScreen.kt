@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -158,7 +158,7 @@ fun AlarmScreen(doseEventId: Long, onAction: (String) -> Unit) {
                     .height(60.dp)
             ) {
                 Icon(
-                    Icons.Filled.Check,
+                    Icons.Rounded.CheckCircle,
                     contentDescription = null,
                     modifier = Modifier.size(22.dp)
                 )

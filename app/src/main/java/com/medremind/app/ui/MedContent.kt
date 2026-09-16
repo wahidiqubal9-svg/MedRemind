@@ -15,29 +15,49 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.Medication
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Medication
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.medremind.app.data.Medicine
+import com.medremind.app.data.Schedule
+import com.medremind.app.data.ScheduleType
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun MedContent(
     modifier: Modifier = Modifier,
     medicines: List<Medicine>,
+    schedulesByMedicine: Map<Long, List<Schedule>>,
     onEdit: (Medicine) -> Unit,
     onAdd: () -> Unit
 ) {
@@ -47,7 +67,7 @@ fun MedContent(
             contentAlignment = Alignment.Center
         ) {
             MedEmptyState(
-                icon = Icons.AutoMirrored.Filled.List,
+                icon = Icons.Outlined.Medication,
                 title = "No medicines yet",
                 message = "Add your first medicine to start tracking doses.",
                 modifier = Modifier
@@ -56,7 +76,7 @@ fun MedContent(
                 action = {
                     GradientPillButton(
                         text = "Add medicine",
-                        icon = Icons.Filled.Add,
+                        icon = Icons.Rounded.Add,
                         onClick = onAdd
                     )
                 }
@@ -68,12 +88,14 @@ fun MedContent(
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 96.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         items(medicines, key = { it.id }) { medicine ->
             MedicineCard(
                 medicine = medicine,
+                schedules = schedulesByMedicine[medicine.id].orEmpty(),
                 onClick = { onEdit(medicine) },
+                onEdit = { onEdit(medicine) },
                 modifier = Modifier.animateItem()
             )
         }
@@ -83,70 +105,235 @@ fun MedContent(
 @Composable
 private fun MedicineCard(
     medicine: Medicine,
+    schedules: List<Schedule>,
     onClick: () -> Unit,
+    onEdit: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val accent = medicineAccent(medicine.id)
-    MedClickableCard(onClick = onClick, modifier = modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .height(60.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(accent)
-            )
-            Spacer(Modifier.width(14.dp))
-            val photo = medicine.photoPath
-            if (photo != null) {
-                AsyncImage(
-                    model = File(photo),
-                    contentDescription = medicine.name,
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    Surface(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 2.dp,
+        shadowElevation = 2.dp
+    ) {
+        Column {
+            Box {
+                val photo = medicine.photoPath
+                if (photo != null) {
+                    AsyncImage(
+                        model = File(photo),
+                        contentDescription = medicine.name,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp)
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(accent, accent.copy(alpha = 0.55f))
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Color.White.copy(alpha = 0.25f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Medication,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier
+                                        .padding(14.dp)
+                                        .size(36.dp)
+                                )
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = medicine.name.take(1).uppercase(),
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                IconButton(
+                    onClick = { menuExpanded = true },
                     modifier = Modifier
-                        .size(56.dp)
-                        .clip(RoundedCornerShape(16.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(accent.copy(alpha = 0.18f)),
-                    contentAlignment = Alignment.Center
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.32f))
                 ) {
-                    Text(
-                        text = medicine.name.take(1).uppercase(),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = accent,
-                        fontWeight = FontWeight.Bold
+                    Icon(
+                        imageVector = Icons.Rounded.MoreVert,
+                        contentDescription = "More options",
+                        tint = Color.White
                     )
                 }
             }
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(medicine.name, style = MaterialTheme.typography.titleMedium)
-                if (medicine.strength.isNotBlank()) {
+
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Edit") },
+                    leadingIcon = {
+                        Icon(Icons.Rounded.Edit, contentDescription = null)
+                    },
+                    onClick = {
+                        menuExpanded = false
+                        onEdit()
+                    }
+                )
+            }
+
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = medicine.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                val dose = doseLine(medicine, schedules)
+                if (dose.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
                     Text(
-                        medicine.strength,
+                        text = dose,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                if (medicine.notes.isNotBlank()) {
-                    Text(
-                        medicine.notes,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
+
+                val timing = timingText(schedules)
+                if (timing.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.Repeat,
+                            contentDescription = null,
+                            tint = accent,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = timing,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                val patterns = schedules.map { schedulePatternLabel(it) }.distinct()
+                if (patterns.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        patterns.forEach { pattern ->
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = accent.copy(alpha = 0.14f),
+                                contentColor = accent
+                            ) {
+                                Text(
+                                    text = pattern,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }
+
+private fun doseLine(medicine: Medicine, schedules: List<Schedule>): String {
+    val doseLabel = schedules.firstNotNullOfOrNull { s -> s.doseLabel.takeIf { it.isNotBlank() } }
+    return listOf(medicine.strength, doseLabel)
+        .filterNotNull()
+        .filter { it.isNotBlank() }
+        .joinToString(" \u00b7 ")
+}
+
+private fun timingText(schedules: List<Schedule>): String {
+    if (schedules.isEmpty()) return ""
+    val clockTimes = mutableListOf<String>()
+    val intervals = mutableListOf<Int>()
+    schedules.forEach { s ->
+        if (s.type == ScheduleType.INTERVAL) {
+            if (s.intervalHours > 0) intervals.add(s.intervalHours)
+        } else {
+            s.times.split(',')
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .forEach { clockTimes.add(it) }
+        }
+    }
+    val uniqueTimes = clockTimes.distinct()
+    val timesStr = when {
+        uniqueTimes.size > 3 ->
+            uniqueTimes.take(2).joinToString(" \u00b7 ") { to12Hour(it) } +
+                " \u00b7 +${uniqueTimes.size - 2} more"
+        uniqueTimes.isNotEmpty() -> uniqueTimes.joinToString(" \u00b7 ") { to12Hour(it) }
+        else -> null
+    }
+    val intervalStr = if (intervals.isNotEmpty()) {
+        intervals.distinct().joinToString(", ") { "Every ${it} h" }
+    } else null
+    return when {
+        timesStr != null && intervalStr != null -> "$timesStr \u00b7 $intervalStr"
+        timesStr != null -> timesStr
+        intervalStr != null -> intervalStr
+        else -> ""
+    }
+}
+
+private fun schedulePatternLabel(schedule: Schedule): String = when (schedule.type) {
+    ScheduleType.DAILY -> "Daily"
+    ScheduleType.WEEKDAYS -> {
+        val days = weekdayShort.filterIndexed { index, _ ->
+            (schedule.daysMask and (1 shl index)) != 0
+        }
+        if (days.isEmpty()) "No days" else days.joinToString(", ")
+    }
+    ScheduleType.INTERVAL -> "Every ${schedule.intervalHours} h"
+    ScheduleType.COURSE -> {
+        if (schedule.endDate != null) {
+            "Course until " + SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(schedule.endDate))
+        } else {
+            "Course"
+        }
+    }
+    else -> "Daily"
+}
+
+private fun to12Hour(time: String): String {
+    val parts = time.trim().split(':')
+    val hour = parts.getOrNull(0)?.toIntOrNull() ?: return time.trim()
+    val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
+    val suffix = if (hour < 12) "AM" else "PM"
+    val h = when {
+        hour == 0 -> 12
+        hour > 12 -> hour - 12
+        else -> hour
+    }
+    return String.format(Locale.getDefault(), "%d:%02d %s", h, minute, suffix)
+}
+
+private val weekdayShort = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")

@@ -20,10 +20,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.rounded.Cancel
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
@@ -411,10 +411,10 @@ fun ProgressRing(
 }
 
 fun statusIcon(status: String): ImageVector = when (status) {
-    DoseStatus.TAKEN -> Icons.Filled.Check
-    DoseStatus.SKIPPED -> Icons.Filled.Close
-    DoseStatus.MISSED -> Icons.Filled.Warning
-    else -> Icons.Filled.Info
+    DoseStatus.TAKEN -> Icons.Rounded.CheckCircle
+    DoseStatus.SKIPPED -> Icons.Rounded.Cancel
+    DoseStatus.MISSED -> Icons.Rounded.ErrorOutline
+    else -> Icons.Rounded.Schedule
 }
 
 @Composable

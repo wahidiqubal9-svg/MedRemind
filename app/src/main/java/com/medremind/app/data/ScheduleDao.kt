@@ -29,4 +29,7 @@ interface ScheduleDao {
 
     @Query("SELECT * FROM schedules WHERE medicineId = :medicineId ORDER BY id ASC")
     fun observeForMedicine(medicineId: Long): Flow<List<Schedule>>
+
+    @Query("SELECT * FROM schedules ORDER BY id ASC")
+    fun observeAll(): Flow<List<Schedule>>
 }

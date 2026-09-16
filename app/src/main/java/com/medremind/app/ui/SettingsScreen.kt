@@ -16,11 +16,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -81,7 +81,7 @@ fun SettingsContent(
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SettingIcon(Icons.Filled.Notifications)
+                SettingIcon(Icons.Rounded.Notifications)
                 Spacer(Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Alarm permissions", style = MaterialTheme.typography.titleMedium)
@@ -92,7 +92,7 @@ fun SettingsContent(
                     )
                 }
                 Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    Icons.Rounded.ChevronRight,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -102,7 +102,7 @@ fun SettingsContent(
         SectionHeader("Appearance")
         MedCard(modifier = Modifier.fillMaxWidth()) {
             SettingSwitchRow(
-                icon = Icons.Filled.Info,
+                icon = Icons.Rounded.Info,
                 title = "Large text",
                 subtitle = "Bigger text for easier reading.",
                 checked = settings.largeText,
@@ -113,7 +113,7 @@ fun SettingsContent(
                 color = MaterialTheme.colorScheme.outlineVariant
             )
             SettingSwitchRow(
-                icon = Icons.Filled.Warning,
+                icon = Icons.Rounded.Warning,
                 title = "High contrast",
                 subtitle = "Stronger colors for low vision.",
                 checked = settings.highContrast,
@@ -124,7 +124,7 @@ fun SettingsContent(
         SectionHeader("Security")
         MedCard(modifier = Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SettingIcon(Icons.Filled.Lock)
+                SettingIcon(Icons.Rounded.Lock)
                 Spacer(Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Caregiver PIN", style = MaterialTheme.typography.titleMedium)

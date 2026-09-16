@@ -18,7 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -247,7 +247,7 @@ fun HistoryContent(
         if (rangeItems.isEmpty()) {
             item(key = "empty") {
                 MedEmptyState(
-                    icon = Icons.Filled.DateRange,
+                    icon = Icons.Rounded.CalendarMonth,
                     title = "No activity yet",
                     message = "No doses recorded in this period.",
                     modifier = Modifier

@@ -22,11 +22,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.ChevronLeft
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -146,7 +145,7 @@ fun TodayContent(
             if (doses.isEmpty()) {
                 item(key = "empty") {
                     MedEmptyState(
-                        icon = Icons.Filled.DateRange,
+                        icon = Icons.Rounded.CalendarMonth,
                         title = "No doses scheduled",
                         message = "Nothing is scheduled for this day.",
                         modifier = Modifier
@@ -315,6 +314,7 @@ private fun CalendarCard(
     onNextMonth: () -> Unit,
     onSelectDay: (LocalDate) -> Unit
 ) {
+    val today = LocalDate.now()
     MedCard(
         modifier = Modifier
             .fillMaxWidth()
@@ -329,20 +329,94 @@ private fun CalendarCard(
                 .clickable { onToggle() },
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(headerText, style = MaterialTheme.typography.titleLarge)
-                Text(
-                    if (expanded) "Tap to collapse" else "Tap for full calendar",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Icon(
-                imageVector = if (expanded) Icons.Filled.KeyboardArrowUp
-                else Icons.Filled.KeyboardArrowDown,
-                contentDescription = if (expanded) "Collapse calendar" else "Expand calendar",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            Text(
+                text = headerText,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f)
             )
+            Surface(
+                onClick = onToggle,
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.CalendarMonth,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = if (expanded) "Collapse" else "Full calendar",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+
+        if (!expanded) {
+            Spacer(Modifier.height(14.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                val stripStart = selectedDate.minusDays(2)
+                for (i in 0 until 6) {
+                    val date = stripStart.plusDays(i.toLong())
+                    val isSelected = date == selectedDate
+                    val isToday = date == today
+                    val circleColor = when {
+                        isSelected -> MaterialTheme.colorScheme.primary
+                        isToday -> MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                        else -> Color.Transparent
+                    }
+                    val numberColor = when {
+                        isSelected -> MaterialTheme.colorScheme.onPrimary
+                        isToday -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.onSurface
+                    }
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onSelectDay(date) },
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = weekdayLetter(date),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isSelected || isToday) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(circleColor)
+                                .then(
+                                    if (isToday && !isSelected) {
+                                        Modifier.border(
+                                            1.5.dp,
+                                            MaterialTheme.colorScheme.primary,
+                                            CircleShape
+                                        )
+                                    } else Modifier
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = date.dayOfMonth.toString(),
+                                color = numberColor,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (isSelected || isToday)
+                                    FontWeight.SemiBold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         AnimatedVisibility(visible = expanded) {
@@ -351,7 +425,7 @@ private fun CalendarCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onPrevMonth) {
                         Icon(
-                            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                            Icons.Rounded.ChevronLeft,
                             contentDescription = "Previous month"
                         )
                     }
@@ -364,7 +438,7 @@ private fun CalendarCard(
                     )
                     IconButton(onClick = onNextMonth) {
                         Icon(
-                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            Icons.Rounded.ChevronRight,
                             contentDescription = "Next month"
                         )
                     }
@@ -387,7 +461,6 @@ private fun CalendarCard(
                 val leading = firstOfMonth.dayOfWeek.value - 1
                 val totalCells = leading + month.lengthOfMonth()
                 val rows = (totalCells + 6) / 7
-                val today = LocalDate.now()
 
                 for (row in 0 until rows) {
                     Row(modifier = Modifier.fillMaxWidth()) {
@@ -400,7 +473,7 @@ private fun CalendarCard(
                                 val background = when {
                                     isSelected -> MaterialTheme.colorScheme.primary
                                     isToday -> MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                                    else -> androidx.compose.ui.graphics.Color.Transparent
+                                    else -> Color.Transparent
                                 }
                                 val textColor = when {
                                     isSelected -> MaterialTheme.colorScheme.onPrimary
@@ -449,6 +522,9 @@ private fun CalendarCard(
         }
     }
 }
+
+private fun weekdayLetter(date: LocalDate): String =
+    date.dayOfWeek.getDisplayName(java.time.format.TextStyle.NARROW, Locale.getDefault())
 
 private fun CalendarHeader(date: LocalDate): String {
     val today = LocalDate.now()

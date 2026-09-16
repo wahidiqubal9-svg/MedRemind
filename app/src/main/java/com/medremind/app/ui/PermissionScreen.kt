@@ -28,10 +28,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -112,7 +112,7 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
             )
 
             PermissionRow(
-                icon = Icons.Filled.Notifications,
+                icon = Icons.Rounded.Notifications,
                 title = "Notifications",
                 granted = notificationsGranted,
                 description = "Shows the reminder when it's time to take medicine.",
@@ -125,7 +125,7 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
             )
 
             PermissionRow(
-                icon = Icons.Filled.Info,
+                icon = Icons.Rounded.Info,
                 title = "Exact alarms",
                 granted = exactAlarmGranted,
                 description = "Makes the reminder fire at the exact scheduled time.",
@@ -145,7 +145,7 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
             )
 
             PermissionRow(
-                icon = Icons.Filled.Warning,
+                icon = Icons.Rounded.Warning,
                 title = "Full-screen alarms",
                 granted = fullScreenGranted,
                 description = "Shows the medicine photo over the lock screen.",
@@ -165,7 +165,7 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
             )
 
             PermissionRow(
-                icon = Icons.Filled.Settings,
+                icon = Icons.Rounded.Settings,
                 title = "Battery optimization",
                 granted = batteryOptimized,
                 description = "Prevents the system from delaying reminders.",
@@ -201,7 +201,7 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
                                     color = MaterialTheme.colorScheme.primary
                                 ) {
                                     Icon(
-                                        Icons.Filled.Notifications,
+                                        Icons.Rounded.Notifications,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.onPrimary,
                                         modifier = Modifier
