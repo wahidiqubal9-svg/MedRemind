@@ -47,14 +47,12 @@ fun SettingsScreen(
     onOpenPermissions: () -> Unit
 ) {
     BackHandler { onBack() }
-    Scaffold(
-        contentWindowInsets = WindowInsets(0.dp),
-        topBar = { MedTopAppBar(title = "Settings") }
-    ) { padding ->
+    Scaffold(contentWindowInsets = WindowInsets(0.dp)) { padding ->
         SettingsContent(
             modifier = Modifier.padding(padding),
             settings = settings,
-            onOpenPermissions = onOpenPermissions
+            onOpenPermissions = onOpenPermissions,
+            onBack = onBack
         )
     }
 }
@@ -63,7 +61,8 @@ fun SettingsScreen(
 fun SettingsContent(
     modifier: Modifier = Modifier,
     settings: SettingsViewModel,
-    onOpenPermissions: () -> Unit
+    onOpenPermissions: () -> Unit,
+    onBack: () -> Unit = {}
 ) {
     var showSetPin by remember { mutableStateOf(false) }
     var showRemovePin by remember { mutableStateOf(false) }
@@ -73,9 +72,13 @@ fun SettingsContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .navigationBarsPadding()
-            .padding(16.dp),
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 16.dp)
+            .padding(top = 4.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        ScreenHeader("Settings", onBack = onBack, modifier = Modifier.padding(horizontal = 4.dp))
+
         MedClickableCard(
             onClick = onOpenPermissions,
             modifier = Modifier.fillMaxWidth()

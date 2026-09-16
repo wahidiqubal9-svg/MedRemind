@@ -86,20 +86,22 @@ fun AddEditMedicineScreen(
         if (uri != null) photoPath = PhotoStorage.copyToInternal(context, uri)
     }
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0.dp),
-        topBar = {
-            MedTopAppBar(title = if (initial == null) "Add medicine" else "Edit medicine")
-        }
-    ) { padding ->
+    Scaffold(contentWindowInsets = WindowInsets(0.dp)) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
-                .padding(16.dp)
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 16.dp)
         ) {
+            ScreenHeader(
+                title = if (initial == null) "Add medicine" else "Edit medicine",
+                onBack = onCancel,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+            Spacer(Modifier.height(12.dp))
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()

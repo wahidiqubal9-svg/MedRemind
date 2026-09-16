@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.medremind.app.data.AppDatabase
 import com.medremind.app.data.Medicine
+import com.medremind.app.ui.SlideToAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -146,29 +147,13 @@ fun AlarmScreen(doseEventId: Long, onAction: (String) -> Unit) {
 
             Spacer(Modifier.weight(1f))
 
-            Button(
-                onClick = { onAction("TAKEN") },
-                shape = RoundedCornerShape(50),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White,
-                    contentColor = Color(0xFF04352F)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp)
-            ) {
-                Icon(
-                    Icons.Rounded.CheckCircle,
-                    contentDescription = null,
-                    modifier = Modifier.size(22.dp)
-                )
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    "Taken",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            SlideToAction(
+                text = "Slide to take",
+                icon = Icons.Rounded.CheckCircle,
+                onConfirm = { onAction("TAKEN") },
+                containerColor = Color.White,
+                contentColor = Color(0xFF04352F)
+            )
             Spacer(Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),

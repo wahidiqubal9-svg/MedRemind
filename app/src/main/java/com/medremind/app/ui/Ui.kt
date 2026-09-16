@@ -1,15 +1,23 @@
 package com.medremind.app.ui
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +35,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Add
@@ -38,6 +47,7 @@ import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -47,11 +57,16 @@ import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -64,13 +79,18 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.medremind.app.data.DoseStatus
 import java.io.File
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 @Composable
 fun MedTopAppBar(
@@ -107,6 +127,7 @@ fun MedTopAppBar(
 fun ScreenHeader(
     title: String,
     modifier: Modifier = Modifier,
+    onBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
     Row(
@@ -116,6 +137,15 @@ fun ScreenHeader(
             .padding(start = 4.dp, end = 4.dp, top = 12.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (onBack != null) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = "Back"
+                )
+            }
+            Spacer(Modifier.width(4.dp))
+        }
         Text(
             text = title,
             style = MaterialTheme.typography.headlineLarge,
@@ -123,6 +153,103 @@ fun ScreenHeader(
             modifier = Modifier.weight(1f)
         )
         actions()
+    }
+}
+
+@Composable
+fun SlideToAction(
+    text: String,
+    icon: ImageVector,
+    onConfirm: () -> Unit,
+    modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.primary,
+    contentColor: Color = MaterialTheme.colorScheme.onPrimary
+) {
+    val density = LocalDensity.current
+    var trackWidth by remember { mutableStateOf(0f) }
+    val thumbSize = 56.dp
+    val thumbPx = with(density) { thumbSize.toPx() }
+    val paddingPx = with(density) { 4.dp.toPx() }
+    val maxOffset = (trackWidth - thumbPx - paddingPx * 2f).coerceAtLeast(1f)
+    val offset = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    val progress = (offset.value / maxOffset).coerceIn(0f, 1f)
+
+    val hint = rememberInfiniteTransition(label = "slideHint")
+    val pulse by hint.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.06f,
+        animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
+        label = "slidePulse"
+    )
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .clip(RoundedCornerShape(50))
+            .background(containerColor.copy(alpha = 0.18f))
+            .onSizeChanged { trackWidth = it.width.toFloat() },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(progress.coerceAtLeast(0.001f))
+                .height(64.dp)
+                .background(containerColor.copy(alpha = 0.4f))
+        )
+        Text(
+            text = text,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .alpha((1f - progress * 1.6f).coerceIn(0f, 1f)),
+            color = contentColor,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(offset.value.roundToInt(), 0) }
+                .padding(4.dp)
+                .size(thumbSize)
+                .graphicsLayer {
+                    scaleX = pulse
+                    scaleY = pulse
+                }
+                .clip(CircleShape)
+                .background(contentColor)
+                .pointerInput(maxOffset) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            if (offset.value >= maxOffset - 10f) {
+                                onConfirm()
+                            } else {
+                                scope.launch {
+                                    offset.animateTo(
+                                        0f,
+                                        spring(
+                                            dampingRatio = 0.5f,
+                                            stiffness = Spring.StiffnessMediumLow
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    ) { change, dragAmount ->
+                        change.consume()
+                        scope.launch {
+                            offset.snapTo((offset.value + dragAmount).coerceIn(0f, maxOffset))
+                        }
+                    }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = containerColor,
+                modifier = Modifier.size(26.dp)
+            )
+        }
     }
 }
 

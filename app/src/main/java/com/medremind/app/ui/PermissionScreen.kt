@@ -94,19 +94,19 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
 
     BackHandler { onBack() }
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0.dp),
-        topBar = { MedTopAppBar(title = "Alarm setup") }
-    ) { padding ->
+    Scaffold(contentWindowInsets = WindowInsets(0.dp)) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
-                .padding(16.dp),
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            ScreenHeader("Alarm setup", onBack = onBack, modifier = Modifier.padding(horizontal = 4.dp))
+
             Text(
                 "For alarms to appear reliably, please allow these.",
                 style = MaterialTheme.typography.bodyLarge,
