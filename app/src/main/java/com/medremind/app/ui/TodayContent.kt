@@ -1,6 +1,8 @@
 package com.medremind.app.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -20,13 +22,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,9 +41,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -62,10 +66,21 @@ fun TodayContent(
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var month by remember { mutableStateOf(YearMonth.now()) }
     var doses by remember { mutableStateOf<List<TodayDose>>(emptyList()) }
+    val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
 
     LaunchedEffect(selectedDate, medicines) {
         doses = vm.dosesOn(selectedDate)
     }
+
+    val now = System.currentTimeMillis()
+    val isToday = selectedDate == LocalDate.now()
+    val nextDose = doses.firstOrNull {
+        it.status == DoseStatus.PENDING && it.timeMillis >= now
+    } ?: doses.firstOrNull { it.status == DoseStatus.PENDING }
+
+    val taken = doses.count { it.status == DoseStatus.TAKEN }
+    val acted = doses.count { it.status != DoseStatus.PENDING }
+    val adherencePct = if (acted == 0) 0 else taken * 100 / acted
 
     Column(modifier = modifier.fillMaxSize()) {
         CalendarCard(
@@ -86,83 +101,204 @@ fun TodayContent(
             }
         )
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = if (selectedDate == LocalDate.now()) "Today's doses"
-                else SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(dateToMillis(selectedDate)),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f)
-            )
-            Text("${doses.size} doses", style = MaterialTheme.typography.labelMedium)
-        }
-
-        if (doses.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "No doses scheduled for this day.",
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyLarge
+            item(key = "hero") {
+                NextDoseHero(
+                    nextDose = if (isToday) nextDose else null,
+                    adherencePct = adherencePct,
+                    isToday = isToday,
+                    dateLabel = CalendarHeader(selectedDate)
                 )
             }
-        } else {
-            val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(doses, key = { it.timeMillis.toString() + it.medicine.id }) { dose ->
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val photo = dose.medicine.photoPath
-                            if (photo != null) {
-                                AsyncImage(
-                                    model = File(photo),
-                                    contentDescription = dose.medicine.name,
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(RoundedCornerShape(10.dp)),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("?")
-                                }
-                            }
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(dose.medicine.name, style = MaterialTheme.typography.titleMedium)
-                                Text(
-                                    timeFormat.format(Date(dose.timeMillis)),
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
-                            Text(
-                                text = doseStatusLabel(dose.status),
-                                color = doseStatusColor(dose.status),
-                                style = MaterialTheme.typography.labelLarge
-                            )
-                        }
+
+            item(key = "header") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isToday) "Today's doses"
+                        else SimpleDateFormat("EEE, d MMM", Locale.getDefault())
+                            .format(dateToMillis(selectedDate)),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh
+                    ) {
+                        Text(
+                            text = "${doses.size} doses",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
                     }
                 }
             }
+
+            if (doses.isEmpty()) {
+                item(key = "empty") {
+                    MedEmptyState(
+                        icon = Icons.Filled.DateRange,
+                        title = "No doses scheduled",
+                        message = "Nothing is scheduled for this day.",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 48.dp)
+                    )
+                }
+            } else {
+                items(doses, key = { it.timeMillis.toString() + it.medicine.id }) { dose ->
+                    DoseCard(dose = dose, timeFormat = timeFormat, modifier = Modifier.animateItem())
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NextDoseHero(
+    nextDose: TodayDose?,
+    adherencePct: Int,
+    isToday: Boolean,
+    dateLabel: String
+) {
+    val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
+    MedHeroCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (isToday) "Next dose" else dateLabel,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
+                )
+                Spacer(Modifier.height(2.dp))
+                if (nextDose != null) {
+                    Text(
+                        text = timeFormat.format(Date(nextDose.timeMillis)),
+                        style = MaterialTheme.typography.displayMedium
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = nextDose.medicine.name,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    if (nextDose.medicine.strength.isNotBlank()) {
+                        Text(
+                            text = nextDose.medicine.strength,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
+                        )
+                    }
+                } else {
+                    Text(
+                        text = if (isToday) "All set" else "No doses",
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                    Text(
+                        text = if (isToday) "Nothing left to take today."
+                        else "Nothing scheduled for this day.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
+                    )
+                }
+            }
+
+            Spacer(Modifier.width(16.dp))
+
+            ProgressRing(
+                percent = adherencePct,
+                modifier = Modifier.size(84.dp)
+            ) {
+                val photo = nextDose?.medicine?.photoPath
+                if (photo != null) {
+                    AsyncImage(
+                        model = File(photo),
+                        contentDescription = nextDose.medicine.name,
+                        modifier = Modifier
+                            .size(62.dp)
+                            .clip(CircleShape)
+                            .border(2.dp, MaterialTheme.colorScheme.onPrimary, CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(62.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.25f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (adherencePct > 0) "$adherencePct%" else "\u2014",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DoseCard(
+    dose: TodayDose,
+    timeFormat: SimpleDateFormat,
+    modifier: Modifier = Modifier
+) {
+    MedClickableCard(onClick = {}, modifier = modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val photo = dose.medicine.photoPath
+            if (photo != null) {
+                AsyncImage(
+                    model = File(photo),
+                    contentDescription = dose.medicine.name,
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(RoundedCornerShape(14.dp)),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = dose.medicine.name.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = dose.medicine.name,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = timeFormat.format(Date(dose.timeMillis)),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            StatusChip(
+                status = dose.status,
+                label = if (dose.status == DoseStatus.PENDING) "Upcoming"
+                else doseStatusLabel(dose.status)
+            )
         }
     }
 }
@@ -179,41 +315,45 @@ private fun CalendarCard(
     onNextMonth: () -> Unit,
     onSelectDay: (LocalDate) -> Unit
 ) {
-    Card(
+    MedCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
             .pointerInput(expanded) {
                 detectVerticalDragGestures { _, dragAmount -> onDrag(dragAmount) }
-            },
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            }
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
-                .clickable { onToggle() }
+                .clickable { onToggle() },
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(headerText, style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        if (expanded) "Pull up to collapse" else "Pull down for full calendar",
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                }
-                Text(if (expanded) "\u25B2" else "\u25BC")
+            Column(modifier = Modifier.weight(1f)) {
+                Text(headerText, style = MaterialTheme.typography.titleLarge)
+                Text(
+                    if (expanded) "Tap to collapse" else "Tap for full calendar",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
+            Icon(
+                imageVector = if (expanded) Icons.Filled.KeyboardArrowUp
+                else Icons.Filled.KeyboardArrowDown,
+                contentDescription = if (expanded) "Collapse calendar" else "Expand calendar",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
 
-            if (expanded) {
-                Spacer(Modifier.height(12.dp))
+        AnimatedVisibility(visible = expanded) {
+            Column {
+                Spacer(Modifier.height(14.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onPrevMonth) {
-                        Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "Previous month")
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                            contentDescription = "Previous month"
+                        )
                     }
                     Text(
                         text = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
@@ -223,21 +363,25 @@ private fun CalendarCard(
                         modifier = Modifier.weight(1f)
                     )
                     IconButton(onClick = onNextMonth) {
-                        Icon(Icons.Filled.KeyboardArrowRight, contentDescription = "Next month")
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = "Next month"
+                        )
                     }
                 }
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(6.dp))
                 Row(modifier = Modifier.fillMaxWidth()) {
                     listOf("M", "T", "W", "T", "F", "S", "S").forEach { label ->
                         Text(
                             text = label,
                             textAlign = TextAlign.Center,
                             style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.weight(1f)
                         )
                     }
                 }
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(6.dp))
 
                 val firstOfMonth = month.atDay(1)
                 val leading = firstOfMonth.dayOfWeek.value - 1
@@ -253,31 +397,45 @@ private fun CalendarCard(
                                 val date = month.atDay(dayNumber)
                                 val isSelected = date == selectedDate
                                 val isToday = date == today
+                                val background = when {
+                                    isSelected -> MaterialTheme.colorScheme.primary
+                                    isToday -> MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                    else -> androidx.compose.ui.graphics.Color.Transparent
+                                }
+                                val textColor = when {
+                                    isSelected -> MaterialTheme.colorScheme.onPrimary
+                                    isToday -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.onSurface
+                                }
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(40.dp),
+                                        .height(44.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(34.dp)
+                                            .size(36.dp)
                                             .clip(CircleShape)
-                                            .background(
-                                                when {
-                                                    isSelected -> MaterialTheme.colorScheme.primary
-                                                    isToday -> MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
-                                                    else -> Color.Transparent
-                                                }
+                                            .background(background)
+                                            .then(
+                                                if (isToday && !isSelected) {
+                                                    Modifier.border(
+                                                        1.5.dp,
+                                                        MaterialTheme.colorScheme.primary,
+                                                        CircleShape
+                                                    )
+                                                } else Modifier
                                             )
                                             .clickable { onSelectDay(date) },
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
                                             text = dayNumber.toString(),
-                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary
-                                            else MaterialTheme.colorScheme.onPrimaryContainer,
-                                            style = MaterialTheme.typography.bodyMedium
+                                            color = textColor,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = if (isSelected || isToday)
+                                                FontWeight.SemiBold else FontWeight.Normal
                                         )
                                     }
                                 }
@@ -300,22 +458,8 @@ private fun CalendarHeader(date: LocalDate): String {
         today.plusDays(1) -> "Tomorrow"
         else -> SimpleDateFormat("EEEE", Locale.getDefault()).format(dateToMillis(date))
     }
-    return prefix + " · " + SimpleDateFormat("d MMM", Locale.getDefault()).format(dateToMillis(date))
+    return prefix + " \u00b7 " + SimpleDateFormat("d MMM", Locale.getDefault()).format(dateToMillis(date))
 }
 
 private fun dateToMillis(date: LocalDate): Long =
     date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-
-private fun doseStatusLabel(status: String): String = when (status) {
-    DoseStatus.TAKEN -> "Taken"
-    DoseStatus.SKIPPED -> "Skipped"
-    DoseStatus.MISSED -> "Missed"
-    else -> "Upcoming"
-}
-
-private fun doseStatusColor(status: String): Color = when (status) {
-    DoseStatus.TAKEN -> Color(0xFF2E7D32)
-    DoseStatus.SKIPPED -> Color(0xFF757575)
-    DoseStatus.MISSED -> Color(0xFFC62828)
-    else -> Color(0xFF1565C0)
-}

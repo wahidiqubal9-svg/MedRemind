@@ -16,22 +16,30 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,14 +49,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
     val context = LocalContext.current
@@ -84,22 +93,26 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
     BackHandler { onBack() }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0.dp),
         topBar = { MedTopAppBar(title = "Alarm setup") }
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 "For alarms to appear reliably, please allow these.",
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             PermissionRow(
+                icon = Icons.Filled.Notifications,
                 title = "Notifications",
                 granted = notificationsGranted,
                 description = "Shows the reminder when it's time to take medicine.",
@@ -112,6 +125,7 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
             )
 
             PermissionRow(
+                icon = Icons.Filled.Info,
                 title = "Exact alarms",
                 granted = exactAlarmGranted,
                 description = "Makes the reminder fire at the exact scheduled time.",
@@ -131,6 +145,7 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
             )
 
             PermissionRow(
+                icon = Icons.Filled.Warning,
                 title = "Full-screen alarms",
                 granted = fullScreenGranted,
                 description = "Shows the medicine photo over the lock screen.",
@@ -150,6 +165,7 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
             )
 
             PermissionRow(
+                icon = Icons.Filled.Settings,
                 title = "Battery optimization",
                 granted = batteryOptimized,
                 description = "Prevents the system from delaying reminders.",
@@ -167,33 +183,58 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
             )
 
             Spacer(Modifier.height(4.dp))
-            Text("Upcoming alarms", style = MaterialTheme.typography.titleMedium)
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    if (upcoming.isEmpty()) {
-                        Text("No upcoming alarms yet. Add a reminder to a medicine.")
-                    } else {
-                        val format = SimpleDateFormat("EEE d MMM, h:mm a", Locale.getDefault())
+            SectionHeader("Upcoming alarms")
+            MedCard(modifier = Modifier.fillMaxWidth()) {
+                if (upcoming.isEmpty()) {
+                    Text(
+                        "No upcoming alarms yet. Add a reminder to a medicine.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    val format = SimpleDateFormat("EEE d MMM, h:mm a", Locale.getDefault())
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         upcoming.take(6).forEach { item ->
-                            Text("${item.medicineName} — ${format.format(Date(item.triggerAt))}")
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.primary
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Notifications,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier
+                                            .padding(8.dp)
+                                            .size(14.dp)
+                                    )
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Text(
+                                    "${item.medicineName} \u00b7 ${format.format(Date(item.triggerAt))}",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            Button(
+            GradientPillButton(
+                text = "Test alarm in 10 seconds",
                 onClick = { vm.triggerTestAlarm() },
                 modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Test alarm in 10 seconds")
-            }
+            )
             Text(
                 "Lock the screen after tapping to check the full-screen alarm.",
-                style = MaterialTheme.typography.bodySmall
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(Modifier.height(4.dp))
-            OutlinedButton(onClick = { tick++ }, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = { tick++ },
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Text("Refresh")
             }
 
@@ -204,27 +245,55 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
 
 @Composable
 private fun PermissionRow(
+    icon: ImageVector,
     title: String,
     granted: Boolean,
     description: String,
     actionLabel: String,
     onAction: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                Text(description, style = MaterialTheme.typography.bodySmall)
-                Text(
-                    text = if (granted) "Allowed" else "Not allowed",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (granted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+    MedCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                shape = CircleShape,
+                color = if (granted) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.errorContainer
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (granted) MaterialTheme.colorScheme.onPrimaryContainer
+                    else MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier
+                        .padding(10.dp)
+                        .size(20.dp)
                 )
             }
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(6.dp))
+                Surface(
+                    shape = CircleShape,
+                    color = if (granted) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.errorContainer
+                ) {
+                    Text(
+                        text = if (granted) "Allowed" else "Not allowed",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (granted) MaterialTheme.colorScheme.onPrimaryContainer
+                        else MaterialTheme.colorScheme.onErrorContainer,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
             if (!granted) {
                 TextButton(onClick = onAction) { Text(actionLabel) }
             }

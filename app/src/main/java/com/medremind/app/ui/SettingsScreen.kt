@@ -5,15 +5,27 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -24,6 +36,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -34,6 +48,7 @@ fun SettingsScreen(
 ) {
     BackHandler { onBack() }
     Scaffold(
+        contentWindowInsets = WindowInsets(0.dp),
         topBar = { MedTopAppBar(title = "Settings") }
     ) { padding ->
         SettingsContent(
@@ -56,74 +71,80 @@ fun SettingsContent(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState()),
+            .verticalScroll(rememberScrollState())
+            .navigationBarsPadding()
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Card(
+        MedClickableCard(
             onClick = onOpenPermissions,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Alarm permissions", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Notifications, exact alarms, full-screen alarms, battery.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SettingIcon(Icons.Filled.Notifications)
+                Spacer(Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Large text", style = MaterialTheme.typography.titleMedium)
-                    Text("Bigger text for easier reading.", style = MaterialTheme.typography.bodySmall)
+                    Text("Alarm permissions", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Notifications, exact alarms, full-screen alarms, battery.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-                Spacer(Modifier.width(12.dp))
-                Switch(
-                    checked = settings.largeText,
-                    onCheckedChange = { settings.updateLargeText(it) }
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
 
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        SectionHeader("Appearance")
+        MedCard(modifier = Modifier.fillMaxWidth()) {
+            SettingSwitchRow(
+                icon = Icons.Filled.Info,
+                title = "Large text",
+                subtitle = "Bigger text for easier reading.",
+                checked = settings.largeText,
+                onCheckedChange = { settings.updateLargeText(it) }
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 12.dp),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+            SettingSwitchRow(
+                icon = Icons.Filled.Warning,
+                title = "High contrast",
+                subtitle = "Stronger colors for low vision.",
+                checked = settings.highContrast,
+                onCheckedChange = { settings.updateHighContrast(it) }
+            )
+        }
+
+        SectionHeader("Security")
+        MedCard(modifier = Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SettingIcon(Icons.Filled.Lock)
+                Spacer(Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("High contrast", style = MaterialTheme.typography.titleMedium)
-                    Text("Stronger colors for low vision.", style = MaterialTheme.typography.bodySmall)
+                    Text("Caregiver PIN", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (settings.pin.isNullOrEmpty()) "Not set"
+                        else "PIN protection is enabled.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-                Spacer(Modifier.width(12.dp))
-                Switch(
-                    checked = settings.highContrast,
-                    onCheckedChange = { settings.updateHighContrast(it) }
-                )
             }
-        }
-
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("Caregiver PIN", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "When set, a PIN is required to add or edit medicines and reminders.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Row(
-                    modifier = Modifier.padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (settings.pin.isNullOrEmpty()) {
-                        TextButton(onClick = { showSetPin = true }) { Text("Set PIN") }
-                    } else {
-                        TextButton(onClick = { showSetPin = true }) { Text("Change PIN") }
-                        TextButton(onClick = { showRemovePin = true }) { Text("Remove PIN") }
-                    }
+            Row(
+                modifier = Modifier.padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(onClick = { showSetPin = true }) {
+                    Text(if (settings.pin.isNullOrEmpty()) "Set PIN" else "Change PIN")
+                }
+                if (!settings.pin.isNullOrEmpty()) {
+                    TextButton(onClick = { showRemovePin = true }) { Text("Remove PIN") }
                 }
             }
         }
@@ -151,5 +172,46 @@ fun SettingsContent(
                 showRemovePin = false
             }
         )
+    }
+}
+
+@Composable
+private fun SettingIcon(icon: ImageVector) {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.primaryContainer
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier
+                .padding(10.dp)
+                .size(20.dp)
+        )
+    }
+}
+
+@Composable
+private fun SettingSwitchRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        SettingIcon(icon)
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }

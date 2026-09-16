@@ -1,5 +1,6 @@
 package com.medremind.app.alarm
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,11 +11,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,11 +30,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.medremind.app.data.AppDatabase
 import com.medremind.app.data.Medicine
@@ -61,70 +70,145 @@ fun AlarmScreen(doseEventId: Long, onAction: (String) -> Unit) {
     }
 
     val med = medicine
-    Surface(modifier = Modifier.fillMaxSize()) {
+    val fallbackBrush = Brush.verticalGradient(
+        listOf(Color(0xFF063B36), Color(0xFF04211E))
+    )
+    val scrimBrush = Brush.verticalGradient(
+        listOf(
+            Color.Black.copy(alpha = 0.55f),
+            Color.Black.copy(alpha = 0.20f),
+            Color.Black.copy(alpha = 0.55f)
+        )
+    )
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        val photo = med?.photoPath
+        if (photo != null) {
+            AsyncImage(
+                model = File(photo),
+                contentDescription = med.name,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(fallbackBrush)
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(scrimBrush)
+        )
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .systemBarsPadding()
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Spacer(Modifier.weight(1f))
+
             Text(
-                text = "Time to take your medicine",
-                style = MaterialTheme.typography.headlineSmall,
+                text = "TIME TO TAKE YOUR MEDICINE",
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White.copy(alpha = 0.85f),
+                textAlign = TextAlign.Center,
+                letterSpacing = 1.5.sp
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = scheduledText.ifBlank { "Now" },
+                style = MaterialTheme.typography.displayLarge,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
             )
-            Spacer(Modifier.height(16.dp))
-
-            val photo = med?.photoPath
-            if (photo != null) {
-                AsyncImage(
-                    model = File(photo),
-                    contentDescription = med.name,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("No photo", style = MaterialTheme.typography.headlineMedium)
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-            Text(text = med?.name ?: "Medicine", style = MaterialTheme.typography.headlineMedium)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = med?.name ?: "Medicine",
+                style = MaterialTheme.typography.headlineLarge,
+                color = Color.White,
+                textAlign = TextAlign.Center
+            )
             if (!med?.strength.isNullOrBlank()) {
-                Text(text = med?.strength ?: "", style = MaterialTheme.typography.titleMedium)
-            }
-            if (scheduledText.isNotBlank()) {
-                Text(text = scheduledText, style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = med?.strength ?: "",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Color.White.copy(alpha = 0.9f),
+                    textAlign = TextAlign.Center
+                )
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.weight(1f))
+
+            Button(
+                onClick = { onAction("TAKEN") },
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White,
+                    contentColor = Color(0xFF04352F)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(60.dp)
+            ) {
+                Icon(
+                    Icons.Filled.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    "Taken",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Button(onClick = { onAction("TAKEN") }, modifier = Modifier.weight(1f)) {
-                    Text("Taken")
+                OutlinedButton(
+                    onClick = { onAction("SNOOZE") },
+                    shape = RoundedCornerShape(50),
+                    border = BorderStroke(1.5.dp, Color.White),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(54.dp)
+                ) {
+                    Text(
+                        "Snooze 5m",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
-                OutlinedButton(onClick = { onAction("SNOOZE") }, modifier = Modifier.weight(1f)) {
-                    Text("Snooze 5m")
+                OutlinedButton(
+                    onClick = { onAction("SKIPPED") },
+                    shape = RoundedCornerShape(50),
+                    border = BorderStroke(1.5.dp, Color.White.copy(alpha = 0.6f)),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color.White.copy(alpha = 0.8f)
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(54.dp)
+                ) {
+                    Text(
+                        "Skip",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            OutlinedButton(onClick = { onAction("SKIPPED") }, modifier = Modifier.fillMaxWidth()) {
-                Text("Skip")
-            }
-            Spacer(Modifier.height(8.dp))
+
+            Spacer(Modifier.height(16.dp))
         }
     }
 }

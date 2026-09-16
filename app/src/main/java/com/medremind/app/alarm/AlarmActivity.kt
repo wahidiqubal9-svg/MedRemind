@@ -15,10 +15,11 @@ import android.os.VibratorManager
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.material3.MaterialTheme
+import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
 import com.medremind.app.data.AppDatabase
 import com.medremind.app.data.DoseStatus
+import com.medremind.app.ui.MedRemindTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -43,8 +44,9 @@ class AlarmActivity : ComponentActivity() {
         }
         val doseEventId = intent.getLongExtra("doseEventId", -1L)
         startSoundAndVibration()
+        enableEdgeToEdge()
         setContent {
-            MaterialTheme {
+            MedRemindTheme {
                 AlarmScreen(
                     doseEventId = doseEventId,
                     onAction = { action -> handleAction(doseEventId, action) }

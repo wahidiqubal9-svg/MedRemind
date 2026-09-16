@@ -17,9 +17,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,13 +31,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.medremind.app.data.DoseStatus
@@ -97,254 +93,228 @@ fun HistoryContent(
     val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
     val primary = MaterialTheme.colorScheme.primary
     val errorColor = MaterialTheme.colorScheme.error
-    val trackColor = MaterialTheme.colorScheme.surfaceVariant
+    val trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(7, 30, 90).forEach { days ->
-                    FilterChip(
-                        selected = rangeDays == days,
-                        onClick = { rangeDays = days },
-                        label = { Text("$days days") }
-                    )
-                }
-            }
+        item(key = "range") {
+            MedSegmentedButtons(
+                options = listOf("7 days", "30 days", "90 days"),
+                selectedIndex = when (rangeDays) {
+                    7 -> 0
+                    30 -> 1
+                    else -> 2
+                },
+                onSelect = { index -> rangeDays = listOf(7, 30, 90)[index] },
+                modifier = Modifier.fillMaxWidth()
+            )
         }
 
-        item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+        item(key = "adherence") {
+            MedHeroCard(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Canvas(modifier = Modifier.size(180.dp)) {
-                            val stroke = 20.dp.toPx()
-                            val diameter = size.minDimension - stroke
-                            val topLeft = Offset(
-                                (size.width - diameter) / 2f,
-                                (size.height - diameter) / 2f
-                            )
-                            drawArc(
-                                color = trackColor,
-                                startAngle = -90f,
-                                sweepAngle = 360f,
-                                useCenter = false,
-                                topLeft = topLeft,
-                                size = Size(diameter, diameter),
-                                style = Stroke(width = stroke, cap = StrokeCap.Round)
-                            )
-                            drawArc(
-                                color = primary,
-                                startAngle = -90f,
-                                sweepAngle = 360f * (percent / 100f),
-                                useCenter = false,
-                                topLeft = topLeft,
-                                size = Size(diameter, diameter),
-                                style = Stroke(width = stroke, cap = StrokeCap.Round)
-                            )
-                        }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Adherence",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "Last $rangeDays days",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "$taken taken \u00b7 $missed missed \u00b7 $skipped skipped",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    ProgressRing(percent = percent, modifier = Modifier.size(96.dp)) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 "$percent%",
-                                style = MaterialTheme.typography.displaySmall
+                                style = MaterialTheme.typography.headlineMedium
                             )
-                            Text("adherence", style = MaterialTheme.typography.labelMedium)
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Last $rangeDays days",
-                        style = MaterialTheme.typography.titleMedium
-                    )
                 }
             }
         }
 
-        item {
+        item(key = "stats") {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 StatCard(
                     modifier = Modifier.weight(1f),
                     label = "Taken",
                     value = taken,
-                    color = Color(0xFF2E7D32)
+                    tint = statusTint(DoseStatus.TAKEN)
                 )
                 StatCard(
                     modifier = Modifier.weight(1f),
                     label = "Missed",
                     value = missed,
-                    color = Color(0xFFC62828)
+                    tint = statusTint(DoseStatus.MISSED)
                 )
                 StatCard(
                     modifier = Modifier.weight(1f),
                     label = "Skipped",
                     value = skipped,
-                    color = Color(0xFF757575)
+                    tint = statusTint(DoseStatus.SKIPPED)
                 )
             }
         }
 
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text("Adherence trend", style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Green = taken, red = missed",
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    val maxTotal = chartDays.maxOfOrNull { it.taken + it.missed }?.coerceAtLeast(1) ?: 1
-                    Canvas(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(150.dp)
-                    ) {
-                        val count = chartDays.size
-                        if (count == 0) return@Canvas
-                        val gap = if (count > 30) 1.dp.toPx() else 3.dp.toPx()
-                        val barWidth = ((size.width - gap * (count - 1)) / count).coerceAtLeast(1f)
-                        chartDays.forEachIndexed { index, day ->
-                            val x = index * (barWidth + gap)
-                            val total = day.taken + day.missed
-                            val totalHeight = size.height * total / maxTotal
-                            val takenHeight = size.height * day.taken / maxTotal
-                            val missedHeight = totalHeight - takenHeight
-                            val baseY = size.height
-                            if (takenHeight > 0f) {
-                                drawRect(
-                                    color = primary,
-                                    topLeft = Offset(x, baseY - takenHeight),
-                                    size = Size(barWidth, takenHeight)
-                                )
-                            }
-                            if (missedHeight > 0f) {
-                                drawRect(
-                                    color = errorColor,
-                                    topLeft = Offset(x, baseY - takenHeight - missedHeight),
-                                    size = Size(barWidth, missedHeight)
-                                )
-                            }
+        item(key = "trend") {
+            MedCard(modifier = Modifier.fillMaxWidth()) {
+                Text("Adherence trend", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Taken vs missed per day",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(14.dp))
+                val maxTotal = chartDays.maxOfOrNull { it.taken + it.missed }?.coerceAtLeast(1) ?: 1
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp)
+                ) {
+                    val count = chartDays.size
+                    if (count == 0) return@Canvas
+                    val gap = if (count > 30) 1.dp.toPx() else 4.dp.toPx()
+                    val barWidth = ((size.width - gap * (count - 1)) / count).coerceAtLeast(1f)
+                    val radius = CornerRadius(barWidth / 2f, barWidth / 2f)
+                    chartDays.forEachIndexed { index, day ->
+                        val x = index * (barWidth + gap)
+                        val total = day.taken + day.missed
+                        val totalHeight = size.height * total / maxTotal
+                        val takenHeight = size.height * day.taken / maxTotal
+                        val missedHeight = totalHeight - takenHeight
+                        val baseY = size.height
+                        if (takenHeight > 0f) {
+                            drawRoundRect(
+                                color = primary,
+                                topLeft = Offset(x, baseY - takenHeight),
+                                size = Size(barWidth, takenHeight),
+                                cornerRadius = radius
+                            )
+                        }
+                        if (missedHeight > 0f) {
+                            drawRoundRect(
+                                color = errorColor.copy(alpha = 0.75f),
+                                topLeft = Offset(x, baseY - takenHeight - missedHeight),
+                                size = Size(barWidth, missedHeight),
+                                cornerRadius = radius
+                            )
                         }
                     }
-                    if (rangeDays > 7) {
-                        Spacer(Modifier.height(6.dp))
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            val first = chartDays.firstOrNull()?.date
-                            val last = chartDays.lastOrNull()?.date
-                            val fmt = SimpleDateFormat("d MMM", Locale.getDefault())
-                            Text(
-                                first?.let { fmt.format(dateToMillis(it)) } ?: "",
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Text(
-                                last?.let { fmt.format(dateToMillis(it)) } ?: "",
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
+                }
+                if (rangeDays > 7) {
+                    Spacer(Modifier.height(6.dp))
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        val first = chartDays.firstOrNull()?.date
+                        val last = chartDays.lastOrNull()?.date
+                        val fmt = SimpleDateFormat("d MMM", Locale.getDefault())
+                        Text(
+                            first?.let { fmt.format(dateToMillis(it)) } ?: "",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            last?.let { fmt.format(dateToMillis(it)) } ?: "",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
         }
 
         if (rangeItems.isEmpty()) {
-            item {
-                Text(
-                    "No doses recorded in this period.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(8.dp)
+            item(key = "empty") {
+                MedEmptyState(
+                    icon = Icons.Filled.DateRange,
+                    title = "No activity yet",
+                    message = "No doses recorded in this period.",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp)
                 )
             }
         }
 
         grouped.forEach { (day, dayItems) ->
-            item {
-                Text(day, style = MaterialTheme.typography.titleMedium)
+            item(key = "day-$day") {
+                Text(
+                    day,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
             items(dayItems, key = { it.event.id }) { item ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val photo = item.photoPath
-                        if (photo != null) {
-                            AsyncImage(
-                                model = File(photo),
-                                contentDescription = item.medicineName,
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(RoundedCornerShape(8.dp)),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("?")
-                            }
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(item.medicineName, style = MaterialTheme.typography.titleSmall)
-                            Text(
-                                timeFormat.format(Date(item.event.scheduledAt)),
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                        Text(
-                            text = statusLabel(item.event.status),
-                            color = statusColor(item.event.status),
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                    }
-                }
+                HistoryRow(item = item, timeFormat = timeFormat, modifier = Modifier.animateItem())
             }
         }
     }
 }
 
 @Composable
-private fun StatCard(
-    modifier: Modifier = Modifier,
-    label: String,
-    value: Int,
-    color: Color
+private fun HistoryRow(
+    item: DoseHistoryItem,
+    timeFormat: SimpleDateFormat,
+    modifier: Modifier = Modifier
 ) {
-    Card(modifier = modifier) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                value.toString(),
-                style = MaterialTheme.typography.headlineMedium,
-                color = color
-            )
-            Text(label, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
+    MedCard(modifier = modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val photo = item.photoPath
+            if (photo != null) {
+                AsyncImage(
+                    model = File(photo),
+                    contentDescription = item.medicineName,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(12.dp)),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = item.medicineName.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(item.medicineName, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    timeFormat.format(Date(item.event.scheduledAt)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            StatusChip(status = item.event.status)
         }
     }
 }
@@ -354,17 +324,3 @@ private fun dateToMillis(date: LocalDate): Long =
 
 private fun dateKey(millis: Long): String =
     SimpleDateFormat("EEEE, d MMM yyyy", Locale.getDefault()).format(Date(millis))
-
-private fun statusLabel(status: String): String = when (status) {
-    DoseStatus.TAKEN -> "Taken"
-    DoseStatus.SKIPPED -> "Skipped"
-    DoseStatus.MISSED -> "Missed"
-    else -> "Pending"
-}
-
-private fun statusColor(status: String): Color = when (status) {
-    DoseStatus.TAKEN -> Color(0xFF2E7D32)
-    DoseStatus.SKIPPED -> Color(0xFF757575)
-    DoseStatus.MISSED -> Color(0xFFC62828)
-    else -> Color(0xFF1565C0)
-}

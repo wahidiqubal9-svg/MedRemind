@@ -1,5 +1,7 @@
 package com.medremind.app.ui
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -27,50 +29,63 @@ fun AppRoot(
         if (settings.pin.isNullOrEmpty()) action() else pendingAction = action
     }
 
-    when {
-        showEditor -> AddEditMedicineScreen(
-            initial = editing,
-            vm = vm,
-            onCancel = {
-                showEditor = false
-                editing = null
-            },
-            onDone = {
-                showEditor = false
-                editing = null
-            }
-        )
+    val screen = when {
+        showEditor -> "editor"
+        showSettings -> "settings"
+        showPermissions -> "permissions"
+        else -> "main"
+    }
 
-        showSettings -> SettingsScreen(
-            settings = settings,
-            onBack = { showSettings = false },
-            onOpenPermissions = { showPermissions = true }
-        )
-
-        showPermissions -> PermissionScreen(
-            onBack = { showPermissions = false },
-            vm = vm
-        )
-
-        else -> MainTabs(
-            tab = tab,
-            onTabChange = { tab = it },
-            medicines = medicines,
-            vm = vm,
-            onAdd = {
-                guarded {
+    Crossfade(
+        targetState = screen,
+        animationSpec = tween(220),
+        label = "screenTransition"
+    ) { current ->
+        when (current) {
+            "editor" -> AddEditMedicineScreen(
+                initial = editing,
+                vm = vm,
+                onCancel = {
+                    showEditor = false
                     editing = null
-                    showEditor = true
+                },
+                onDone = {
+                    showEditor = false
+                    editing = null
                 }
-            },
-            onEdit = { medicine ->
-                guarded {
-                    editing = medicine
-                    showEditor = true
-                }
-            },
-            onOpenSettings = { showSettings = true }
-        )
+            )
+
+            "settings" -> SettingsScreen(
+                settings = settings,
+                onBack = { showSettings = false },
+                onOpenPermissions = { showPermissions = true }
+            )
+
+            "permissions" -> PermissionScreen(
+                onBack = { showPermissions = false },
+                vm = vm
+            )
+
+            else -> MainTabs(
+                tab = tab,
+                onTabChange = { tab = it },
+                medicines = medicines,
+                vm = vm,
+                onAdd = {
+                    guarded {
+                        editing = null
+                        showEditor = true
+                    }
+                },
+                onEdit = { medicine ->
+                    guarded {
+                        editing = medicine
+                        showEditor = true
+                    }
+                },
+                onOpenSettings = { showSettings = true }
+            )
+        }
     }
 
     val action = pendingAction

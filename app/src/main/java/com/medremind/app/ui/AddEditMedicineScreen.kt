@@ -4,29 +4,30 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,7 +48,6 @@ import com.medremind.app.data.Schedule
 import com.medremind.app.data.ScheduleType
 import java.io.File
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditMedicineScreen(
     initial: Medicine?,
@@ -84,6 +84,7 @@ fun AddEditMedicineScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             MedTopAppBar(title = if (initial == null) "Add medicine" else "Edit medicine")
         }
@@ -92,33 +93,43 @@ fun AddEditMedicineScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
                 .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .padding(16.dp)
         ) {
-            Box(
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
+                    .height(200.dp),
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh
             ) {
-                val photo = photoPath
-                if (photo != null) {
-                    AsyncImage(
-                        model = File(photo),
-                        contentDescription = "Medicine photo",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Text("No photo yet")
+                Box(contentAlignment = Alignment.Center) {
+                    val photo = photoPath
+                    if (photo != null) {
+                        AsyncImage(
+                            model = File(photo),
+                            contentDescription = "Medicine photo",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                "No photo yet",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
 
             Row(modifier = Modifier.fillMaxWidth()) {
-                OutlinedButton(
+                GradientPillButton(
+                    text = "Take photo",
                     onClick = {
                         val file = PhotoStorage.newPhotoFile(context)
                         pendingFile = file
@@ -130,24 +141,25 @@ fun AddEditMedicineScreen(
                         takePicture.launch(uri)
                     },
                     modifier = Modifier.weight(1f)
-                ) {
-                    Text("Take photo")
-                }
-                Spacer(Modifier.width(8.dp))
+                )
+                Spacer(Modifier.width(10.dp))
                 OutlinedButton(
                     onClick = {
                         pickImage.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                         )
                     },
+                    shape = RoundedCornerShape(50),
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Choose")
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(20.dp))
 
+            SectionHeader("Details")
+            Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -155,7 +167,7 @@ fun AddEditMedicineScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
             OutlinedTextField(
                 value = strength,
                 onValueChange = { strength = it },
@@ -163,7 +175,7 @@ fun AddEditMedicineScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
             OutlinedTextField(
                 value = notes,
                 onValueChange = { notes = it },
@@ -172,13 +184,13 @@ fun AddEditMedicineScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(20.dp))
 
-            Text("Reminders", style = MaterialTheme.typography.titleMedium)
+            SectionHeader("Reminders")
             Spacer(Modifier.height(8.dp))
 
             schedules.forEach { schedule ->
-                Card(
+                MedClickableCard(
                     onClick = {
                         editingSchedule = schedule
                         showScheduleEditor = true
@@ -187,11 +199,13 @@ fun AddEditMedicineScreen(
                         .fillMaxWidth()
                         .padding(vertical = 4.dp)
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(scheduleSummary(schedule), style = MaterialTheme.typography.bodyLarge)
-                        if (!schedule.enabled) {
-                            Text("Disabled", style = MaterialTheme.typography.bodySmall)
-                        }
+                    Text(scheduleSummary(schedule), style = MaterialTheme.typography.bodyLarge)
+                    if (!schedule.enabled) {
+                        Text(
+                            "Disabled",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -201,6 +215,7 @@ fun AddEditMedicineScreen(
                     editingSchedule = null
                     showScheduleEditor = true
                 },
+                shape = RoundedCornerShape(50),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Add reminder")
@@ -208,7 +223,9 @@ fun AddEditMedicineScreen(
 
             Spacer(Modifier.height(24.dp))
 
-            Button(
+            GradientPillButton(
+                text = "Save",
+                icon = Icons.Filled.Add,
                 onClick = {
                     val base = initial ?: Medicine(name = "")
                     val medicine = base.copy(
@@ -221,14 +238,16 @@ fun AddEditMedicineScreen(
                 },
                 enabled = name.isNotBlank(),
                 modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Save")
-            }
+            )
 
             if (initial != null) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
                 OutlinedButton(
                     onClick = { vm.deleteMedicine(initial) { onDone() } },
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Delete medicine")
