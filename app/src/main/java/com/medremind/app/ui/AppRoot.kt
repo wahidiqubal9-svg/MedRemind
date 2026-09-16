@@ -83,6 +83,11 @@ fun AppRoot(
                         showEditor = true
                     }
                 },
+                onDelete = { medicine ->
+                    guarded {
+                        vm.deleteMedicine(medicine) {}
+                    }
+                },
                 onOpenSettings = { showSettings = true }
             )
         }

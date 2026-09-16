@@ -137,7 +137,7 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                     it.medicineId == schedule.medicineId && abs(it.scheduledAt - trigger) < 90_000L
                 }
                 val status = event?.status ?: if (trigger < now) DoseStatus.MISSED else DoseStatus.PENDING
-                result.add(TodayDose(trigger, medicine, status))
+                result.add(TodayDose(trigger, medicine, status, schedule))
             }
         }
         result.sortedBy { it.timeMillis }
@@ -175,7 +175,8 @@ data class DoseHistoryItem(
 data class TodayDose(
     val timeMillis: Long,
     val medicine: Medicine,
-    val status: String
+    val status: String,
+    val schedule: Schedule
 )
 
 private const val MISSED_AFTER_MILLIS = 2 * 60 * 60 * 1000L
