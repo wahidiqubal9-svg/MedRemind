@@ -82,7 +82,7 @@ fun AddEditMedicineScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(if (initial == null) "Add medicine" else "Edit medicine") })
+            MedTopAppBar(title = if (initial == null) "Add medicine" else "Edit medicine")
         }
     ) { padding ->
         Column(

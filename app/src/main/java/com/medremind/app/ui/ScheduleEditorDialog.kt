@@ -53,7 +53,7 @@ fun ScheduleEditorDialog(
     var type by remember { mutableStateOf(initial?.type ?: ScheduleType.DAILY) }
     var times by remember {
         mutableStateOf(
-            (initial?.times ?: "08:00").split(',')
+            (initial?.times ?: "").split(',')
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
                 .toMutableList()
@@ -105,6 +105,12 @@ fun ScheduleEditorDialog(
                 } else {
                     Text("Times")
                     Spacer(Modifier.height(4.dp))
+                    if (times.isEmpty()) {
+                        Text(
+                            "No times yet — tap \"Add time\".",
+                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                        )
+                    }
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -220,8 +226,9 @@ fun ScheduleEditorDialog(
     if (showTimePicker) {
         val current = times.getOrNull(editingTimeIndex)
         val parts = current?.split(':')
-        val initHour = parts?.getOrNull(0)?.toIntOrNull() ?: 8
-        val initMinute = parts?.getOrNull(1)?.toIntOrNull() ?: 0
+        val now = java.time.LocalTime.now()
+        val initHour = parts?.getOrNull(0)?.toIntOrNull() ?: now.hour
+        val initMinute = parts?.getOrNull(1)?.toIntOrNull() ?: now.minute
         TimePickerDialog(
             initialHour = initHour,
             initialMinute = initMinute,

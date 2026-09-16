@@ -81,14 +81,7 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
     ) { tick++ }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Alarm setup") },
-                navigationIcon = {
-                    TextButton(onClick = onBack) { Text("Back") }
-                }
-            )
-        }
+        topBar = { MedTopAppBar(title = "Alarm setup", onBack = onBack) }
     ) { padding ->
         Column(
             modifier = Modifier

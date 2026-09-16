@@ -38,12 +38,7 @@ fun SettingsScreen(
     var showRemovePin by remember { mutableStateOf(false) }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Settings") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } }
-            )
-        }
+        topBar = { MedTopAppBar(title = "Settings", onBack = onBack) }
     ) { padding ->
         Column(
             modifier = Modifier

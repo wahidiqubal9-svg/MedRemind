@@ -65,12 +65,7 @@ fun HistoryScreen(onBack: () -> Unit, vm: MedicineViewModel) {
     val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("History") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } }
-            )
-        }
+        topBar = { MedTopAppBar(title = "History", onBack = onBack) }
     ) { padding ->
         LazyColumn(
             modifier = Modifier

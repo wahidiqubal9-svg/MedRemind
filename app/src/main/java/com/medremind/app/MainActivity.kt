@@ -3,14 +3,12 @@ package com.medremind.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.medremind.app.ui.AppRoot
-import com.medremind.app.ui.HighContrastLight
+import com.medremind.app.ui.MedRemindTheme
 import com.medremind.app.ui.SettingsViewModel
 
 class MainActivity : ComponentActivity() {
@@ -25,9 +23,7 @@ class MainActivity : ComponentActivity() {
                 baseDensity
             }
             CompositionLocalProvider(LocalDensity provides density) {
-                MaterialTheme(
-                    colorScheme = if (settings.highContrast) HighContrastLight else lightColorScheme()
-                ) {
+                MedRemindTheme(highContrast = settings.highContrast) {
                     AppRoot(settings = settings)
                 }
             }

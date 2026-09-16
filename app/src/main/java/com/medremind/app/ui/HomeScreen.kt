@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -16,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
@@ -60,11 +62,11 @@ fun HomeScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("MedRemind") },
+            MedTopAppBar(
+                title = "MedRemind",
                 actions = {
-                    TextButton(onClick = onOpenHistory) { Text("History") }
-                    TextButton(onClick = onOpenSettings) { Text("Settings") }
+                    MedTopBarAction("History") { onOpenHistory() }
+                    MedTopBarAction("Settings") { onOpenSettings() }
                 }
             )
         },
@@ -83,18 +85,28 @@ fun HomeScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .padding(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Next dose", style = MaterialTheme.typography.titleMedium)
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("NEXT DOSE", style = MaterialTheme.typography.labelMedium)
+                    Spacer(Modifier.height(6.dp))
                     if (next == null) {
-                        Text("No reminders scheduled.", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "No reminders scheduled",
+                            style = MaterialTheme.typography.titleLarge
+                        )
                     } else {
                         Text(next.medicineName, style = MaterialTheme.typography.headlineSmall)
+                        Spacer(Modifier.height(2.dp))
                         Text(
                             SimpleDateFormat("EEE d MMM, h:mm a", Locale.getDefault())
                                 .format(Date(next.triggerAt)),
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.titleMedium
                         )
                     }
                 }
