@@ -21,6 +21,64 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     var highContrast by mutableStateOf(prefs.getBoolean("high_contrast", false))
         private set
 
+    var profileName by mutableStateOf(prefs.getString("profile_name", "") ?: "")
+        private set
+
+    var profileAge by mutableStateOf(prefs.getString("profile_age", "") ?: "")
+        private set
+
+    var profileSex by mutableStateOf(prefs.getString("profile_sex", "") ?: "")
+        private set
+
+    var profileWeight by mutableStateOf(prefs.getString("profile_weight", "") ?: "")
+        private set
+
+    var profileHeight by mutableStateOf(prefs.getString("profile_height", "") ?: "")
+        private set
+
+    var profileDiseases by mutableStateOf(prefs.getString("profile_diseases", "") ?: "")
+        private set
+
+    var profilePhoto by mutableStateOf(prefs.getString("profile_photo", null))
+        private set
+
+    fun updateProfileName(value: String) {
+        profileName = value
+        prefs.edit().putString("profile_name", value).apply()
+    }
+
+    fun updateProfileAge(value: String) {
+        profileAge = value
+        prefs.edit().putString("profile_age", value).apply()
+    }
+
+    fun updateProfileSex(value: String) {
+        profileSex = value
+        prefs.edit().putString("profile_sex", value).apply()
+    }
+
+    fun updateProfileWeight(value: String) {
+        profileWeight = value
+        prefs.edit().putString("profile_weight", value).apply()
+    }
+
+    fun updateProfileHeight(value: String) {
+        profileHeight = value
+        prefs.edit().putString("profile_height", value).apply()
+    }
+
+    fun updateProfileDiseases(value: String) {
+        profileDiseases = value
+        prefs.edit().putString("profile_diseases", value).apply()
+    }
+
+    fun updateProfilePhoto(path: String?) {
+        profilePhoto = path
+        prefs.edit().apply {
+            if (path == null) remove("profile_photo") else putString("profile_photo", path)
+        }.apply()
+    }
+
     fun updatePin(value: String?) {
         pin = value
         prefs.edit().apply {

@@ -1,9 +1,17 @@
 package com.medremind.app.ui
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -187,56 +196,90 @@ private fun WeekStrip(
     onSelect: (LocalDate) -> Unit
 ) {
     val today = LocalDate.now()
-    val sunday = selectedDate.minusDays((selectedDate.dayOfWeek.value % 7).toLong())
-    Row(
+    var drag by remember { mutableStateOf(0f) }
+    val weekStart = selectedDate.minusDays((selectedDate.dayOfWeek.value % 7).toLong())
+
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-    ) {
-        for (i in 0 until 7) {
-            val date = sunday.plusDays(i.toLong())
-            val isSelected = date == selectedDate
-            val isToday = date == today
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(16.dp))
-                    .clickable { onSelect(date) }
-                    .padding(vertical = 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = weekdayLetter(date),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (isSelected) MaterialTheme.colorScheme.onSurface
-                    else MaterialTheme.colorScheme.onSurfaceVariant
+            .pointerInput(selectedDate) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        val total = drag
+                        drag = 0f
+                        if (total <= -48f) onSelect(selectedDate.plusDays(7))
+                        else if (total >= 48f) onSelect(selectedDate.minusDays(7))
+                    },
+                    onHorizontalDrag = { _, amount -> drag += amount }
                 )
-                Spacer(Modifier.height(8.dp))
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent
+            }
+    ) {
+        AnimatedContent(
+            targetState = weekStart,
+            transitionSpec = {
+                val forward = targetState > initialState
+                val dir = if (forward) 1 else -1
+                (slideInHorizontally(tween(260)) { w -> dir * w } + fadeIn(tween(220))) togetherWith
+                    (slideOutHorizontally(tween(200)) { w -> -dir * w } + fadeOut(tween(160)))
+            },
+            label = "weekStrip"
+        ) { start ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                for (i in 0 until 7) {
+                    val date = start.plusDays(i.toLong())
+                    val isSelected = date == selectedDate
+                    val isToday = date == today
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable { onSelect(date) }
+                            .padding(vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = weekdayLetter(date),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isSelected) MaterialTheme.colorScheme.onSurface
+                            else MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        .then(
-                            if (isToday && !isSelected) {
-                                Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                            } else Modifier
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = date.dayOfMonth.toString(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = if (isSelected || isToday) FontWeight.SemiBold
-                        else FontWeight.Normal,
-                        color = when {
-                            isSelected -> MaterialTheme.colorScheme.surface
-                            isToday -> MaterialTheme.colorScheme.primary
-                            else -> MaterialTheme.colorScheme.onSurface
+                        Spacer(Modifier.height(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.onSurface
+                                    else Color.Transparent
+                                )
+                                .then(
+                                    if (isToday && !isSelected) {
+                                        Modifier.border(
+                                            1.5.dp,
+                                            MaterialTheme.colorScheme.primary,
+                                            CircleShape
+                                        )
+                                    } else Modifier
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = date.dayOfMonth.toString(),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (isSelected || isToday) FontWeight.SemiBold
+                                else FontWeight.Normal,
+                                color = when {
+                                    isSelected -> MaterialTheme.colorScheme.surface
+                                    isToday -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.onSurface
+                                }
+                            )
                         }
-                    )
+                    }
                 }
             }
         }

@@ -31,8 +31,8 @@ fun AppRoot(
 
     val screen = when {
         showEditor -> "editor"
-        showSettings -> "settings"
         showPermissions -> "permissions"
+        showSettings -> "settings"
         else -> "main"
     }
 
@@ -58,7 +58,10 @@ fun AppRoot(
             "settings" -> SettingsScreen(
                 settings = settings,
                 onBack = { showSettings = false },
-                onOpenPermissions = { showPermissions = true }
+                onOpenPermissions = {
+                    showSettings = false
+                    showPermissions = true
+                }
             )
 
             "permissions" -> PermissionScreen(
@@ -71,6 +74,7 @@ fun AppRoot(
                 onTabChange = { tab = it },
                 medicines = medicines,
                 vm = vm,
+                settings = settings,
                 onAdd = {
                     guarded {
                         editing = null

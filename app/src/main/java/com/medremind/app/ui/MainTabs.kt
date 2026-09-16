@@ -1,21 +1,21 @@
 package com.medremind.app.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
@@ -25,7 +25,6 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -34,9 +33,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
-import com.medremind.app.R
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.medremind.app.R
 import com.medremind.app.data.Medicine
 
 private data class NavSpec(
@@ -58,6 +57,7 @@ fun MainTabs(
     onTabChange: (Int) -> Unit,
     medicines: List<Medicine>,
     vm: MedicineViewModel,
+    settings: SettingsViewModel,
     onAdd: () -> Unit,
     onEdit: (Medicine) -> Unit,
     onDelete: (Medicine) -> Unit,
@@ -92,12 +92,7 @@ fun MainTabs(
         bottomBar = { MedBottomBar(tab = tab, onTabChange = onTabChange) },
         floatingActionButton = {
             when (tab) {
-                0 -> GradientPillButton(
-                    text = "Schedule",
-                    icon = Icons.Rounded.Add,
-                    onClick = onAdd
-                )
-                1 -> GradientPillButton(
+                0, 1 -> GradientPillButton(
                     text = "Add medicine",
                     icon = Icons.Rounded.Add,
                     onClick = onAdd
@@ -106,10 +101,19 @@ fun MainTabs(
             }
         }
     ) { padding ->
-        Crossfade(
+        AnimatedContent(
             targetState = tab,
-            animationSpec = tween(240),
-            label = "tabCrossfade"
+            transitionSpec = {
+                val forward = targetState > initialState
+                val enter = slideInHorizontally(
+                    animationSpec = tween(260)
+                ) { width -> if (forward) width / 5 else -width / 5 } + fadeIn(tween(240))
+                val exit = slideOutHorizontally(
+                    animationSpec = tween(200)
+                ) { width -> if (forward) -width / 5 else width / 5 } + fadeOut(tween(160))
+                enter togetherWith exit
+            },
+            label = "tabTransition"
         ) { current ->
             when (current) {
                 0 -> TodayContent(
@@ -135,6 +139,7 @@ fun MainTabs(
                 3 -> HealthScreen(modifier = Modifier.padding(padding))
                 else -> MeScreen(
                     modifier = Modifier.padding(padding),
+                    settings = settings,
                     onOpenSettings = onOpenSettings
                 )
             }
@@ -163,7 +168,15 @@ private fun MedBottomBar(
                         modifier = Modifier.size(if (tab == index) 30.dp else 27.dp)
                     )
                 },
-                label = { Text(spec.label) },
+                label = {
+                    Text(
+                        text = spec.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Clip
+                    )
+                },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = MaterialTheme.colorScheme.onSurface,
                     selectedTextColor = MaterialTheme.colorScheme.onSurface,
@@ -190,77 +203,5 @@ private fun HealthScreen(modifier: Modifier = Modifier) {
                 .fillMaxWidth()
                 .padding(horizontal = 32.dp)
         )
-    }
-}
-
-@Composable
-private fun MeScreen(
-    modifier: Modifier = Modifier,
-    onOpenSettings: () -> Unit
-) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            tonalElevation = 2.dp,
-            shadowElevation = 2.dp
-        ) {
-            androidx.compose.foundation.layout.Row(
-                modifier = Modifier.padding(18.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                MedAvatar(name = "You", photoPath = null, size = 52.dp)
-                Spacer(Modifier.width(16.dp))
-                Column {
-                    Text(
-                        text = "You",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = "MedRemind user",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-
-        Surface(
-            onClick = onOpenSettings,
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            tonalElevation = 2.dp,
-            shadowElevation = 2.dp
-        ) {
-            androidx.compose.foundation.layout.Row(
-                modifier = Modifier.padding(18.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Settings,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.width(14.dp))
-                Text(
-                    text = "Settings",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f)
-                )
-                Icon(
-                    imageVector = Icons.Rounded.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
     }
 }
