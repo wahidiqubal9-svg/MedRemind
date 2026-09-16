@@ -287,15 +287,32 @@ fun MedClickableCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
+        label = "cardScale"
+    )
     Surface(
-        onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        },
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = 2.dp,
         shadowElevation = 2.dp
     ) {
-        Column(modifier = Modifier.padding(16.dp), content = content)
+        Box(
+            modifier = Modifier.clickable(
+                interactionSource = interaction,
+                indication = ripple(),
+                onClick = onClick
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp), content = content)
+        }
     }
 }
 

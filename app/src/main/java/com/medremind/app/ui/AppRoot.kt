@@ -1,7 +1,14 @@
 package com.medremind.app.ui
 
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -36,9 +43,23 @@ fun AppRoot(
         else -> "main"
     }
 
-    Crossfade(
+    AnimatedContent(
         targetState = screen,
-        animationSpec = tween(220),
+        transitionSpec = {
+            val opening = targetState != "main"
+            if (opening) {
+                val enter = slideInVertically(tween(300)) { height -> height / 10 } +
+                    fadeIn(tween(260)) +
+                    scaleIn(tween(300), initialScale = 0.96f)
+                val exit = fadeOut(tween(160)) + scaleOut(tween(220), targetScale = 0.98f)
+                enter togetherWith exit
+            } else {
+                val enter = fadeIn(tween(260)) + scaleIn(tween(300), initialScale = 0.98f)
+                val exit = slideOutVertically(tween(280)) { height -> height / 10 } +
+                    fadeOut(tween(160))
+                enter togetherWith exit
+            }
+        },
         label = "screenTransition"
     ) { current ->
         when (current) {

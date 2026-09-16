@@ -130,10 +130,6 @@ fun TodayContent(
                         month = YearMonth.from(it)
                     }
                 )
-                CalendarHint(
-                    expanded = expanded,
-                    onClick = { expanded = !expanded }
-                )
             }
         }
 
@@ -530,47 +526,7 @@ private fun formatDoseTime(millis: Long): String =
 private fun weekdayLetter(date: LocalDate): String =
     date.dayOfWeek.getDisplayName(java.time.format.TextStyle.NARROW, Locale.getDefault())
 
-@Composable
-private fun CalendarHint(
-    expanded: Boolean,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier.fillMaxWidth(),
-        contentAlignment = Alignment.Center
-    ) {
-        if (expanded) {
-            IconButton(onClick = onClick) {
-                Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowUp,
-                    contentDescription = "Close full calendar",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        } else {
-            val transition = rememberInfiniteTransition(label = "calendarHint")
-            val offsetY by transition.animateFloat(
-                initialValue = 0f,
-                targetValue = 6f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(700),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "hintOffset"
-            )
-            IconButton(
-                onClick = onClick,
-                modifier = Modifier.offset(y = offsetY.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = "Open full calendar",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
+
 
 private fun dateToMillis(date: LocalDate): Long =
     date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
