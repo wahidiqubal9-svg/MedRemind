@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -59,11 +60,18 @@ fun MedContent(
     schedulesByMedicine: Map<Long, List<Schedule>>,
     onEdit: (Medicine) -> Unit,
     onDelete: (Medicine) -> Unit,
-    onAdd: () -> Unit
+    onAdd: () -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     if (medicines.isEmpty()) {
         Column(modifier = modifier.fillMaxSize()) {
-            ScreenHeader("Medicines", modifier = Modifier.padding(horizontal = 16.dp))
+            ScreenHeader("Medicines", modifier = Modifier.padding(horizontal = 16.dp)) {
+                SquareIconButton(
+                    icon = Icons.Rounded.Settings,
+                    contentDescription = "Settings",
+                    onClick = onOpenSettings
+                )
+            }
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -93,7 +101,15 @@ fun MedContent(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        item(key = "med_header") { ScreenHeader("Medicines") }
+        item(key = "med_header") {
+            ScreenHeader("Medicines") {
+                SquareIconButton(
+                    icon = Icons.Rounded.Settings,
+                    contentDescription = "Settings",
+                    onClick = onOpenSettings
+                )
+            }
+        }
         items(medicines, key = { it.id }) { medicine ->
             MedicineCard(
                 medicine = medicine,

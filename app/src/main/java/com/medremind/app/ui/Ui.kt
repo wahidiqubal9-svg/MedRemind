@@ -104,16 +104,26 @@ fun MedTopAppBar(
 }
 
 @Composable
-fun ScreenHeader(title: String, modifier: Modifier = Modifier) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.headlineLarge,
-        fontWeight = FontWeight.Bold,
+fun ScreenHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    actions: @Composable RowScope.() -> Unit = {}
+) {
+    Row(
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(start = 4.dp, end = 4.dp, top = 12.dp, bottom = 4.dp)
-    )
+            .padding(start = 4.dp, end = 4.dp, top = 12.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f)
+        )
+        actions()
+    }
 }
 
 @Composable

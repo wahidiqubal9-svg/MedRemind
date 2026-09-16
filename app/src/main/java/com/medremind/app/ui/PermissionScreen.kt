@@ -86,6 +86,8 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
     val batteryOptimized = context.getSystemService(PowerManager::class.java)
         ?.isIgnoringBatteryOptimizations(context.packageName) == true
 
+    val overlayGranted = Settings.canDrawOverlays(context)
+
     val notifLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { tick++ }
@@ -175,6 +177,24 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
                         context.startActivity(
                             Intent(
                                 Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                Uri.parse("package:" + context.packageName)
+                            )
+                        )
+                    }
+                }
+            )
+
+            PermissionRow(
+                icon = Icons.Rounded.Warning,
+                title = "Display over other apps",
+                granted = overlayGranted,
+                description = "Shows the full-screen reminder even while you're using the phone.",
+                actionLabel = "Open settings",
+                onAction = {
+                    runCatching {
+                        context.startActivity(
+                            Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                                 Uri.parse("package:" + context.packageName)
                             )
                         )

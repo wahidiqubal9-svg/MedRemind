@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -139,15 +140,18 @@ fun MainTabs(
                     schedulesByMedicine = schedulesByMedicine,
                     onEdit = onEdit,
                     onDelete = onDelete,
-                    onAdd = onAdd
+                    onAdd = onAdd,
+                    onOpenSettings = onOpenSettings
                 )
                 2 -> HistoryContent(
                     modifier = Modifier.padding(padding),
-                    vm = vm
+                    vm = vm,
+                    onOpenSettings = onOpenSettings
                 )
                 3 -> HealthScreen(
                     modifier = Modifier.padding(padding),
-                    settings = settings
+                    settings = settings,
+                    onOpenSettings = onOpenSettings
                 )
                 else -> MeScreen(
                     modifier = Modifier.padding(padding),
@@ -204,7 +208,8 @@ private fun MedBottomBar(
 @Composable
 private fun HealthScreen(
     modifier: Modifier = Modifier,
-    settings: SettingsViewModel
+    settings: SettingsViewModel,
+    onOpenSettings: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     val selected = settings.profileDiseases
@@ -218,7 +223,13 @@ private fun HealthScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        ScreenHeader("Health")
+        ScreenHeader("Health") {
+            SquareIconButton(
+                icon = Icons.Rounded.Settings,
+                contentDescription = "Settings",
+                onClick = onOpenSettings
+            )
+        }
 
         MedCard(modifier = Modifier.fillMaxWidth()) {
             Text("Your conditions", style = MaterialTheme.typography.titleMedium)

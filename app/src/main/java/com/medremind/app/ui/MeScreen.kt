@@ -84,7 +84,13 @@ fun MeScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        ScreenHeader("Me")
+        ScreenHeader("Me") {
+            SquareIconButton(
+                icon = Icons.Rounded.Settings,
+                contentDescription = "Settings",
+                onClick = onOpenSettings
+            )
+        }
 
         if (!editing && hasProfile) {
             ProfileSummary(
@@ -156,7 +162,7 @@ private fun ProfileSummary(
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            ProfileAvatar(photoPath = settings.profilePhoto, onClick = onEdit, size = 104.dp)
+            ProfileAvatar(photoPath = settings.profilePhoto, onClick = onEdit, size = 128.dp)
             Spacer(Modifier.height(14.dp))
             Text(
                 text = settings.profileName.ifBlank { "Your profile" },
@@ -229,7 +235,7 @@ private fun ProfileForm(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            ProfileAvatar(photoPath = settings.profilePhoto, onClick = onPickPhoto, size = 96.dp)
+            ProfileAvatar(photoPath = settings.profilePhoto, onClick = onPickPhoto, size = 120.dp)
             Spacer(Modifier.height(10.dp))
             Text(
                 text = "Tap the photo to change it",
@@ -334,7 +340,6 @@ private fun ProfileAvatar(
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {

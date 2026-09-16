@@ -2,6 +2,10 @@ package com.medremind.app.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -12,6 +16,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +26,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -36,6 +42,8 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.HorizontalDivider
@@ -97,13 +105,37 @@ fun TodayContent(
             onOpenSettings = onOpenSettings
         )
 
-        WeekStrip(
-            selectedDate = selectedDate,
-            onSelect = {
-                selectedDate = it
-                month = YearMonth.from(it)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .pointerInput(expanded) {
+                    var acc = 0f
+                    detectVerticalDragGestures { _, amount ->
+                        acc += amount
+                        if (acc > 40f) {
+                            expanded = true
+                            acc = 0f
+                        } else if (acc < -40f) {
+                            expanded = false
+                            acc = 0f
+                        }
+                    }
+                }
+        ) {
+            Column {
+                WeekStrip(
+                    selectedDate = selectedDate,
+                    onSelect = {
+                        selectedDate = it
+                        month = YearMonth.from(it)
+                    }
+                )
+                CalendarHint(
+                    expanded = expanded,
+                    onClick = { expanded = !expanded }
+                )
             }
-        )
+        }
 
         AnimatedVisibility(visible = expanded) {
             MonthGrid(
@@ -171,7 +203,11 @@ private fun TodayHeader(
     val title = if (isToday) {
         "Today"
     } else {
-        SimpleDateFormat("MMMM", Locale.getDefault()).format(dateToMillis(selectedDate))
+        val sameYear = selectedDate.year == LocalDate.now().year
+        SimpleDateFormat(
+            if (sameYear) "MMMM d" else "MMMM d, yyyy",
+            Locale.getDefault()
+        ).format(dateToMillis(selectedDate))
     }
     Row(
         modifier = Modifier
@@ -206,25 +242,13 @@ private fun WeekStrip(
     onSelect: (LocalDate) -> Unit
 ) {
     val today = LocalDate.now()
-    val baseWeekStart = weekStartOf(today)
     val pageCount = 1201
     val center = pageCount / 2
-    val pagerState = rememberPagerState(
-        initialPage = (center + weeksBetween(baseWeekStart, selectedDate)).coerceIn(0, pageCount - 1),
-        pageCount = { pageCount }
-    )
+    val pagerState = rememberPagerState(initialPage = center, pageCount = { pageCount })
 
     LaunchedEffect(pagerState.settledPage) {
-        val start = baseWeekStart.plusDays(((pagerState.settledPage - center) * 7).toLong())
-        val candidate = start.plusDays((selectedDate.dayOfWeek.value % 7).toLong())
-        if (candidate != selectedDate) onSelect(candidate)
-    }
-
-    LaunchedEffect(selectedDate) {
-        val target = (center + weeksBetween(baseWeekStart, selectedDate)).coerceIn(0, pageCount - 1)
-        if (target != pagerState.currentPage && !pagerState.isScrollInProgress) {
-            pagerState.animateScrollToPage(target)
-        }
+        val anchor = today.plusDays(((pagerState.settledPage - center) * 7).toLong())
+        if (anchor != selectedDate) onSelect(anchor)
     }
 
     HorizontalPager(
@@ -233,7 +257,7 @@ private fun WeekStrip(
             .fillMaxWidth()
             .height(78.dp)
     ) { page ->
-        val start = baseWeekStart.plusDays(((page - center) * 7).toLong())
+        val start = today.plusDays(((page - center) * 7).toLong()).minusDays(3)
         Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -506,11 +530,47 @@ private fun formatDoseTime(millis: Long): String =
 private fun weekdayLetter(date: LocalDate): String =
     date.dayOfWeek.getDisplayName(java.time.format.TextStyle.NARROW, Locale.getDefault())
 
-private fun weekStartOf(date: LocalDate): LocalDate =
-    date.minusDays((date.dayOfWeek.value % 7).toLong())
-
-private fun weeksBetween(base: LocalDate, date: LocalDate): Int =
-    ((weekStartOf(date).toEpochDay() - base.toEpochDay()) / 7).toInt()
+@Composable
+private fun CalendarHint(
+    expanded: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center
+    ) {
+        if (expanded) {
+            IconButton(onClick = onClick) {
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardArrowUp,
+                    contentDescription = "Close full calendar",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            val transition = rememberInfiniteTransition(label = "calendarHint")
+            val offsetY by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 6f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(700),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "hintOffset"
+            )
+            IconButton(
+                onClick = onClick,
+                modifier = Modifier.offset(y = offsetY.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = "Open full calendar",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
 
 private fun dateToMillis(date: LocalDate): Long =
     date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()

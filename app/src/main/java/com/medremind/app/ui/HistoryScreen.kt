@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,7 +51,8 @@ private data class DayStat(val date: LocalDate, val taken: Int, val missed: Int)
 @Composable
 fun HistoryContent(
     modifier: Modifier = Modifier,
-    vm: MedicineViewModel
+    vm: MedicineViewModel,
+    onOpenSettings: () -> Unit
 ) {
     val history by vm.history.collectAsState()
 
@@ -100,7 +102,15 @@ fun HistoryContent(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item(key = "progress_header") { ScreenHeader("Progress") }
+        item(key = "progress_header") {
+            ScreenHeader("Progress") {
+                SquareIconButton(
+                    icon = Icons.Rounded.Settings,
+                    contentDescription = "Settings",
+                    onClick = onOpenSettings
+                )
+            }
+        }
 
         item(key = "range") {
             MedSegmentedButtons(
