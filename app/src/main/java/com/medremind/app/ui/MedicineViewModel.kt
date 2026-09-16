@@ -12,6 +12,7 @@ import com.medremind.app.data.Schedule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -23,6 +24,29 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
 
     val medicines: StateFlow<List<Medicine>> = db.medicineDao().getAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val history: StateFlow<List<DoseHistoryItem>> = combine(
+        db.doseEventDao().observeAll(),
+        db.medicineDao().observeAll()
+    ) { events, medicines ->
+        val byId = medicines.associateBy { it.id }
+        events.map { event ->
+            val medicine = byId[event.medicineId]
+            DoseHistoryItem(
+                event = event,
+                medicineName = medicine?.name ?: "Medicine",
+                photoPath = medicine?.photoPath
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun markOverdueAsMissed() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                db.doseEventDao().markMissedBefore(System.currentTimeMillis() - MISSED_AFTER_MILLIS)
+            }
+        }
+    }
 
     suspend fun schedulesFor(medicineId: Long): List<Schedule> =
         withContext(Dispatchers.IO) { db.scheduleDao().forMedicine(medicineId) }
@@ -106,3 +130,11 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
 }
 
 data class UpcomingAlarm(val medicineName: String, val triggerAt: Long)
+
+data class DoseHistoryItem(
+    val event: DoseEvent,
+    val medicineName: String,
+    val photoPath: String?
+)
+
+private const val MISSED_AFTER_MILLIS = 2 * 60 * 60 * 1000L

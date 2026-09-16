@@ -14,10 +14,13 @@ fun AppRoot(vm: MedicineViewModel = viewModel()) {
     val medicines by vm.medicines.collectAsState()
     var showEditor by remember { mutableStateOf(false) }
     var showPermissions by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Medicine?>(null) }
 
     when {
         showPermissions -> PermissionScreen(onBack = { showPermissions = false }, vm = vm)
+
+        showHistory -> HistoryScreen(onBack = { showHistory = false }, vm = vm)
 
         showEditor -> AddEditMedicineScreen(
             initial = editing,
@@ -42,7 +45,8 @@ fun AppRoot(vm: MedicineViewModel = viewModel()) {
                 editing = medicine
                 showEditor = true
             },
-            onOpenSetup = { showPermissions = true }
+            onOpenSetup = { showPermissions = true },
+            onOpenHistory = { showHistory = true }
         )
     }
 }

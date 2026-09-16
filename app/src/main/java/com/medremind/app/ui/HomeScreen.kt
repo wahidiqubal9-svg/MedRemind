@@ -40,13 +40,15 @@ fun HomeScreen(
     medicines: List<Medicine>,
     onAdd: () -> Unit,
     onEdit: (Medicine) -> Unit,
-    onOpenSetup: () -> Unit
+    onOpenSetup: () -> Unit,
+    onOpenHistory: () -> Unit
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("MedRemind") },
                 actions = {
+                    TextButton(onClick = onOpenHistory) { Text("History") }
                     TextButton(onClick = onOpenSetup) { Text("Setup") }
                 }
             )

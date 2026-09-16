@@ -116,7 +116,7 @@ fun ScheduleEditorDialog(
                                     editingTimeIndex = index
                                     showTimePicker = true
                                 },
-                                label = { Text("$time  \u2715") }
+                                label = { Text("${to12Hour(time)}  \u2715") }
                             )
                         }
                     }
@@ -259,7 +259,7 @@ private fun TimePickerDialog(
     val state = rememberTimePickerState(
         initialHour = initialHour,
         initialMinute = initialMinute,
-        is24Hour = true
+        is24Hour = false
     )
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -285,3 +285,16 @@ private fun TypeChip(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 private val dayLabels = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+private fun to12Hour(time: String): String {
+    val parts = time.split(':')
+    val hour = parts.getOrNull(0)?.toIntOrNull() ?: return time
+    val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
+    val suffix = if (hour < 12) "AM" else "PM"
+    val h = when {
+        hour == 0 -> 12
+        hour > 12 -> hour - 12
+        else -> hour
+    }
+    return String.format("%d:%02d %s", h, minute, suffix)
+}

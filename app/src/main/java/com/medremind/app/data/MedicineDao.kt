@@ -12,6 +12,9 @@ interface MedicineDao {
     @Query("SELECT * FROM medicines ORDER BY name COLLATE NOCASE ASC")
     fun getAll(): Flow<List<Medicine>>
 
+    @Query("SELECT * FROM medicines ORDER BY name COLLATE NOCASE ASC")
+    fun observeAll(): Flow<List<Medicine>>
+
     @Query("SELECT * FROM medicines WHERE id = :id")
     suspend fun byId(id: Long): Medicine?
 
