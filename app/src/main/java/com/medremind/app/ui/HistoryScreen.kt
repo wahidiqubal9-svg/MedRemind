@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -16,12 +17,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -42,15 +40,20 @@ import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+private data class DayStat(val label: String, val taken: Int, val missed: Int)
+
 @Composable
-fun HistoryScreen(onBack: () -> Unit, vm: MedicineViewModel) {
+fun HistoryContent(
+    modifier: Modifier = Modifier,
+    vm: MedicineViewModel
+) {
     val history by vm.history.collectAsState()
 
     LaunchedEffect(Unit) { vm.markOverdueAsMissed() }
 
+    val zone = remember { ZoneId.systemDefault() }
     val todayStart = remember {
-        LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        LocalDate.now().atStartOfDay(zone).toInstant().toEpochMilli()
     }
     val todayItems = history.filter { it.event.scheduledAt >= todayStart }
     val takenToday = todayItems.count { it.event.status == DoseStatus.TAKEN }
@@ -58,87 +61,153 @@ fun HistoryScreen(onBack: () -> Unit, vm: MedicineViewModel) {
     val missedToday = todayItems.count { it.event.status == DoseStatus.MISSED }
     val pendingToday = todayItems.count { it.event.status == DoseStatus.PENDING }
 
+    val last7 = remember(history) {
+        (6 downTo 0).map { offset ->
+            val date = LocalDate.now().minusDays(offset.toLong())
+            val dayStart = date.atStartOfDay(zone).toInstant().toEpochMilli()
+            val dayEnd = dayStart + 24L * 60 * 60 * 1000
+            val items = history.filter { it.event.scheduledAt in dayStart until dayEnd }
+            DayStat(
+                label = date.dayOfWeek.name.take(1) + date.dayOfWeek.name.drop(1).take(2).lowercase(),
+                taken = items.count { it.event.status == DoseStatus.TAKEN },
+                missed = items.count { it.event.status == DoseStatus.MISSED }
+            )
+        }
+    }
+
+    val weekTaken = last7.sumOf { it.taken }
+    val weekMissed = last7.sumOf { it.missed }
+    val weekTotal = weekTaken + weekMissed
+    val adherence = if (weekTotal == 0) 0 else (weekTaken * 100) / weekTotal
+
     val grouped = remember(history) {
         history.groupBy { dateKey(it.event.scheduledAt) }
     }
-
     val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
 
-    Scaffold(
-        topBar = { MedTopAppBar(title = "History", onBack = onBack) }
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Today", style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.size(4.dp))
-                        Text("Taken: $takenToday    Missed: $missedToday")
-                        Text("Skipped: $skippedToday    Pending: $pendingToday")
-                    }
-                }
-            }
-
-            if (history.isEmpty()) {
-                item {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("TODAY", style = MaterialTheme.typography.labelMedium)
+                    Spacer(Modifier.height(4.dp))
                     Text(
-                        "No doses recorded yet. When a reminder fires and you mark it, it will appear here.",
-                        modifier = Modifier.padding(8.dp)
+                        "Taken: $takenToday    Missed: $missedToday",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        "Skipped: $skippedToday    Pending: $pendingToday",
+                        style = MaterialTheme.typography.bodyMedium
                     )
                 }
             }
+        }
 
-            grouped.forEach { (day, dayItems) ->
-                item {
-                    Text(day, style = MaterialTheme.typography.titleMedium)
-                }
-                items(dayItems, key = { it.event.id }) { item ->
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val photo = item.photoPath
-                            if (photo != null) {
-                                AsyncImage(
-                                    model = File(photo),
-                                    contentDescription = item.medicineName,
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(RoundedCornerShape(8.dp)),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("?")
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("Last 7 days", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Adherence: $adherence%  ($weekTaken taken, $weekMissed missed)",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    val maxTotal = last7.maxOfOrNull { it.taken + it.missed }?.coerceAtLeast(1) ?: 1
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        last7.forEach { day ->
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Row(verticalAlignment = Alignment.Bottom) {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(10.dp)
+                                            .height((64f * day.taken / maxTotal).dp)
+                                            .background(MaterialTheme.colorScheme.primary)
+                                    )
+                                    Spacer(Modifier.width(3.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .width(10.dp)
+                                            .height((64f * day.missed / maxTotal).dp)
+                                            .background(MaterialTheme.colorScheme.error)
+                                    )
                                 }
+                                Spacer(Modifier.height(4.dp))
+                                Text(day.label, style = MaterialTheme.typography.labelSmall)
                             }
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(item.medicineName, style = MaterialTheme.typography.titleSmall)
-                                Text(
-                                    timeFormat.format(Date(item.event.scheduledAt)),
-                                    style = MaterialTheme.typography.bodySmall
-                                )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (history.isEmpty()) {
+            item {
+                Text(
+                    "No doses recorded yet. When a reminder fires and you mark it, it will appear here.",
+                    modifier = Modifier.padding(8.dp)
+                )
+            }
+        }
+
+        grouped.forEach { (day, dayItems) ->
+            item {
+                Text(day, style = MaterialTheme.typography.titleMedium)
+            }
+            items(dayItems, key = { it.event.id }) { item ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val photo = item.photoPath
+                        if (photo != null) {
+                            AsyncImage(
+                                model = File(photo),
+                                contentDescription = item.medicineName,
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("?")
                             }
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(item.medicineName, style = MaterialTheme.typography.titleSmall)
                             Text(
-                                text = statusLabel(item.event.status),
-                                color = statusColor(item.event.status),
-                                style = MaterialTheme.typography.labelLarge
+                                timeFormat.format(Date(item.event.scheduledAt)),
+                                style = MaterialTheme.typography.bodySmall
                             )
                         }
+                        Text(
+                            text = statusLabel(item.event.status),
+                            color = statusColor(item.event.status),
+                            style = MaterialTheme.typography.labelLarge
+                        )
                     }
                 }
             }

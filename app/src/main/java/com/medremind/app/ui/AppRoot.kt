@@ -3,6 +3,7 @@ package com.medremind.app.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -15,10 +16,9 @@ fun AppRoot(
     vm: MedicineViewModel = viewModel()
 ) {
     val medicines by vm.medicines.collectAsState()
+    var tab by remember { mutableIntStateOf(0) }
     var showEditor by remember { mutableStateOf(false) }
     var showPermissions by remember { mutableStateOf(false) }
-    var showHistory by remember { mutableStateOf(false) }
-    var showSettings by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Medicine?>(null) }
     var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
@@ -27,16 +27,6 @@ fun AppRoot(
     }
 
     when {
-        showPermissions -> PermissionScreen(onBack = { showPermissions = false }, vm = vm)
-
-        showHistory -> HistoryScreen(onBack = { showHistory = false }, vm = vm)
-
-        showSettings -> SettingsScreen(
-            settings = settings,
-            onBack = { showSettings = false },
-            onOpenPermissions = { showPermissions = true }
-        )
-
         showEditor -> AddEditMedicineScreen(
             initial = editing,
             vm = vm,
@@ -50,9 +40,17 @@ fun AppRoot(
             }
         )
 
-        else -> HomeScreen(
+        showPermissions -> PermissionScreen(
+            onBack = { showPermissions = false },
+            vm = vm
+        )
+
+        else -> MainTabs(
+            tab = tab,
+            onTabChange = { tab = it },
             medicines = medicines,
             vm = vm,
+            settings = settings,
             onAdd = {
                 guarded {
                     editing = null
@@ -65,8 +63,7 @@ fun AppRoot(
                     showEditor = true
                 }
             },
-            onOpenSettings = { showSettings = true },
-            onOpenHistory = { showHistory = true }
+            onOpenPermissions = { showPermissions = true }
         )
     }
 
