@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.medremind.app.alarm.ReminderScheduler
 import com.medremind.app.data.AppDatabase
 import com.medremind.app.data.Medicine
+import com.medremind.app.data.DoseEvent
 import com.medremind.app.data.PhotoStorage
 import com.medremind.app.data.Schedule
 import kotlinx.coroutines.Dispatchers
@@ -70,4 +71,38 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
             onDone()
         }
     }
+
+    suspend fun upcomingAlarms(): List<UpcomingAlarm> = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        db.scheduleDao().getAllOnce()
+            .filter { it.enabled }
+            .mapNotNull { schedule ->
+                val trigger = ReminderScheduler.nextTrigger(schedule, now) ?: return@mapNotNull null
+                val medicine = db.medicineDao().byId(schedule.medicineId)
+                UpcomingAlarm(medicine?.name ?: "Medicine", trigger)
+            }
+            .sortedBy { it.triggerAt }
+    }
+
+    fun triggerTestAlarm() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val medicine = db.medicineDao().first()
+                val eventId = db.doseEventDao().insert(
+                    DoseEvent(
+                        scheduleId = 0L,
+                        medicineId = medicine?.id ?: 0L,
+                        scheduledAt = System.currentTimeMillis()
+                    )
+                )
+                ReminderScheduler.scheduleSnooze(
+                    app,
+                    eventId,
+                    System.currentTimeMillis() + 10_000L
+                )
+            }
+        }
+    }
 }
+
+data class UpcomingAlarm(val medicineName: String, val triggerAt: Long)

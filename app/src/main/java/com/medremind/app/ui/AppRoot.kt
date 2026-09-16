@@ -17,7 +17,7 @@ fun AppRoot(vm: MedicineViewModel = viewModel()) {
     var editing by remember { mutableStateOf<Medicine?>(null) }
 
     when {
-        showPermissions -> PermissionScreen(onBack = { showPermissions = false })
+        showPermissions -> PermissionScreen(onBack = { showPermissions = false }, vm = vm)
 
         showEditor -> AddEditMedicineScreen(
             initial = editing,

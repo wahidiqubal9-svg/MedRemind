@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import com.medremind.app.MainActivity
 import com.medremind.app.data.AppDatabase
 import com.medremind.app.data.Schedule
 import com.medremind.app.data.ScheduleType
@@ -80,6 +81,15 @@ object ReminderScheduler {
         return null
     }
 
+    private fun showAppIntent(context: Context): PendingIntent =
+        PendingIntent.getActivity(
+            context,
+            0,
+            Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
     fun pendingIntent(context: Context, scheduleId: Long): PendingIntent {
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             action = ACTION_ALARM
@@ -102,9 +112,28 @@ object ReminderScheduler {
             return
         }
         if (canScheduleExact(am)) {
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, next, pi)
+            am.setAlarmClock(AlarmManager.AlarmClockInfo(next, showAppIntent(context)), pi)
         } else {
             am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, next, pi)
+        }
+    }
+
+    fun scheduleSnooze(context: Context, doseEventId: Long, triggerAt: Long) {
+        val am = context.getSystemService(AlarmManager::class.java) ?: return
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            action = ACTION_SNOOZE
+            putExtra(EXTRA_SNOOZE_EVENT_ID, doseEventId)
+        }
+        val pi = PendingIntent.getBroadcast(
+            context,
+            (doseEventId + 100_000L).toInt(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        if (canScheduleExact(am)) {
+            am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, showAppIntent(context)), pi)
+        } else {
+            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
         }
     }
 

@@ -118,23 +118,8 @@ class AlarmActivity : ComponentActivity() {
     }
 
     private fun scheduleSnooze(context: Context, doseEventId: Long) {
-        val am = context.getSystemService(AlarmManager::class.java) ?: return
         val triggerAt = System.currentTimeMillis() + SNOOZE_MINUTES * 60_000L
-        val intent = Intent(context, AlarmReceiver::class.java).apply {
-            action = ReminderScheduler.ACTION_SNOOZE
-            putExtra(ReminderScheduler.EXTRA_SNOOZE_EVENT_ID, doseEventId)
-        }
-        val pi = PendingIntent.getBroadcast(
-            context,
-            (doseEventId + 100_000L).toInt(),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !am.canScheduleExactAlarms()) {
-            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
-        } else {
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
-        }
+        ReminderScheduler.scheduleSnooze(context, doseEventId, triggerAt)
     }
 
     override fun onDestroy() {

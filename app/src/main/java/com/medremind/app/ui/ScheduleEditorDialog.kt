@@ -4,18 +4,24 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -27,7 +33,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduleEditorDialog(
     initial: Schedule?,
@@ -45,7 +51,14 @@ fun ScheduleEditorDialog(
     }.getOrNull()
 
     var type by remember { mutableStateOf(initial?.type ?: ScheduleType.DAILY) }
-    var times by remember { mutableStateOf(initial?.times ?: "08:00") }
+    var times by remember {
+        mutableStateOf(
+            (initial?.times ?: "08:00").split(',')
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .toMutableList()
+        )
+    }
     var daysMask by remember { mutableStateOf(initial?.daysMask ?: 0) }
     var intervalHours by remember { mutableStateOf((initial?.intervalHours ?: 8).toString()) }
     var startDate by remember {
@@ -55,6 +68,12 @@ fun ScheduleEditorDialog(
         mutableStateOf(initial?.endDate?.let { formatDate(it) } ?: "")
     }
     var doseLabel by remember { mutableStateOf(initial?.doseLabel ?: "") }
+
+    var showTimePicker by remember { mutableStateOf(false) }
+    var editingTimeIndex by remember { mutableIntStateOf(-1) }
+
+    val needsTimes = type != ScheduleType.INTERVAL
+    val canSave = !needsTimes || times.isNotEmpty()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -75,25 +94,46 @@ fun ScheduleEditorDialog(
 
                 Spacer(Modifier.height(12.dp))
 
-                when (type) {
-                    ScheduleType.INTERVAL -> {
-                        OutlinedTextField(
-                            value = intervalHours,
-                            onValueChange = { intervalHours = it.filter { c -> c.isDigit() } },
-                            label = { Text("Every N hours") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                if (type == ScheduleType.INTERVAL) {
+                    OutlinedTextField(
+                        value = intervalHours,
+                        onValueChange = { intervalHours = it.filter { c -> c.isDigit() } },
+                        label = { Text("Every N hours") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Text("Times")
+                    Spacer(Modifier.height(4.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        times.forEachIndexed { index, time ->
+                            FilterChip(
+                                selected = true,
+                                onClick = {
+                                    editingTimeIndex = index
+                                    showTimePicker = true
+                                },
+                                label = { Text("$time  \u2715") }
+                            )
+                        }
                     }
-                    else -> {
-                        OutlinedTextField(
-                            value = times,
-                            onValueChange = { times = it },
-                            label = { Text("Times (HH:mm, comma separated)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            editingTimeIndex = -1
+                            showTimePicker = true
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Add time")
                     }
+                    Text(
+                        "Tap a time to change or remove it.",
+                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                    )
                 }
 
                 if (type == ScheduleType.WEEKDAYS) {
@@ -148,12 +188,13 @@ fun ScheduleEditorDialog(
         },
         confirmButton = {
             TextButton(
+                enabled = canSave,
                 onClick = {
                     val base = initial ?: Schedule(medicineId = 0L)
                     onSave(
                         base.copy(
                             type = type,
-                            times = times.trim(),
+                            times = times.joinToString(","),
                             daysMask = daysMask,
                             intervalHours = intervalHours.toIntOrNull() ?: 8,
                             startDate = parseDate(startDate) ?: 0L,
@@ -171,6 +212,67 @@ fun ScheduleEditorDialog(
             if (initial != null) {
                 TextButton(onClick = onDelete) { Text("Remove") }
             } else {
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        }
+    )
+
+    if (showTimePicker) {
+        val current = times.getOrNull(editingTimeIndex)
+        val parts = current?.split(':')
+        val initHour = parts?.getOrNull(0)?.toIntOrNull() ?: 8
+        val initMinute = parts?.getOrNull(1)?.toIntOrNull() ?: 0
+        TimePickerDialog(
+            initialHour = initHour,
+            initialMinute = initMinute,
+            allowRemove = editingTimeIndex in times.indices && times.size > 1,
+            onConfirm = { hour, minute ->
+                val formatted = String.format("%02d:%02d", hour, minute)
+                if (editingTimeIndex in times.indices) {
+                    times = times.toMutableList().also { it[editingTimeIndex] = formatted }
+                } else {
+                    times = (times + formatted).distinct().sorted().toMutableList()
+                }
+                showTimePicker = false
+            },
+            onRemove = {
+                if (editingTimeIndex in times.indices) {
+                    times = times.toMutableList().also { it.removeAt(editingTimeIndex) }
+                }
+                showTimePicker = false
+            },
+            onDismiss = { showTimePicker = false }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimePickerDialog(
+    initialHour: Int,
+    initialMinute: Int,
+    allowRemove: Boolean,
+    onConfirm: (Int, Int) -> Unit,
+    onRemove: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val state = rememberTimePickerState(
+        initialHour = initialHour,
+        initialMinute = initialMinute,
+        is24Hour = true
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select time") },
+        text = { TimePicker(state = state) },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(state.hour, state.minute) }) { Text("OK") }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (allowRemove) {
+                    TextButton(onClick = onRemove) { Text("Remove") }
+                }
                 TextButton(onClick = onDismiss) { Text("Cancel") }
             }
         }
