@@ -3,6 +3,7 @@ package com.medremind.app.ui
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -47,6 +48,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.medremind.app.data.PhotoStorage
 import java.io.File
@@ -81,21 +83,28 @@ fun MeScreen(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .navigationBarsPadding()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 110.dp)
     ) {
-        ScreenHeader("Me") {
-            SquareIconButton(
+        PageHeader(eyebrow = "Your account", title = "Me") {
+            GlassIconButton(
                 icon = Icons.Rounded.Settings,
                 contentDescription = "Settings",
                 onClick = onOpenSettings
             )
         }
 
+        Spacer(Modifier.height(6.dp))
+
         if (!editing && hasProfile) {
-            ProfileSummary(
+            ProfileCard(
                 settings = settings,
-                onEdit = { editing = true }
+                onEdit = { editing = true },
+                onPickPhoto = {
+                    pickImage.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                }
             )
         } else {
             ProfileForm(
@@ -111,33 +120,158 @@ fun MeScreen(
             )
         }
 
-        Surface(
-            onClick = onOpenSettings,
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            tonalElevation = 2.dp,
-            shadowElevation = 2.dp
-        ) {
-            Row(
-                modifier = Modifier.padding(18.dp),
-                verticalAlignment = Alignment.CenterVertically
+        SettingsListCard(onOpenSettings = onOpenSettings)
+    }
+}
+
+@Composable
+private fun ProfileCard(
+    settings: SettingsViewModel,
+    onEdit: () -> Unit,
+    onPickPhoto: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 22.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 8.dp
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(92.dp)
+                    .background(MedGradients.heroHorizontal())
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 44.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.Settings,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.width(14.dp))
+                AvatarWithBadge(settings = settings, onPickPhoto = onPickPhoto)
+                Spacer(Modifier.height(12.dp))
                 Text(
-                    text = "Settings",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f)
+                    text = settings.profileName.ifBlank { "Your profile" },
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold
                 )
+                Spacer(Modifier.height(20.dp))
+                Column(modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StatBox(
+                            label = "Age",
+                            value = settings.profileAge.ifBlank { "—" },
+                            modifier = Modifier.weight(1f)
+                        )
+                        StatBox(
+                            label = "Sex",
+                            value = settings.profileSex.ifBlank { "—" },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StatBox(
+                            label = "Weight",
+                            value = settings.profileWeight.let { if (it.isBlank()) "—" else "$it kg" },
+                            modifier = Modifier.weight(1f)
+                        )
+                        StatBox(
+                            label = "Height",
+                            value = settings.profileHeight.let { if (it.isBlank()) "—" else "$it cm" },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(18.dp))
+                Surface(
+                    onClick = onEdit,
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    border = BorderStroke(
+                        1.5.dp,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 14.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Edit,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Edit profile", fontWeight = FontWeight.ExtraBold)
+                    }
+                }
+                Spacer(Modifier.height(20.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun AvatarWithBadge(
+    settings: SettingsViewModel,
+    onPickPhoto: () -> Unit
+) {
+    Box(modifier = Modifier.size(96.dp)) {
+        Surface(
+            modifier = Modifier.size(96.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer,
+            border = BorderStroke(4.dp, MaterialTheme.colorScheme.surface),
+            shadowElevation = 8.dp
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                val photo = settings.profilePhoto
+                if (photo != null) {
+                    AsyncImage(
+                        model = File(photo),
+                        contentDescription = "Profile photo",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Text(
+                        text = initials(settings.profileName),
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+            }
+        }
+        Surface(
+            onClick = onPickPhoto,
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            border = BorderStroke(3.dp, MaterialTheme.colorScheme.surface),
+            modifier = Modifier
+                .size(32.dp)
+                .align(Alignment.BottomEnd)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    imageVector = Icons.Rounded.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    imageVector = Icons.Rounded.PhotoCamera,
+                    contentDescription = "Change photo",
+                    modifier = Modifier.size(14.dp)
                 )
             }
         }
@@ -145,79 +279,77 @@ fun MeScreen(
 }
 
 @Composable
-private fun ProfileSummary(
-    settings: SettingsViewModel,
-    onEdit: () -> Unit
+private fun StatBox(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 2.dp,
-        shadowElevation = 2.dp
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
-        Column(
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp)) {
+            Text(
+                text = label.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+            Spacer(Modifier.height(3.dp))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsListCard(onOpenSettings: () -> Unit) {
+    Surface(
+        onClick = onOpenSettings,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 6.dp
+    ) {
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            ProfileAvatar(photoPath = settings.profilePhoto, onClick = onEdit, size = 128.dp)
-            Spacer(Modifier.height(14.dp))
-            Text(
-                text = settings.profileName.ifBlank { "Your profile" },
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(16.dp))
-
-            DetailRow("Age", settings.profileAge)
-            DetailRow("Sex", settings.profileSex)
-            DetailRow("Weight", settings.profileWeight.let { if (it.isBlank()) "" else "$it kg" })
-            DetailRow("Height", settings.profileHeight.let { if (it.isBlank()) "" else "$it cm" })
-
-            if (settings.profileDiseases.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Conditions",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+            Surface(
+                shape = RoundedCornerShape(13.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh
+            ) {
+                Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Rounded.Settings,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(19.dp)
                     )
-                    Spacer(Modifier.height(8.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        settings.profileDiseases.forEach { disease ->
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                            ) {
-                                Text(
-                                    text = disease,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                                )
-                            }
-                        }
-                    }
                 }
             }
-
-            Spacer(Modifier.height(20.dp))
-            OutlinedButton(
-                onClick = onEdit,
-                shape = RoundedCornerShape(50),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Edit,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text("Edit profile")
-            }
+            Spacer(Modifier.width(14.dp))
+            Text(
+                text = "Settings",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.ExtraBold,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                imageVector = Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -230,7 +362,9 @@ private fun ProfileForm(
     onSave: () -> Unit,
     onCancel: () -> Unit
 ) {
-    MedCard(modifier = Modifier.fillMaxWidth()) {
+    MedCard(modifier = Modifier
+        .fillMaxWidth()
+        .padding(top = 22.dp)) {
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -364,7 +498,7 @@ private fun ProfileAvatar(
                     imageVector = Icons.Rounded.Person,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(size / 2)
+                    modifier = Modifier.size(size * 0.5f)
                 )
             }
         }
@@ -384,28 +518,6 @@ private fun ProfileAvatar(
                     .size(16.dp)
             )
         }
-    }
-}
-
-@Composable
-private fun DetailRow(label: String, value: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = value.ifBlank { "—" },
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold
-        )
     }
 }
 
@@ -430,4 +542,13 @@ private fun ProfileField(
         },
         modifier = Modifier.fillMaxWidth()
     )
+}
+
+private fun initials(name: String): String {
+    val parts = name.trim().split(" ").filter { it.isNotEmpty() }
+    return when {
+        parts.isEmpty() -> "ME"
+        parts.size == 1 -> parts[0].take(2).uppercase()
+        else -> (parts[0].take(1) + parts[1].take(1)).uppercase()
+    }
 }
