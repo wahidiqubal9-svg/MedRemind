@@ -153,21 +153,23 @@ fun TodayContent(
         ) {
             if (doses.isEmpty()) {
                 item(key = "empty") {
-                    MedEmptyState(
-                        icon = Icons.Rounded.CalendarMonth,
-                        title = "No doses scheduled",
-                        message = "Nothing is scheduled for this day. Add a medicine to get started.",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 48.dp),
-                        action = {
-                            GradientPillButton(
-                                text = "Add medicine",
-                                icon = Icons.Rounded.Add,
-                                onClick = onAdd
-                            )
-                        }
-                    )
+                    MedCard(modifier = Modifier.fillMaxWidth()) {
+                        MedEmptyState(
+                            icon = Icons.Rounded.CalendarMonth,
+                            title = "No doses scheduled",
+                            message = "Nothing is scheduled for this day. Add a medicine to get started.",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 28.dp),
+                            action = {
+                                GradientPillButton(
+                                    text = "Add medicine",
+                                    icon = Icons.Rounded.Add,
+                                    onClick = onAdd
+                                )
+                            }
+                        )
+                    }
                 }
             } else {
                 items(groups, key = { it.first }) { (time, list) ->
