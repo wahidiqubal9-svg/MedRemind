@@ -297,7 +297,8 @@ fun AddEditMedicineScreen(
                     },
                     label = "stepTransition"
                 ) { stepIndex ->
-                    when (stepIndex) {
+                    Column {
+                        when (stepIndex) {
                     0 -> DetailsStep(
                         name = name,
                         onName = { name = it },
@@ -341,7 +342,8 @@ fun AddEditMedicineScreen(
                         daysLabel = if (specificDaysOnly) daysLabel(daysMask) else "Every day",
                         durationLabel = if (durationDays == 0) "Continue" else "$durationDays days"
                     )
-                }
+                        }
+                    }
                 }
             }
 
