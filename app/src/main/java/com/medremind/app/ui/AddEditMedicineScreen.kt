@@ -32,16 +32,20 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -108,6 +112,8 @@ fun AddEditMedicineScreen(
     var qtyUnit by rememberSaveable { mutableStateOf("tablet") }
     var photoPath by rememberSaveable { mutableStateOf(initial?.photoPath) }
     var pendingFile by remember { mutableStateOf<File?>(null) }
+    var showPhotoSheet by remember { mutableStateOf(false) }
+    var unitTarget by remember { mutableStateOf<Int?>(null) }
 
     var frequency by remember { mutableIntStateOf(0) }
     var daysMask by remember { mutableIntStateOf(0b0011111) }
@@ -242,27 +248,12 @@ fun AddEditMedicineScreen(
                         doseAmount = doseAmount,
                         onDoseAmount = { doseAmount = it },
                         doseUnit = doseUnit,
-                        onDoseUnit = { doseUnit = it },
                         qtyAmount = qtyAmount,
                         onQtyAmount = { qtyAmount = it },
                         qtyUnit = qtyUnit,
-                        onQtyUnit = { qtyUnit = it },
                         photoPath = photoPath,
-                        onPickPhoto = {
-                            pickImage.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                            )
-                        },
-                        onTakePhoto = {
-                            val file = PhotoStorage.newPhotoFile(context)
-                            pendingFile = file
-                            val uri = FileProvider.getUriForFile(
-                                context,
-                                context.packageName + ".fileprovider",
-                                file
-                            )
-                            takePicture.launch(uri)
-                        }
+                        onPhotoClick = { showPhotoSheet = true },
+                        onOpenUnit = { target -> unitTarget = target }
                     )
                     1 -> ScheduleStep(
                         frequency = frequency,
@@ -358,6 +349,41 @@ fun AddEditMedicineScreen(
             }
         }
     }
+
+    if (showPhotoSheet) {
+        PhotoSourceSheet(
+            onDismiss = { showPhotoSheet = false },
+            onCamera = {
+                showPhotoSheet = false
+                val file = PhotoStorage.newPhotoFile(context)
+                pendingFile = file
+                val uri = FileProvider.getUriForFile(
+                    context,
+                    context.packageName + ".fileprovider",
+                    file
+                )
+                takePicture.launch(uri)
+            },
+            onGallery = {
+                showPhotoSheet = false
+                pickImage.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            }
+        )
+    }
+
+    unitTarget?.let { target ->
+        UnitSheet(
+            options = if (target == 0) doseUnits else qtyUnits,
+            current = if (target == 0) doseUnit else qtyUnit,
+            onSelect = { value ->
+                if (target == 0) doseUnit = value else qtyUnit = value
+                unitTarget = null
+            },
+            onDismiss = { unitTarget = null }
+        )
+    }
 }
 
 @Composable
@@ -367,14 +393,12 @@ private fun DetailsStep(
     doseAmount: String,
     onDoseAmount: (String) -> Unit,
     doseUnit: String,
-    onDoseUnit: (String) -> Unit,
     qtyAmount: String,
     onQtyAmount: (String) -> Unit,
     qtyUnit: String,
-    onQtyUnit: (String) -> Unit,
     photoPath: String?,
-    onPickPhoto: () -> Unit,
-    onTakePhoto: () -> Unit
+    onPhotoClick: () -> Unit,
+    onOpenUnit: (Int) -> Unit
 ) {
     Text(
         "Add medicine",
@@ -410,13 +434,13 @@ private fun DetailsStep(
             modifier = Modifier.weight(1f)
         )
         Spacer(Modifier.width(10.dp))
-        UnitDropdown(value = doseUnit, options = doseUnits, onSelect = onDoseUnit)
+        UnitButton(value = doseUnit, onClick = { onOpenUnit(0) })
     }
 
     Spacer(Modifier.height(16.dp))
     FieldLabel("Medicine photo", hint = "(optional)")
     Surface(
-        onClick = onPickPhoto,
+        onClick = onPhotoClick,
         modifier = Modifier
             .fillMaxWidth()
             .height(170.dp),
@@ -450,15 +474,11 @@ private fun DetailsStep(
         }
     }
     Spacer(Modifier.height(8.dp))
-    OutlinedButton(
-        onClick = onTakePhoto,
-        shape = RoundedCornerShape(50),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Icon(Icons.Rounded.PhotoCamera, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text("Take a photo")
-    }
+    Text(
+        "Tap to take a photo or choose from gallery",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 
     Spacer(Modifier.height(16.dp))
     FieldLabel("How many at each time?")
@@ -471,7 +491,7 @@ private fun DetailsStep(
             modifier = Modifier.weight(1f)
         )
         Spacer(Modifier.width(10.dp))
-        UnitDropdown(value = qtyUnit, options = qtyUnits, onSelect = onQtyUnit)
+        UnitButton(value = qtyUnit, onClick = { onOpenUnit(1) })
     }
 }
 
@@ -708,38 +728,175 @@ private fun FieldLabel(text: String, hint: String? = null) {
 }
 
 @Composable
-private fun UnitDropdown(value: String, options: List<String>, onSelect: (String) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        Surface(
-            onClick = { expanded = true },
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            contentColor = MaterialTheme.colorScheme.onSurface
+private fun UnitButton(value: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.width(8.dp))
-                Icon(
-                    imageVector = Icons.Rounded.ChevronRight,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
+            Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.width(8.dp))
+            Icon(
+                imageVector = Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
+            )
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PhotoSourceSheet(
+    onDismiss: () -> Unit,
+    onCamera: () -> Unit,
+    onGallery: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp)
+        ) {
+            Text(
+                text = "Medicine photo",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 12.dp, bottom = 8.dp)
+            )
+            SheetOption(Icons.Rounded.PhotoCamera, "Take photo", onCamera)
+            SheetOption(Icons.Rounded.PhotoLibrary, "Choose from gallery", onGallery)
+            Spacer(Modifier.height(8.dp))
+            SheetCancel(onDismiss)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun UnitSheet(
+    options: List<String>,
+    current: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp)
+        ) {
+            Text(
+                text = "Select unit",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 12.dp, bottom = 8.dp)
+            )
             options.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option) },
-                    onClick = {
-                        onSelect(option)
-                        expanded = false
+                val selected = option == current
+                Surface(
+                    onClick = { onSelect(option) },
+                    shape = MaterialTheme.shapes.medium,
+                    color = if (selected) MaterialTheme.colorScheme.primaryContainer
+                    else Color.Transparent
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 15.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = option,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+                            else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (selected) {
+                            Icon(
+                                imageVector = Icons.Rounded.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
-                )
+                }
             }
+            Spacer(Modifier.height(8.dp))
+            SheetCancel(onDismiss)
+        }
+    }
+}
+
+@Composable
+private fun SheetOption(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.medium,
+        color = Color.Transparent,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 15.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(Modifier.width(14.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun SheetCancel(onDismiss: () -> Unit) {
+    Surface(
+        onClick = onDismiss,
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Box(
+            modifier = Modifier.padding(vertical = 14.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Cancel", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         }
     }
 }
