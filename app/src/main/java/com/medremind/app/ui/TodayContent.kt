@@ -45,6 +45,7 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.MoreVert
@@ -66,9 +67,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.medremind.app.data.DoseStatus
 import com.medremind.app.data.Medicine
@@ -84,7 +87,6 @@ fun TodayContent(
     medicines: List<Medicine>,
     vm: MedicineViewModel,
     onAdd: () -> Unit,
-    onEdit: (Medicine) -> Unit,
     onOpenSettings: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -198,8 +200,8 @@ fun TodayContent(
                     TimeGroupCard(
                         time = time,
                         doses = list,
-                        onEdit = onEdit,
                         onTake = { dose -> vm.markDose(dose, DoseStatus.TAKEN) { reloadTick++ } },
+                        onSkip = { dose -> vm.markDose(dose, DoseStatus.SKIPPED) { reloadTick++ } },
                         modifier = Modifier.animateItem()
                     )
                 }
@@ -207,7 +209,7 @@ fun TodayContent(
                 if (doneGroups.isNotEmpty()) {
                     item(key = "done_header") {
                         SectionHeader(
-                            "Taken / Skipped",
+                            "Today's medicines",
                             modifier = Modifier.padding(top = 10.dp)
                         )
                     }
@@ -215,8 +217,8 @@ fun TodayContent(
                         TimeGroupCard(
                             time = time,
                             doses = list,
-                            onEdit = onEdit,
                             onTake = { dose -> vm.markDose(dose, DoseStatus.TAKEN) { reloadTick++ } },
+                            onSkip = { dose -> vm.markDose(dose, DoseStatus.SKIPPED) { reloadTick++ } },
                             modifier = Modifier.animateItem()
                         )
                     }
@@ -455,8 +457,8 @@ private fun MonthGrid(
 private fun TimeGroupCard(
     time: String,
     doses: List<TodayDose>,
-    onEdit: (Medicine) -> Unit,
     onTake: (TodayDose) -> Unit,
+    onSkip: (TodayDose) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -485,7 +487,7 @@ private fun TimeGroupCard(
 
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
                 doses.forEachIndexed { index, dose ->
-                    DoseRow(dose = dose, onEdit = onEdit, onTake = onTake)
+                    DoseRow(dose = dose, onTake = onTake, onSkip = onSkip)
                     if (index != doses.lastIndex) {
                         HorizontalDivider(
                             modifier = Modifier.padding(start = 66.dp),
@@ -502,14 +504,13 @@ private fun TimeGroupCard(
 @Composable
 private fun DoseRow(
     dose: TodayDose,
-    onEdit: (Medicine) -> Unit,
-    onTake: (TodayDose) -> Unit
+    onTake: (TodayDose) -> Unit,
+    onSkip: (TodayDose) -> Unit
 ) {
+    val completed = dose.status != DoseStatus.PENDING
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .clickable { onEdit(dose.medicine) }
             .padding(horizontal = 6.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -523,7 +524,10 @@ private fun DoseRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = dose.medicine.name,
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.titleMedium,
+                textDecoration = if (completed) TextDecoration.LineThrough else null,
+                color = if (completed) MaterialTheme.colorScheme.onSurfaceVariant
+                else MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = doseSubtitle(dose),
@@ -533,32 +537,57 @@ private fun DoseRow(
             )
         }
         Spacer(Modifier.width(8.dp))
-        if (dose.status == DoseStatus.PENDING) {
-            Surface(
-                onClick = { onTake(dose) },
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.CheckCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = "Taken",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-        } else {
+        if (completed) {
             StatusChip(status = dose.status)
+        } else {
+            DoseActionButton(
+                text = "Taken",
+                icon = Icons.Rounded.CheckCircle,
+                container = MaterialTheme.colorScheme.primaryContainer,
+                content = MaterialTheme.colorScheme.onPrimaryContainer,
+                onClick = { onTake(dose) }
+            )
+            Spacer(Modifier.width(6.dp))
+            DoseActionButton(
+                text = "Skip",
+                icon = Icons.Rounded.Close,
+                container = MaterialTheme.colorScheme.surfaceContainerHigh,
+                content = MaterialTheme.colorScheme.onSurfaceVariant,
+                onClick = { onSkip(dose) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun DoseActionButton(
+    text: String,
+    icon: ImageVector,
+    container: Color,
+    content: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = container,
+        contentColor = content
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp)
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }

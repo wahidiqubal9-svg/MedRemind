@@ -131,7 +131,6 @@ fun MainTabs(
                     medicines = medicines,
                     vm = vm,
                     onAdd = onAdd,
-                    onEdit = onEdit,
                     onOpenSettings = onOpenSettings
                 )
                 1 -> MedContent(
