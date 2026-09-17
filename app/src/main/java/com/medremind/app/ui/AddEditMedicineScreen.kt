@@ -13,10 +13,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -37,6 +39,7 @@ import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,6 +54,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -79,19 +85,44 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-private data class FreqOption(val title: String, val sub: String, val times: List<String>)
-
-private val freqOptions = listOf(
-    FreqOption("Every day", "1 time daily at 8:00 AM", listOf("08:00")),
-    FreqOption("Twice a day", "8:00 AM & 8:00 PM", listOf("08:00", "20:00")),
-    FreqOption("Three times a day", "8:00 AM · 2:00 PM · 8:00 PM", listOf("08:00", "14:00", "20:00")),
-    FreqOption("Specific days", "Choose which days below", listOf("08:00"))
-)
-
 private val doseUnits = listOf("mg", "g", "ml", "IU")
 private val qtyUnits = listOf("tablet", "capsule", "drop", "ml", "puff")
 private val dayLabels = listOf("M", "T", "W", "T", "F", "S", "S")
 private val dayNamesFull = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+private val doseOrdinals = listOf(
+    "1st dose", "2nd dose", "3rd dose", "4th dose", "5th dose",
+    "6th dose", "7th dose", "8th dose", "9th dose", "10th dose"
+)
+
+private fun suggestedTimes(count: Int): List<String> = when (count) {
+    1 -> listOf("08:00")
+    2 -> listOf("08:00", "20:00")
+    3 -> listOf("08:00", "14:00", "20:00")
+    4 -> listOf("06:00", "12:00", "18:00", "00:00")
+    else -> {
+        val interval = 12.0 / (count - 1)
+        (0 until count).map { i ->
+            val hour = 8 + interval * i
+            val h = hour.toInt()
+            val m = ((hour - h) * 60).toInt()
+            String.format("%02d:%02d", h, m)
+        }
+    }
+}
+
+private fun timeOfDayColor(hour: Int): Color = when {
+    hour in 5..11 -> Color(0xFFFB923C)
+    hour in 12..16 -> Color(0xFFF59E0B)
+    hour in 17..20 -> Color(0xFF8B5CF6)
+    else -> Color(0xFF3B82F6)
+}
+
+private fun timeOfDayLabel(hour: Int): String = when {
+    hour in 5..11 -> "Morning"
+    hour in 12..16 -> "Afternoon"
+    hour in 17..20 -> "Evening"
+    else -> "Night"
+}
 
 @Composable
 fun AddEditMedicineScreen(
@@ -115,10 +146,13 @@ fun AddEditMedicineScreen(
     var showPhotoSheet by remember { mutableStateOf(false) }
     var unitTarget by remember { mutableStateOf<Int?>(null) }
 
-    var frequency by remember { mutableIntStateOf(0) }
+    var timesCount by remember { mutableIntStateOf(2) }
+    var isCustomCount by remember { mutableStateOf(false) }
+    var specificDaysOnly by remember { mutableStateOf(false) }
     var daysMask by remember { mutableIntStateOf(0b0011111) }
     var durationDays by remember { mutableIntStateOf(0) }
-    var times by remember { mutableStateOf(listOf("08:00")) }
+    var times by remember { mutableStateOf(listOf("08:00", "20:00")) }
+    var editingTimeIndex by remember { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(initial?.id) {
         if (initial != null) {
@@ -132,19 +166,15 @@ fun AddEditMedicineScreen(
                 }
                 times = first.times.split(',').map { it.trim() }.filter { it.isNotEmpty() }
                     .ifEmpty { listOf("08:00") }
+                timesCount = times.size.coerceIn(1, 10)
+                isCustomCount = timesCount > 4
+                specificDaysOnly = first.type == ScheduleType.WEEKDAYS
                 daysMask = if (first.type == ScheduleType.WEEKDAYS) first.daysMask.let {
                     if (it == 0) 0b0011111 else it
                 } else 0b0011111
-                frequency = when {
-                    first.type == ScheduleType.WEEKDAYS -> 3
-                    times == listOf("08:00") -> 0
-                    times == listOf("08:00", "20:00") -> 1
-                    times == listOf("08:00", "14:00", "20:00") -> 2
-                    else -> 0
-                }
                 durationDays = first.endDate?.let { end ->
                     val days = ((end - System.currentTimeMillis()) / 86_400_000L).toInt()
-                    listOf(7, 30, 90).minByOrNull { kotlin.math.abs(it - days) }?.takeIf { days > 0 } ?: 0
+                    days.coerceAtLeast(1)
                 } ?: 0
             }
         }
@@ -179,10 +209,12 @@ fun AddEditMedicineScreen(
                 qtyAmount = "1"
                 qtyUnit = "tablet"
                 photoPath = null
-                frequency = 0
+                timesCount = 2
+                isCustomCount = false
+                specificDaysOnly = false
                 daysMask = 0b0011111
                 durationDays = 0
-                times = listOf("08:00")
+                times = listOf("08:00", "20:00")
                 step = 0
                 saved = false
             }
@@ -256,15 +288,22 @@ fun AddEditMedicineScreen(
                         onOpenUnit = { target -> unitTarget = target }
                     )
                     1 -> ScheduleStep(
-                        frequency = frequency,
-                        onFrequency = { index ->
-                            frequency = index
-                            if (index != 3) times = freqOptions[index].times
+                        timesCount = timesCount,
+                        isCustomCount = isCustomCount,
+                        onSelectCount = { count, custom ->
+                            isCustomCount = custom
+                            timesCount = count
+                            times = suggestedTimes(count)
+                        },
+                        specificDaysOnly = specificDaysOnly,
+                        onSelectDayType = { specific ->
+                            specificDaysOnly = specific
+                            if (specific && daysMask == 0) daysMask = 0b0011111
                         },
                         daysMask = daysMask,
-                        onToggleDay = { index ->
-                            daysMask = daysMask xor (1 shl index)
-                        },
+                        onToggleDay = { index -> daysMask = daysMask xor (1 shl index) },
+                        times = times,
+                        onEditTime = { index -> editingTimeIndex = index },
                         durationDays = durationDays,
                         onDuration = { durationDays = it }
                     )
@@ -275,8 +314,8 @@ fun AddEditMedicineScreen(
                         photoPath = photoPath,
                         onEdit = { step = 0 },
                         timeLabel = times.joinToString(" · ") { formatTimeLabel(it) },
-                        daysLabel = daysLabel(daysMask, frequency),
-                        durationLabel = if (durationDays == 0) "Ongoing" else "$durationDays days"
+                        daysLabel = if (specificDaysOnly) daysLabel(daysMask) else "Every day",
+                        durationLabel = if (durationDays == 0) "Continue" else "$durationDays days"
                     )
                 }
             }
@@ -325,9 +364,9 @@ fun AddEditMedicineScreen(
                                 val schedule = Schedule(
                                     id = initial?.let { 0L } ?: 0L,
                                     medicineId = base.id,
-                                    type = if (frequency == 3) ScheduleType.WEEKDAYS else ScheduleType.DAILY,
+                                    type = if (specificDaysOnly) ScheduleType.WEEKDAYS else ScheduleType.DAILY,
                                     times = times.joinToString(","),
-                                    daysMask = if (frequency == 3) daysMask else 0,
+                                    daysMask = if (specificDaysOnly) daysMask else 0,
                                     doseLabel = "$qtyAmount $qtyUnit".trim(),
                                     endDate = if (durationDays > 0) {
                                         System.currentTimeMillis() + durationDays * 86_400_000L
@@ -382,6 +421,20 @@ fun AddEditMedicineScreen(
                 unitTarget = null
             },
             onDismiss = { unitTarget = null }
+        )
+    }
+
+    editingTimeIndex?.let { index ->
+        TimePickerDialog(
+            initial = times.getOrElse(index) { "08:00" },
+            onDismiss = { editingTimeIndex = null },
+            onConfirm = { hour, minute ->
+                val newTime = String.format("%02d:%02d", hour, minute)
+                times = times.toMutableList().also {
+                    if (index in it.indices) it[index] = newTime
+                }
+                editingTimeIndex = null
+            }
         )
     }
 }
@@ -497,13 +550,22 @@ private fun DetailsStep(
 
 @Composable
 private fun ScheduleStep(
-    frequency: Int,
-    onFrequency: (Int) -> Unit,
+    timesCount: Int,
+    isCustomCount: Boolean,
+    onSelectCount: (Int, Boolean) -> Unit,
+    specificDaysOnly: Boolean,
+    onSelectDayType: (Boolean) -> Unit,
     daysMask: Int,
     onToggleDay: (Int) -> Unit,
+    times: List<String>,
+    onEditTime: (Int) -> Unit,
     durationDays: Int,
     onDuration: (Int) -> Unit
 ) {
+    var customCountText by remember { mutableStateOf(if (isCustomCount) timesCount.toString() else "5") }
+    var customDurationText by remember { mutableStateOf(if (durationDays > 0) durationDays.toString() else "14") }
+    val durationIsCustom = durationDays > 0 && durationDays != 7 && durationDays != 30
+
     Text(
         "How often?",
         style = MaterialTheme.typography.headlineMedium,
@@ -511,56 +573,260 @@ private fun ScheduleStep(
     )
     Spacer(Modifier.height(4.dp))
     Text(
-        "Choose how frequently you take this medicine. We'll remind you at the right times.",
+        "Set the daily frequency, days, and duration.",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
     Spacer(Modifier.height(18.dp))
 
-    FieldLabel("Frequency")
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        freqOptions.forEachIndexed { index, option ->
-            FrequencyOptionRow(
-                title = option.title,
-                subtitle = option.sub,
-                selected = frequency == index,
-                onClick = { onFrequency(index) }
+    FieldLabel("1. Times per day")
+    MedSegmentedButtons(
+        options = listOf("1x", "2x", "3x", "4x", "Custom"),
+        selectedIndex = if (isCustomCount || timesCount !in 1..4) 4 else timesCount - 1,
+        onSelect = { index ->
+            if (index == 4) {
+                onSelectCount(customCountText.toIntOrNull()?.coerceIn(5, 10) ?: 5, true)
+            } else {
+                onSelectCount(index + 1, false)
+            }
+        },
+        modifier = Modifier.fillMaxWidth()
+    )
+    if (isCustomCount) {
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "How many times?",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(10.dp))
+            OutlinedTextField(
+                value = customCountText,
+                onValueChange = { value ->
+                    val filtered = value.filter { it.isDigit() }.take(2)
+                    customCountText = filtered
+                    val n = filtered.toIntOrNull()
+                    if (n != null && n in 5..10) onSelectCount(n, true)
+                },
+                singleLine = true,
+                modifier = Modifier.width(96.dp)
             )
         }
     }
 
-    Spacer(Modifier.height(18.dp))
-    FieldLabel("Days", hint = "(tap to toggle)")
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        dayLabels.forEachIndexed { index, label ->
-            val selected = (daysMask and (1 shl index)) != 0
-            DayPill(
-                label = label,
-                selected = selected,
-                onClick = { onToggleDay(index) },
-                modifier = Modifier.weight(1f)
-            )
+    Spacer(Modifier.height(20.dp))
+    FieldLabel("2. Which days?")
+    MedSegmentedButtons(
+        options = listOf("Every day", "Specific days"),
+        selectedIndex = if (specificDaysOnly) 1 else 0,
+        onSelect = { onSelectDayType(it == 1) },
+        modifier = Modifier.fillMaxWidth()
+    )
+    if (specificDaysOnly) {
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            dayLabels.forEachIndexed { index, label ->
+                DayPill(
+                    label = label,
+                    selected = (daysMask and (1 shl index)) != 0,
+                    onClick = { onToggleDay(index) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = if (daysMask == 0) {
+                "Select at least one day."
+            } else {
+                "Selected: " + dayNamesFull
+                    .filterIndexed { index, _ -> (daysMask and (1 shl index)) != 0 }
+                    .joinToString(", ")
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = if (daysMask == 0) MaterialTheme.colorScheme.error
+            else MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 
-    Spacer(Modifier.height(18.dp))
-    FieldLabel("For how long?", hint = "(optional)")
+    Spacer(Modifier.height(20.dp))
+    FieldLabel("3. Set times")
+    Box {
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(top = 22.dp, bottom = 22.dp)
+                .offset(x = 7.dp)
+                .width(2.dp)
+                .fillMaxHeight()
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            times.forEachIndexed { index, time ->
+                AlarmRow(index = index, time = time, onClick = { onEditTime(index) })
+            }
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    Text(
+        "Tap any time to adjust it.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+
+    Spacer(Modifier.height(20.dp))
+    FieldLabel("4. For how long?", hint = "(optional)")
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        listOf(0 to "Ongoing", 7 to "7 days", 30 to "30 days", 90 to "90 days").forEach { (days, label) ->
+        listOf(0 to "Continue", 7 to "7 days", 30 to "30 days", -1 to "Custom").forEach { (days, label) ->
+            val selected = if (days == -1) durationIsCustom else durationDays == days
             DurationChip(
                 label = label,
-                selected = durationDays == days,
-                onClick = { onDuration(days) },
+                selected = selected,
+                onClick = {
+                    if (days == -1) {
+                        onDuration(customDurationText.toIntOrNull()?.coerceIn(1, 365) ?: 14)
+                    } else {
+                        onDuration(days)
+                    }
+                },
                 modifier = Modifier.weight(1f)
             )
         }
     }
+    if (durationIsCustom) {
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "For",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(8.dp))
+            OutlinedTextField(
+                value = customDurationText,
+                onValueChange = { value ->
+                    val filtered = value.filter { it.isDigit() }.take(3)
+                    customDurationText = filtered
+                    val n = filtered.toIntOrNull()
+                    if (n != null && n in 1..365) onDuration(n)
+                },
+                singleLine = true,
+                modifier = Modifier.width(96.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "days",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun AlarmRow(
+    index: Int,
+    time: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val hour = time.substringBefore(':').toIntOrNull() ?: 8
+    val accent = timeOfDayColor(hour)
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(16.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surface)
+                .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
+        )
+        Spacer(Modifier.width(14.dp))
+        Surface(
+            onClick = onClick,
+            shape = RoundedCornerShape(18.dp),
+            color = accent.copy(alpha = 0.08f),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant
+            ),
+            modifier = Modifier.weight(1f)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = formatTimeLabel(time),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Light
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = if (hour < 12) "AM" else "PM",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = timeOfDayLabel(hour),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = accent,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = doseOrdinals.getOrElse(index) { "Dose ${index + 1}" },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimePickerDialog(
+    initial: String,
+    onDismiss: () -> Unit,
+    onConfirm: (Int, Int) -> Unit
+) {
+    val parts = initial.split(':')
+    val startHour = parts.getOrNull(0)?.toIntOrNull() ?: 8
+    val startMinute = parts.getOrNull(1)?.toIntOrNull() ?: 0
+    val state = rememberTimePickerState(
+        initialHour = startHour,
+        initialMinute = startMinute,
+        is24Hour = false
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = { onConfirm(state.hour, state.minute) }) { Text("Set") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+        text = {
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                TimePicker(state = state)
+            }
+        }
+    )
 }
 
 @Composable
@@ -1040,10 +1306,10 @@ private fun splitAmountUnit(value: String, defaultUnit: String): Pair<String, St
     }
 }
 
-private fun daysLabel(mask: Int, frequency: Int): String = when {
-    frequency != 3 -> "Every day"
+private fun daysLabel(mask: Int): String = when {
     mask == 0b1111111 -> "Every day"
     mask == 0b0011111 -> "Mon – Fri"
+    mask == 0 -> "No days"
     else -> dayNamesFull.filterIndexed { index, _ -> (mask and (1 shl index)) != 0 }
         .joinToString(", ")
         .ifBlank { "No days" }
