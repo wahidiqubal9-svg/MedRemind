@@ -4,6 +4,15 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,6 +35,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -60,6 +70,7 @@ import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,7 +83,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.medremind.app.data.Medicine
@@ -273,7 +286,18 @@ fun AddEditMedicineScreen(
                     .padding(horizontal = 20.dp)
                     .padding(top = 8.dp, bottom = 20.dp)
             ) {
-                when (step) {
+                AnimatedContent(
+                    targetState = step,
+                    transitionSpec = {
+                        val forward = targetState > initialState
+                        (slideInHorizontally(tween(320)) { w -> if (forward) w else -w } +
+                            fadeIn(tween(260))) togetherWith
+                            (slideOutHorizontally(tween(260)) { w -> if (forward) -w else w } +
+                                fadeOut(tween(180)))
+                    },
+                    label = "stepTransition"
+                ) { stepIndex ->
+                    when (stepIndex) {
                     0 -> DetailsStep(
                         name = name,
                         onName = { name = it },
@@ -317,6 +341,7 @@ fun AddEditMedicineScreen(
                         daysLabel = if (specificDaysOnly) daysLabel(daysMask) else "Every day",
                         durationLabel = if (durationDays == 0) "Continue" else "$durationDays days"
                     )
+                }
                 }
             }
 
@@ -484,6 +509,7 @@ private fun DetailsStep(
             onValueChange = { onDoseAmount(it.filter { c -> c.isDigit() || c == '.' }) },
             placeholder = { Text("500") },
             singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.weight(1f)
         )
         Spacer(Modifier.width(10.dp))
@@ -541,6 +567,7 @@ private fun DetailsStep(
             onValueChange = { onQtyAmount(it.filter { c -> c.isDigit() || c == '.' }) },
             placeholder = { Text("1") },
             singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.weight(1f)
         )
         Spacer(Modifier.width(10.dp))
@@ -592,26 +619,29 @@ private fun ScheduleStep(
         },
         modifier = Modifier.fillMaxWidth()
     )
-    if (isCustomCount) {
-        Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "How many times?",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.width(10.dp))
-            OutlinedTextField(
-                value = customCountText,
-                onValueChange = { value ->
-                    val filtered = value.filter { it.isDigit() }.take(2)
-                    customCountText = filtered
-                    val n = filtered.toIntOrNull()
-                    if (n != null && n in 5..10) onSelectCount(n, true)
-                },
-                singleLine = true,
-                modifier = Modifier.width(96.dp)
-            )
+    AnimatedVisibility(visible = isCustomCount) {
+        Column {
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "How many times?",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.width(10.dp))
+                OutlinedTextField(
+                    value = customCountText,
+                    onValueChange = { value ->
+                        val filtered = value.filter { it.isDigit() }.take(2)
+                        customCountText = filtered
+                        val n = filtered.toIntOrNull()
+                        if (n != null && n in 5..10) onSelectCount(n, true)
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.width(96.dp)
+                )
+            }
         }
     }
 
@@ -623,34 +653,36 @@ private fun ScheduleStep(
         onSelect = { onSelectDayType(it == 1) },
         modifier = Modifier.fillMaxWidth()
     )
-    if (specificDaysOnly) {
-        Spacer(Modifier.height(12.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            dayLabels.forEachIndexed { index, label ->
-                DayPill(
-                    label = label,
-                    selected = (daysMask and (1 shl index)) != 0,
-                    onClick = { onToggleDay(index) },
-                    modifier = Modifier.weight(1f)
-                )
+    AnimatedVisibility(visible = specificDaysOnly) {
+        Column {
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                dayLabels.forEachIndexed { index, label ->
+                    DayPill(
+                        label = label,
+                        selected = (daysMask and (1 shl index)) != 0,
+                        onClick = { onToggleDay(index) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = if (daysMask == 0) {
+                    "Select at least one day."
+                } else {
+                    "Selected: " + dayNamesFull
+                        .filterIndexed { index, _ -> (daysMask and (1 shl index)) != 0 }
+                        .joinToString(", ")
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (daysMask == 0) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = if (daysMask == 0) {
-                "Select at least one day."
-            } else {
-                "Selected: " + dayNamesFull
-                    .filterIndexed { index, _ -> (daysMask and (1 shl index)) != 0 }
-                    .joinToString(", ")
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = if (daysMask == 0) MaterialTheme.colorScheme.error
-            else MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 
     Spacer(Modifier.height(20.dp))
@@ -666,8 +698,10 @@ private fun ScheduleStep(
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
         )
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            times.forEachIndexed { index, time ->
-                AlarmRow(index = index, time = time, onClick = { onEditTime(index) })
+            key(times.joinToString(",")) {
+                times.forEachIndexed { index, time ->
+                    AlarmRow(index = index, time = time, onClick = { onEditTime(index) })
+                }
             }
         }
     }
@@ -737,10 +771,22 @@ private fun AlarmRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var appeared by remember { mutableStateOf(false) }
+    LaunchedEffect(index, time) {
+        delay(index * 70L)
+        appeared = true
+    }
     val hour = time.substringBefore(':').toIntOrNull() ?: 8
     val accent = timeOfDayColor(hour)
+    AnimatedVisibility(
+        visible = appeared,
+        modifier = modifier,
+        enter = slideInHorizontally(tween(420)) { it } +
+            fadeIn(tween(320)) +
+            scaleIn(tween(420), initialScale = 0.95f)
+    ) {
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
@@ -795,6 +841,7 @@ private fun AlarmRow(
                 }
             }
         }
+    }
     }
 }
 
