@@ -137,10 +137,41 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                     it.medicineId == schedule.medicineId && abs(it.scheduledAt - trigger) < 90_000L
                 }
                 val status = event?.status ?: if (trigger < now) DoseStatus.MISSED else DoseStatus.PENDING
-                result.add(TodayDose(trigger, medicine, status, schedule))
+                result.add(TodayDose(trigger, medicine, status, schedule, event?.id))
             }
         }
         result.sortedBy { it.timeMillis }
+    }
+
+    fun markDose(dose: TodayDose, status: String, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val dao = db.doseEventDao()
+                val existingId = dose.eventId
+                if (existingId != null) {
+                    val event = dao.byId(existingId)
+                    if (event != null) {
+                        dao.update(
+                            event.copy(
+                                status = status,
+                                actedAt = System.currentTimeMillis()
+                            )
+                        )
+                    }
+                } else {
+                    dao.insert(
+                        DoseEvent(
+                            scheduleId = dose.schedule.id,
+                            medicineId = dose.medicine.id,
+                            scheduledAt = dose.timeMillis,
+                            status = status,
+                            actedAt = System.currentTimeMillis()
+                        )
+                    )
+                }
+            }
+            onDone()
+        }
     }
 
     fun triggerTestAlarm() {
@@ -176,7 +207,8 @@ data class TodayDose(
     val timeMillis: Long,
     val medicine: Medicine,
     val status: String,
-    val schedule: Schedule
+    val schedule: Schedule,
+    val eventId: Long? = null
 )
 
 private const val MISSED_AFTER_MILLIS = 2 * 60 * 60 * 1000L

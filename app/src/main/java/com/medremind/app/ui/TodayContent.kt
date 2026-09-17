@@ -42,6 +42,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
@@ -57,6 +58,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -68,6 +70,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.medremind.app.data.DoseStatus
 import com.medremind.app.data.Medicine
 import java.text.SimpleDateFormat
 import java.time.LocalDate
@@ -88,13 +91,20 @@ fun TodayContent(
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var month by remember { mutableStateOf(YearMonth.now()) }
     var doses by remember { mutableStateOf<List<TodayDose>>(emptyList()) }
-    var mutedTimes by remember { mutableStateOf(setOf<String>()) }
+    var reloadTick by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(selectedDate, medicines) {
+    LaunchedEffect(selectedDate, medicines, reloadTick) {
         doses = vm.dosesOn(selectedDate)
     }
 
-    val groups = doses
+    val pendingGroups = doses
+        .filter { it.status == DoseStatus.PENDING }
+        .groupBy { formatDoseTime(it.timeMillis) }
+        .toList()
+        .sortedBy { (_, list) -> list.minOf { it.timeMillis } }
+
+    val doneGroups = doses
+        .filter { it.status != DoseStatus.PENDING }
         .groupBy { formatDoseTime(it.timeMillis) }
         .toList()
         .sortedBy { (_, list) -> list.minOf { it.timeMillis } }
@@ -184,18 +194,32 @@ fun TodayContent(
                     }
                 }
             } else {
-                items(groups, key = { it.first }) { (time, list) ->
+                items(pendingGroups, key = { "p-${it.first}" }) { (time, list) ->
                     TimeGroupCard(
                         time = time,
                         doses = list,
-                        muted = time in mutedTimes,
-                        onToggleMute = {
-                            mutedTimes = if (time in mutedTimes) mutedTimes - time else mutedTimes + time
-                        },
                         onEdit = onEdit,
-                        onAdd = onAdd,
+                        onTake = { dose -> vm.markDose(dose, DoseStatus.TAKEN) { reloadTick++ } },
                         modifier = Modifier.animateItem()
                     )
+                }
+
+                if (doneGroups.isNotEmpty()) {
+                    item(key = "done_header") {
+                        SectionHeader(
+                            "Taken / Skipped",
+                            modifier = Modifier.padding(top = 10.dp)
+                        )
+                    }
+                    items(doneGroups, key = { "d-${it.first}" }) { (time, list) ->
+                        TimeGroupCard(
+                            time = time,
+                            doses = list,
+                            onEdit = onEdit,
+                            onTake = { dose -> vm.markDose(dose, DoseStatus.TAKEN) { reloadTick++ } },
+                            modifier = Modifier.animateItem()
+                        )
+                    }
                 }
             }
         }
@@ -431,10 +455,8 @@ private fun MonthGrid(
 private fun TimeGroupCard(
     time: String,
     doses: List<TodayDose>,
-    muted: Boolean,
-    onToggleMute: () -> Unit,
     onEdit: (Medicine) -> Unit,
-    onAdd: () -> Unit,
+    onTake: (TodayDose) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -448,7 +470,7 @@ private fun TimeGroupCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 14.dp),
+                    .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -457,14 +479,13 @@ private fun TimeGroupCard(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
                 )
-                SpeakerToggle(muted = muted, onToggle = onToggleMute)
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
                 doses.forEachIndexed { index, dose ->
-                    DoseRow(dose = dose, onEdit = onEdit)
+                    DoseRow(dose = dose, onEdit = onEdit, onTake = onTake)
                     if (index != doses.lastIndex) {
                         HorizontalDivider(
                             modifier = Modifier.padding(start = 66.dp),
@@ -472,13 +493,7 @@ private fun TimeGroupCard(
                         )
                     }
                 }
-                Spacer(Modifier.height(8.dp))
-                DashedAddRow(
-                    text = "Med / Tracker",
-                    onClick = onAdd,
-                    modifier = Modifier.padding(horizontal = 4.dp)
-                )
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(4.dp))
             }
         }
     }
@@ -487,7 +502,8 @@ private fun TimeGroupCard(
 @Composable
 private fun DoseRow(
     dose: TodayDose,
-    onEdit: (Medicine) -> Unit
+    onEdit: (Medicine) -> Unit,
+    onTake: (TodayDose) -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -516,12 +532,33 @@ private fun DoseRow(
                 maxLines = 1
             )
         }
-        IconButton(onClick = { onEdit(dose.medicine) }) {
-            Icon(
-                imageVector = Icons.Rounded.MoreVert,
-                contentDescription = "Options for ${dose.medicine.name}",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        Spacer(Modifier.width(8.dp))
+        if (dose.status == DoseStatus.PENDING) {
+            Surface(
+                onClick = { onTake(dose) },
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.CheckCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "Taken",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        } else {
+            StatusChip(status = dose.status)
         }
     }
 }
