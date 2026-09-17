@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -49,6 +50,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -175,6 +177,15 @@ fun TodayContent(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            item(key = "summary") {
+                RiseIn(index = 0) {
+                    SummaryCard(
+                        taken = doses.count { it.status == DoseStatus.TAKEN },
+                        total = doses.size,
+                        missed = doses.count { it.status == DoseStatus.MISSED }
+                    )
+                }
+            }
             if (doses.isEmpty()) {
                 item(key = "empty") {
                     MedCard(modifier = Modifier.fillMaxWidth()) {
@@ -196,14 +207,17 @@ fun TodayContent(
                     }
                 }
             } else {
-                items(pendingGroups, key = { "p-${it.first}" }) { (time, list) ->
-                    TimeGroupCard(
-                        time = time,
-                        doses = list,
-                        onTake = { dose -> vm.markDose(dose, DoseStatus.TAKEN) { reloadTick++ } },
-                        onSkip = { dose -> vm.markDose(dose, DoseStatus.SKIPPED) { reloadTick++ } },
-                        modifier = Modifier.animateItem()
-                    )
+                itemsIndexed(pendingGroups, key = { _, item -> "p-${item.first}" }) { index, item ->
+                    val (time, list) = item
+                    RiseIn(index = index + 1) {
+                        TimeGroupCard(
+                            time = time,
+                            doses = list,
+                            onTake = { dose -> vm.markDose(dose, DoseStatus.TAKEN) { reloadTick++ } },
+                            onSkip = { dose -> vm.markDose(dose, DoseStatus.SKIPPED) { reloadTick++ } },
+                            modifier = Modifier.animateItem()
+                        )
+                    }
                 }
 
                 if (doneGroups.isNotEmpty()) {
@@ -226,6 +240,76 @@ fun TodayContent(
             }
         }
     }
+}
+
+@Composable
+private fun SummaryCard(taken: Int, total: Int, missed: Int) {
+    val pct = if (total == 0) 0 else taken * 100 / total
+    MedHeroCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Daily progress",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "$taken of $total doses taken",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SummaryChip(Color(0xFF7EF0B2), "$taken Taken")
+                    SummaryChip(Color(0xFFFFB3C4), "$missed Missed")
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            ProgressRing(percent = pct, modifier = Modifier.size(80.dp)) {
+                Text(
+                    "$pct%",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SummaryChip(dot: Color, text: String) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = Color.White.copy(alpha = 0.18f),
+        contentColor = Color.White
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(dot)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+private fun timeOfDayColor(hour: Int): Color = when {
+    hour in 5..11 -> Color(0xFFD97706)
+    hour in 12..16 -> Color(0xFFF59E0B)
+    hour in 17..20 -> Color(0xFF9333EA)
+    else -> Color(0xFF6D5BD0)
 }
 
 @Composable
@@ -469,17 +553,57 @@ private fun TimeGroupCard(
         shadowElevation = 2.dp
     ) {
         Column {
+            val hour = remember(doses) {
+                java.util.Calendar.getInstance().apply { timeInMillis = doses.first().timeMillis }
+                    .get(java.util.Calendar.HOUR_OF_DAY)
+            }
+            val allDone = doses.all { it.status != DoseStatus.PENDING }
+            val anyMissed = doses.any { it.status == DoseStatus.MISSED }
+            val accentColor = timeOfDayColor(hour)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 14.dp),
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = time,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(13.dp))
+                        .background(accentColor.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Schedule,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(19.dp)
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = time,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${doses.size} medicine" + if (doses.size == 1) "" else "s",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                StatusChip(
+                    status = when {
+                        !allDone -> DoseStatus.PENDING
+                        anyMissed -> DoseStatus.MISSED
+                        else -> DoseStatus.TAKEN
+                    },
+                    label = when {
+                        !allDone -> "Upcoming"
+                        anyMissed -> "Missed"
+                        else -> "Completed"
+                    }
                 )
             }
 

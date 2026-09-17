@@ -1,7 +1,11 @@
 package com.medremind.app.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -15,9 +19,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,9 +46,13 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Cancel
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Cancel
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Medication
+import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.VolumeOff
 import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.AlertDialog
@@ -56,6 +67,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,6 +85,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -86,10 +99,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.medremind.app.data.DoseStatus
 import java.io.File
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -273,9 +288,12 @@ fun MedCard(
     Surface(
         modifier = modifier,
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 2.dp,
-        shadowElevation = 2.dp
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant
+        ),
+        shadowElevation = 6.dp
     ) {
         Column(modifier = Modifier.padding(16.dp), content = content)
     }
@@ -300,9 +318,12 @@ fun MedClickableCard(
             scaleY = scale
         },
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 2.dp,
-        shadowElevation = 2.dp
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant
+        ),
+        shadowElevation = 6.dp
     ) {
         Box(
             modifier = Modifier.clickable(
@@ -568,10 +589,10 @@ fun doseStatusLabel(status: String): String = when (status) {
 fun statusTint(status: String): Color {
     val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     return when (status) {
-        DoseStatus.TAKEN -> if (dark) Color(0xFF7FE0A8) else Color(0xFF1B7F3B)
-        DoseStatus.SKIPPED -> if (dark) Color(0xFFB4BCC0) else Color(0xFF6B7280)
-        DoseStatus.MISSED -> if (dark) Color(0xFFFF9C92) else Color(0xFFC62828)
-        else -> if (dark) Color(0xFF9CC3FF) else Color(0xFF1565C0)
+        DoseStatus.TAKEN -> if (dark) Color(0xFF7EF0B2) else Color(0xFF0A7F4F)
+        DoseStatus.SKIPPED -> if (dark) Color(0xFFB9C0CC) else Color(0xFF5B6472)
+        DoseStatus.MISSED -> if (dark) Color(0xFFFDA4AF) else Color(0xFFD53862)
+        else -> if (dark) Color(0xFF93C5FD) else Color(0xFF2563EB)
     }
 }
 
@@ -814,4 +835,256 @@ fun MedConfirmDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+
+@Composable
+fun RiseIn(index: Int = 0, content: @Composable () -> Unit) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay((index * 55).toLong())
+        visible = true
+    }
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(420)) +
+            slideInVertically(
+                animationSpec = tween(520, easing = CubicBezierEasing(0.22f, 1f, 0.36f, 1f))
+            ) { height -> height / 3 }
+    ) {
+        content()
+    }
+}
+
+@Composable
+fun SectionTitle(
+    title: String,
+    modifier: Modifier = Modifier,
+    trailing: (@Composable () -> Unit)? = null
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 2.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.ExtraBold,
+            modifier = Modifier.weight(1f)
+        )
+        trailing?.invoke()
+    }
+}
+
+private val medIconBg = listOf(
+    listOf(Color(0xFFE0E7FF), Color(0xFFF3E8FF)),
+    listOf(Color(0xFFDCFCE7), Color(0xFFD1FAE5)),
+    listOf(Color(0xFFFFE4E6), Color(0xFFFEE2E2)),
+    listOf(Color(0xFFFEF3C7), Color(0xFFFDE68A))
+)
+private val medIconFg = listOf(
+    Color(0xFF6366F1), Color(0xFF059669), Color(0xFFE11D48), Color(0xFFB45309)
+)
+
+@Composable
+fun MedIconSquare(
+    label: String,
+    seed: Long,
+    modifier: Modifier = Modifier,
+    size: Dp = 46.dp,
+    photoPath: String? = null
+) {
+    if (photoPath != null) {
+        AsyncImage(
+            model = File(photoPath),
+            contentDescription = label,
+            modifier = modifier
+                .size(size)
+                .clip(RoundedCornerShape(size * 0.3f)),
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        val i = (seed % 4).toInt().let { if (it < 0) it + 4 else it }
+        Box(
+            modifier = modifier
+                .size(size)
+                .clip(RoundedCornerShape(size * 0.3f))
+                .background(Brush.linearGradient(medIconBg[i])),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = label.take(1).uppercase(),
+                color = medIconFg[i],
+                fontWeight = FontWeight.Bold,
+                fontSize = (size.value * 0.42f).sp
+            )
+        }
+    }
+}
+
+@Composable
+fun Stepper(step: Int, total: Int = 3, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        repeat(total) { index ->
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(
+                        if (index <= step) {
+                            MedGradients.heroHorizontal()
+                        } else {
+                            SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest)
+                        }
+                    )
+            )
+        }
+    }
+}
+
+@Composable
+fun DropZone(
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val borderColor = MaterialTheme.colorScheme.outline
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(26.dp))
+            .clickable(onClick = onClick)
+            .drawBehind {
+                drawRoundRect(
+                    color = borderColor,
+                    style = Stroke(
+                        width = 2.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(18f, 14f), 0f)
+                    ),
+                    cornerRadius = CornerRadius(26.dp.toPx())
+                )
+            }
+            .padding(vertical = 42.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(MedGradients.heroHorizontal()),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.PhotoCamera,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold)
+        Spacer(Modifier.height(3.dp))
+        Text(
+            subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+fun SearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String = "Search"
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant
+        ),
+        shadowElevation = 3.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 15.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(10.dp))
+            Box(modifier = Modifier.weight(1f)) {
+                if (value.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun FilterChipRow(
+    options: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        options.forEachIndexed { index, label ->
+            val selected = index == selectedIndex
+            Surface(
+                onClick = { onSelect(index) },
+                shape = RoundedCornerShape(50),
+                color = if (selected) Color.Transparent else MaterialTheme.colorScheme.surface,
+                contentColor = if (selected) MaterialTheme.colorScheme.onPrimary
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                border = if (selected) null else androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant
+                ),
+                modifier = if (selected) {
+                    Modifier.background(MedGradients.heroHorizontal(), RoundedCornerShape(50))
+                } else Modifier
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 15.dp, vertical = 9.dp)
+                )
+            }
+        }
+    }
 }

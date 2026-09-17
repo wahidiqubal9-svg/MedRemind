@@ -268,15 +268,9 @@ fun AddEditMedicineScreen(
                 }
             }
 
-            LinearProgressIndicator(
-                progress = { (step + 1) / 3f },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .padding(horizontal = 20.dp, vertical = 6.dp)
-                    .clip(RoundedCornerShape(50)),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            Stepper(
+                step = step,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
             )
 
             Column(
@@ -520,46 +514,29 @@ private fun DetailsStep(
 
     Spacer(Modifier.height(16.dp))
     FieldLabel("Medicine photo", hint = "(optional)")
-    Surface(
-        onClick = onPhotoClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(170.dp),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            if (photoPath != null) {
-                AsyncImage(
-                    model = File(photoPath),
-                    contentDescription = "Medicine photo",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Rounded.PhotoCamera,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(34.dp)
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        "Add photo",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+    if (photoPath != null) {
+        Surface(
+            onClick = onPhotoClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp),
+            shape = RoundedCornerShape(26.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh
+        ) {
+            AsyncImage(
+                model = File(photoPath),
+                contentDescription = "Medicine photo",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
         }
+    } else {
+        DropZone(
+            title = "Add photo",
+            subtitle = "Tap to take a photo or choose from gallery",
+            onClick = onPhotoClick
+        )
     }
-    Spacer(Modifier.height(8.dp))
-    Text(
-        "Tap to take a photo or choose from gallery",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
 
     Spacer(Modifier.height(16.dp))
     FieldLabel("How many at each time?")

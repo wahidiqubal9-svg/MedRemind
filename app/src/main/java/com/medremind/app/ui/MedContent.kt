@@ -26,13 +26,16 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -63,6 +66,18 @@ fun MedContent(
     onAdd: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
+    var query by remember { mutableStateOf("") }
+    var filter by remember { mutableIntStateOf(0) }
+    val filterOptions = listOf("All", "Daily", "Weekly", "Course")
+    val filteredMedicines = medicines.filter { medicine ->
+        (query.isBlank() || medicine.name.contains(query, ignoreCase = true)) &&
+            when (filter) {
+                1 -> schedulesByMedicine[medicine.id].orEmpty().any { it.type == ScheduleType.DAILY }
+                2 -> schedulesByMedicine[medicine.id].orEmpty().any { it.type == ScheduleType.WEEKDAYS }
+                3 -> schedulesByMedicine[medicine.id].orEmpty().any { it.type == ScheduleType.COURSE }
+                else -> true
+            }
+    }
     if (medicines.isEmpty()) {
         Column(modifier = modifier.fillMaxSize()) {
             ScreenHeader("Medicines", modifier = Modifier.padding(horizontal = 16.dp)) {
@@ -110,7 +125,21 @@ fun MedContent(
                 )
             }
         }
-        items(medicines, key = { it.id }) { medicine ->
+        item(key = "search") {
+            SearchField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = "Search medicines…"
+            )
+        }
+        item(key = "filters") {
+            FilterChipRow(
+                options = filterOptions,
+                selectedIndex = filter,
+                onSelect = { filter = it }
+            )
+        }
+        items(filteredMedicines, key = { it.id }) { medicine ->
             MedicineCard(
                 medicine = medicine,
                 schedules = schedulesByMedicine[medicine.id].orEmpty(),
@@ -140,128 +169,100 @@ private fun MedicineCard(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 2.dp,
-        shadowElevation = 2.dp
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant
+        ),
+        shadowElevation = 6.dp
     ) {
-        Column {
-            val photo = medicine.photoPath
-            if (photo != null) {
-                AsyncImage(
-                    model = File(photo),
-                    contentDescription = medicine.name,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp),
-                    contentScale = ContentScale.Crop
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MedIconSquare(
+                    label = medicine.name,
+                    seed = medicine.id,
+                    size = 66.dp,
+                    photoPath = medicine.photoPath
                 )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(accent, accent.copy(alpha = 0.55f))
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Surface(
-                            shape = CircleShape,
-                            color = Color.White.copy(alpha = 0.25f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Medication,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier
-                                    .padding(14.dp)
-                                    .size(36.dp)
-                            )
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = medicine.name.take(1).uppercase(),
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.Top) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = medicine.name,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold
-                        )
-
-                        val dose = doseLine(medicine, schedules)
-                        if (dose.isNotBlank()) {
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = dose,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        val timing = timingText(schedules)
-                        if (timing.isNotBlank()) {
-                            Spacer(Modifier.height(4.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Repeat,
-                                    contentDescription = null,
-                                    tint = accent,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text(
-                                    text = timing,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-
-                    InlineMedicineActions(
-                        expanded = actionsExpanded,
-                        onToggle = { actionsExpanded = !actionsExpanded },
-                        onEdit = {
-                            actionsExpanded = false
-                            onEdit()
-                        },
-                        onDelete = {
-                            actionsExpanded = false
-                            showDelete = true
-                        }
+                Spacer(Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = medicine.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = doseLine(medicine, schedules).ifBlank { "—" },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                InlineMedicineActions(
+                    expanded = actionsExpanded,
+                    onToggle = { actionsExpanded = !actionsExpanded },
+                    onEdit = {
+                        actionsExpanded = false
+                        onEdit()
+                    },
+                    onDelete = {
+                        actionsExpanded = false
+                        showDelete = true
+                    }
+                )
+            }
 
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(16.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                val timing = timingText(schedules)
+                if (timing.isNotBlank()) {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Schedule,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                timing,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
                 val patterns = schedules.map { schedulePatternLabel(it) }.distinct()
                 if (patterns.isNotEmpty()) {
-                    Spacer(Modifier.height(10.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        patterns.forEach { pattern ->
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = accent.copy(alpha = 0.14f),
-                                contentColor = accent
-                            ) {
-                                Text(
-                                    text = pattern,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                                )
-                            }
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Repeat,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                patterns.joinToString(", "),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }

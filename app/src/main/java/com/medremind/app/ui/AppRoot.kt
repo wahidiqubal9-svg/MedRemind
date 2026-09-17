@@ -9,6 +9,11 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -16,6 +21,10 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.medremind.app.data.Medicine
 
@@ -43,9 +52,36 @@ fun AppRoot(
         else -> "main"
     }
 
-    AnimatedContent(
-        targetState = screen,
-        transitionSpec = {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFF6366F1).copy(alpha = 0.16f),
+                        Color.Transparent
+                    ),
+                    center = Offset(size.width * 0.9f, -size.height * 0.05f),
+                    radius = size.width * 0.95f
+                )
+            )
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFFA855F7).copy(alpha = 0.10f),
+                        Color.Transparent
+                    ),
+                    center = Offset(0f, size.height * 0.35f),
+                    radius = size.width * 0.85f
+                )
+            )
+        }
+        AnimatedContent(
+            targetState = screen,
+            transitionSpec = {
             val opening = targetState != "main"
             if (opening) {
                 val enter = slideInVertically(tween(300)) { height -> height / 10 } +
@@ -116,6 +152,7 @@ fun AppRoot(
                 onOpenSettings = { showSettings = true }
             )
         }
+    }
     }
 
     val action = pendingAction
