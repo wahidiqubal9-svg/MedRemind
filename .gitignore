@@ -12,3 +12,6 @@ app/build/
 *.apk
 *.aab
 *.log
+
+# local dev prototype (not part of the app)
+prototype/
