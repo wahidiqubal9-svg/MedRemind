@@ -7,8 +7,10 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -123,27 +125,37 @@ fun TodayContent(
                 }
         ) {
             Column {
-                WeekStrip(
-                    selectedDate = selectedDate,
-                    onSelect = {
-                        selectedDate = it
-                        month = YearMonth.from(it)
-                    }
-                )
-            }
-        }
-
-        AnimatedVisibility(visible = expanded) {
-            MonthGrid(
-                month = month,
-                selectedDate = selectedDate,
-                onPrevMonth = { month = month.minusMonths(1) },
-                onNextMonth = { month = month.plusMonths(1) },
-                onSelectDay = { date ->
-                    selectedDate = date
-                    month = YearMonth.from(date)
+                AnimatedVisibility(
+                    visible = !expanded,
+                    enter = expandVertically(tween(280)) + fadeIn(tween(220)),
+                    exit = shrinkVertically(tween(200)) + fadeOut(tween(140))
+                ) {
+                    WeekStrip(
+                        selectedDate = selectedDate,
+                        onSelect = {
+                            selectedDate = it
+                            month = YearMonth.from(it)
+                        }
+                    )
                 }
-            )
+
+                AnimatedVisibility(
+                    visible = expanded,
+                    enter = expandVertically(tween(300)) + fadeIn(tween(240)),
+                    exit = shrinkVertically(tween(220)) + fadeOut(tween(140))
+                ) {
+                    MonthGrid(
+                        month = month,
+                        selectedDate = selectedDate,
+                        onPrevMonth = { month = month.minusMonths(1) },
+                        onNextMonth = { month = month.plusMonths(1) },
+                        onSelectDay = { date ->
+                            selectedDate = date
+                            month = YearMonth.from(date)
+                        }
+                    )
+                }
+            }
         }
 
         LazyColumn(
