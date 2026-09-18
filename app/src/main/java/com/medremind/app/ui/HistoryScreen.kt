@@ -34,6 +34,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -67,23 +68,17 @@ fun HistoryContent(
     LaunchedEffect(Unit) { vm.markOverdueAsMissed() }
 
     var rangeDays by remember { mutableIntStateOf(7) }
-    val zone = remember { ZoneId.systemDefault() }
-    val today = LocalDate.now()
+    var stats by remember { mutableStateOf<List<DayDoseStat>>(emptyList()) }
 
-    val days = remember(history, rangeDays, zone) {
-        val byDate = history.groupBy {
-            Instant.ofEpochMilli(it.event.scheduledAt).atZone(zone).toLocalDate()
-        }
-        ((rangeDays - 1) downTo 0).map { offset ->
-            val date = today.minusDays(offset.toLong())
-            date to byDate[date].orEmpty().map { it.event.status }
-        }
+    LaunchedEffect(rangeDays, history) {
+        stats = vm.doseStatsForRange(rangeDays)
     }
 
-    val allStatuses = days.flatMap { it.second }
+    val allStatuses = stats.flatMap { it.statuses }
     val taken = allStatuses.count { it == DoseStatus.TAKEN }
     val missed = allStatuses.count { it == DoseStatus.MISSED }
     val skipped = allStatuses.count { it == DoseStatus.SKIPPED }
+    val pending = allStatuses.count { it == DoseStatus.PENDING }
     val due = taken + missed + skipped
     val percent = if (due == 0) 0 else taken * 100 / due
 
@@ -120,11 +115,12 @@ fun HistoryContent(
 
         item(key = "adherence") {
             AdherenceChartCard(
-                days = days,
+                stats = stats,
                 rangeDays = rangeDays,
                 taken = taken,
                 missed = missed,
                 skipped = skipped,
+                pending = pending,
                 percent = percent
             )
         }
@@ -185,14 +181,15 @@ fun HistoryContent(
 
 @Composable
 private fun AdherenceChartCard(
-    days: List<Pair<LocalDate, List<String>>>,
+    stats: List<DayDoseStat>,
     rangeDays: Int,
     taken: Int,
     missed: Int,
     skipped: Int,
+    pending: Int,
     percent: Int
 ) {
-    val visibleDays = days.takeLast(minOf(rangeDays, 7))
+    val visibleDays = stats.takeLast(minOf(rangeDays, 7))
     val due = taken + missed + skipped
 
     Surface(
@@ -224,6 +221,7 @@ private fun AdherenceChartCard(
                             HeroChip("$taken of $due taken")
                             HeroChip("$missed missed")
                             if (skipped > 0) HeroChip("$skipped skipped")
+                            if (pending > 0) HeroChip("$pending pending")
                         }
                     }
                     Spacer(Modifier.width(12.dp))
@@ -263,10 +261,10 @@ private fun AdherenceChartCard(
                         .height(190.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    visibleDays.forEach { (date, statuses) ->
+                    visibleDays.forEach { day ->
                         DayColumn(
-                            date = date,
-                            statuses = statuses,
+                            date = day.date,
+                            statuses = day.statuses,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -411,9 +409,14 @@ private fun SegBlock(status: String) {
                     .background(Color(0xFF4338CA))
             )
         }
+        FUTURE_STATUS -> Box(
+            modifier = base
+                .border(1.5.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(50))
+                .background(Color.White.copy(alpha = 0.06f))
+        )
         else -> Box(
             modifier = base
-                .border(1.5.dp, Color.White.copy(alpha = 0.7f), RoundedCornerShape(50))
+                .border(1.5.dp, Color.White.copy(alpha = 0.75f), RoundedCornerShape(50))
                 .background(Color.White.copy(alpha = 0.15f))
         )
     }
