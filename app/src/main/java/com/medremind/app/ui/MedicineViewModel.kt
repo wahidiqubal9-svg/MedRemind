@@ -276,8 +276,6 @@ data class DoseHistoryItem(
     val photoPath: String?
 )
 
-data class DayDoseStat(val date: LocalDate, val statuses: List<String>)
-
 data class DoseLogEntry(
     val medicineName: String,
     val photoPath: String?,
