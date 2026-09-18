@@ -27,6 +27,43 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     var alarmSound by mutableStateOf(prefs.getString("alarm_sound", "alarm") ?: "alarm")
         private set
 
+    var snoozeMinutes by mutableStateOf(prefs.getInt("snooze_minutes", 5))
+        private set
+
+    var dynamicColor by mutableStateOf(prefs.getBoolean("dynamic_color", false))
+        private set
+
+    var hapticsEnabled by mutableStateOf(prefs.getBoolean("haptics_enabled", true))
+        private set
+
+    var reduceMotion by mutableStateOf(prefs.getBoolean("reduce_motion", false))
+        private set
+
+    init {
+        HapticPrefs.enabled = hapticsEnabled
+    }
+
+    fun updateSnoozeMinutes(value: Int) {
+        snoozeMinutes = value
+        prefs.edit().putInt("snooze_minutes", value).apply()
+    }
+
+    fun updateDynamicColor(value: Boolean) {
+        dynamicColor = value
+        prefs.edit().putBoolean("dynamic_color", value).apply()
+    }
+
+    fun updateHapticsEnabled(value: Boolean) {
+        hapticsEnabled = value
+        HapticPrefs.enabled = value
+        prefs.edit().putBoolean("haptics_enabled", value).apply()
+    }
+
+    fun updateReduceMotion(value: Boolean) {
+        reduceMotion = value
+        prefs.edit().putBoolean("reduce_motion", value).apply()
+    }
+
     fun updateAlarmStyle(value: String) {
         alarmStyle = value
         prefs.edit().putString("alarm_style", value).apply()

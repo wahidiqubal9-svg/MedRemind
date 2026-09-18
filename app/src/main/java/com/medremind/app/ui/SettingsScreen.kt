@@ -1,5 +1,6 @@
 package com.medremind.app.ui
 
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,10 +18,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Animation
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.ColorLens
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -122,6 +127,32 @@ fun SettingsContent(
                 checked = settings.highContrast,
                 onCheckedChange = { settings.updateHighContrast(it) }
             )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                Divider()
+                SettingSwitchRow(
+                    icon = Icons.Rounded.ColorLens,
+                    title = "Dynamic color",
+                    subtitle = "Match the app to your wallpaper palette.",
+                    checked = settings.dynamicColor,
+                    onCheckedChange = { settings.updateDynamicColor(it) }
+                )
+            }
+            Divider()
+            SettingSwitchRow(
+                icon = Icons.Rounded.Vibration,
+                title = "Haptic feedback",
+                subtitle = "A gentle buzz on taps and confirmations.",
+                checked = settings.hapticsEnabled,
+                onCheckedChange = { settings.updateHapticsEnabled(it) }
+            )
+            Divider()
+            SettingSwitchRow(
+                icon = Icons.Rounded.Animation,
+                title = "Reduce motion",
+                subtitle = "Fewer animations for calmer feedback.",
+                checked = settings.reduceMotion,
+                onCheckedChange = { settings.updateReduceMotion(it) }
+            )
         }
 
         SectionHeader("Alarm")
@@ -163,6 +194,27 @@ fun SettingsContent(
                 onSelect = {
                     settings.updateAlarmSound(listOf("alarm", "ringtone", "notification", "none")[it])
                 },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(Modifier.height(18.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SettingIcon(Icons.Rounded.Timer)
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Snooze duration", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "${settings.snoozeMinutes} minutes",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            MedSegmentedButtons(
+                options = listOf("5 min", "10 min", "15 min"),
+                selectedIndex = listOf(5, 10, 15).indexOf(settings.snoozeMinutes).coerceAtLeast(0),
+                onSelect = { settings.updateSnoozeMinutes(listOf(5, 10, 15)[it]) },
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -219,6 +271,14 @@ fun SettingsContent(
             }
         )
     }
+}
+
+@Composable
+private fun Divider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(vertical = 12.dp),
+        color = MaterialTheme.colorScheme.outlineVariant
+    )
 }
 
 @Composable

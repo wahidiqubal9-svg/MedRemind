@@ -15,10 +15,20 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.medremind.app.R
+
+val MedFontFamily = FontFamily(
+    Font(R.font.inter_regular, FontWeight.Normal),
+    Font(R.font.inter_medium, FontWeight.Medium),
+    Font(R.font.inter_semibold, FontWeight.SemiBold),
+    Font(R.font.inter_bold, FontWeight.Bold),
+    Font(R.font.inter_extrabold, FontWeight.ExtraBold)
+)
 
 val LightColors = lightColorScheme(
     primary = Color(0xFF6366F1),
@@ -147,105 +157,120 @@ private val MedShapes = Shapes(
 
 private val MedTypography = Typography(
     displayLarge = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = MedFontFamily,
+        fontFeatureSettings = "tnum",
         fontWeight = FontWeight.Bold,
         fontSize = 52.sp,
         lineHeight = 60.sp,
         letterSpacing = (-0.5).sp
     ),
     displayMedium = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = MedFontFamily,
+        fontFeatureSettings = "tnum",
         fontWeight = FontWeight.Bold,
         fontSize = 44.sp,
         lineHeight = 52.sp,
         letterSpacing = 0.sp
     ),
     displaySmall = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = MedFontFamily,
+        fontFeatureSettings = "tnum",
         fontWeight = FontWeight.Bold,
         fontSize = 36.sp,
         lineHeight = 44.sp,
         letterSpacing = 0.sp
     ),
     headlineLarge = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = MedFontFamily,
+        fontFeatureSettings = "tnum",
         fontWeight = FontWeight.SemiBold,
         fontSize = 32.sp,
         lineHeight = 40.sp,
         letterSpacing = 0.sp
     ),
     headlineMedium = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = MedFontFamily,
+        fontFeatureSettings = "tnum",
         fontWeight = FontWeight.SemiBold,
         fontSize = 28.sp,
         lineHeight = 36.sp,
         letterSpacing = 0.sp
     ),
     headlineSmall = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = MedFontFamily,
+        fontFeatureSettings = "tnum",
         fontWeight = FontWeight.SemiBold,
         fontSize = 24.sp,
         lineHeight = 32.sp,
         letterSpacing = 0.sp
     ),
     titleLarge = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = MedFontFamily,
+        fontFeatureSettings = "tnum",
         fontWeight = FontWeight.SemiBold,
         fontSize = 22.sp,
         lineHeight = 28.sp,
         letterSpacing = 0.sp
     ),
     titleMedium = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = MedFontFamily,
+        fontFeatureSettings = "tnum",
         fontWeight = FontWeight.SemiBold,
         fontSize = 18.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.1.sp
     ),
     titleSmall = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = MedFontFamily,
+        fontFeatureSettings = "tnum",
         fontWeight = FontWeight.SemiBold,
         fontSize = 15.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.1.sp
     ),
     bodyLarge = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = MedFontFamily,
+        fontFeatureSettings = "tnum",
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.5.sp
     ),
     bodyMedium = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = MedFontFamily,
+        fontFeatureSettings = "tnum",
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.25.sp
     ),
     bodySmall = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = MedFontFamily,
+        fontFeatureSettings = "tnum",
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp,
         lineHeight = 16.sp,
         letterSpacing = 0.4.sp
     ),
     labelLarge = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = MedFontFamily,
+        fontFeatureSettings = "tnum",
         fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.1.sp
     ),
     labelMedium = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = MedFontFamily,
+        fontFeatureSettings = "tnum",
         fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
         lineHeight = 16.sp,
         letterSpacing = 0.5.sp
     ),
     labelSmall = TextStyle(
-        fontFamily = FontFamily.Default,
+        fontFamily = MedFontFamily,
+        fontFeatureSettings = "tnum",
         fontWeight = FontWeight.Medium,
         fontSize = 11.sp,
         lineHeight = 16.sp,
@@ -284,14 +309,17 @@ object MedGradients {
 fun MedRemindTheme(
     highContrast: Boolean = false,
     darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
-    val dynamic = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val dynamic = dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val colors = when {
         highContrast -> HighContrastLight
-        darkTheme -> if (dynamic) dynamicDarkColorScheme(context) else DarkColors
-        else -> if (dynamic) dynamicLightColorScheme(context) else LightColors
+        dynamic && darkTheme -> dynamicDarkColorScheme(context)
+        dynamic -> dynamicLightColorScheme(context)
+        darkTheme -> DarkColors
+        else -> LightColors
     }
     MaterialTheme(
         colorScheme = colors,

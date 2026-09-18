@@ -218,8 +218,9 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         result.sortedBy { it.timeMillis }
     }
 
-    fun markDose(dose: TodayDose, status: String, onDone: () -> Unit = {}) {
+    fun markDose(dose: TodayDose, status: String, onDone: (Long?) -> Unit = {}) {
         viewModelScope.launch {
+            var eventId: Long? = null
             withContext(Dispatchers.IO) {
                 val dao = db.doseEventDao()
                 val existingId = dose.eventId
@@ -233,8 +234,9 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                             )
                         )
                     }
+                    eventId = existingId
                 } else {
-                    dao.insert(
+                    eventId = dao.insert(
                         DoseEvent(
                             scheduleId = dose.schedule.id,
                             medicineId = dose.medicine.id,
@@ -243,6 +245,21 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                             actedAt = System.currentTimeMillis()
                         )
                     )
+                }
+            }
+            onDone(eventId)
+        }
+    }
+
+    /** Reverts a taken/skipped dose back to pending (used by the Undo snackbar). */
+    fun undoDose(eventId: Long?, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                if (eventId != null) {
+                    val dao = db.doseEventDao()
+                    dao.byId(eventId)?.let { event ->
+                        dao.update(event.copy(status = DoseStatus.PENDING, actedAt = null))
+                    }
                 }
             }
             onDone()

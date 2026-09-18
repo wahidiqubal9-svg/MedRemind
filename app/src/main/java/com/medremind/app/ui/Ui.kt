@@ -100,6 +100,14 @@ import java.io.File
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
+/** Consistent depth tokens so cards/sheets don't drift apart. */
+object MedElevation {
+    val card = 1.dp
+    val raised = 3.dp
+    val sheet = 8.dp
+    val floating = 14.dp
+}
+
 @Composable
 fun ScreenHeader(
     title: String,
@@ -150,15 +158,18 @@ fun SlideToAction(
     val maxOffset = (trackWidth - thumbPx - paddingPx * 2f).coerceAtLeast(1f)
     val offset = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
+    val haptics = rememberMedHaptics()
+    val reduceMotion = LocalReduceMotion.current
     val progress = (offset.value / maxOffset).coerceIn(0f, 1f)
 
     val hint = rememberInfiniteTransition(label = "slideHint")
-    val pulse by hint.animateFloat(
+    val animatedPulse by hint.animateFloat(
         initialValue = 1f,
         targetValue = 1.06f,
         animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
         label = "slidePulse"
     )
+    val pulse = if (reduceMotion) 1f else animatedPulse
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -198,8 +209,10 @@ fun SlideToAction(
                     detectHorizontalDragGestures(
                         onDragEnd = {
                             if (offset.value >= maxOffset - 10f) {
+                                haptics.confirm()
                                 onConfirm()
                             } else {
+                                haptics.tick()
                                 scope.launch {
                                     offset.animateTo(
                                         0f,
@@ -243,7 +256,7 @@ fun MedCard(
             1.dp,
             MaterialTheme.colorScheme.outlineVariant
         ),
-        shadowElevation = 2.dp
+        shadowElevation = MedElevation.card
     ) {
         Column(modifier = Modifier.padding(16.dp), content = content)
     }
@@ -256,6 +269,7 @@ fun MedClickableCard(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val interaction = remember { MutableInteractionSource() }
+    val haptics = rememberMedHaptics()
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.97f else 1f,
@@ -273,13 +287,16 @@ fun MedClickableCard(
             1.dp,
             MaterialTheme.colorScheme.outlineVariant
         ),
-        shadowElevation = 2.dp
+        shadowElevation = MedElevation.card
     ) {
         Box(
             modifier = Modifier.clickable(
                 interactionSource = interaction,
                 indication = ripple(),
-                onClick = onClick
+                onClick = {
+                    haptics.tap()
+                    onClick()
+                }
             )
         ) {
             Column(modifier = Modifier.padding(16.dp), content = content)
@@ -296,7 +313,7 @@ fun MedHeroCard(
         modifier = modifier,
         shape = MaterialTheme.shapes.extraLarge,
         color = Color.Transparent,
-        shadowElevation = 2.dp
+        shadowElevation = MedElevation.card
     ) {
         Box(
             modifier = Modifier.background(MedGradients.hero())
@@ -323,6 +340,7 @@ fun GradientPillButton(
         )
     )
     val interaction = remember { MutableInteractionSource() }
+    val haptics = rememberMedHaptics()
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.95f else 1f,
@@ -341,7 +359,10 @@ fun GradientPillButton(
                 interactionSource = interaction,
                 indication = ripple(),
                 enabled = enabled,
-                onClick = onClick
+                onClick = {
+                    haptics.tap()
+                    onClick()
+                }
             )
             .padding(horizontal = 24.dp, vertical = 14.dp),
         contentAlignment = Alignment.Center
@@ -373,6 +394,7 @@ fun MedSegmentedButtons(
     modifier: Modifier = Modifier,
     onSelect: (Int) -> Unit
 ) {
+    val haptics = rememberMedHaptics()
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(50),
@@ -395,7 +417,10 @@ fun MedSegmentedButtons(
                         .weight(1f)
                         .clip(RoundedCornerShape(50))
                         .background(bg)
-                        .clickable { onSelect(index) }
+                        .clickable {
+                            haptics.tap()
+                            onSelect(index)
+                        }
                         .padding(vertical = 9.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -509,7 +534,7 @@ fun StatCard(
             1.dp,
             MaterialTheme.colorScheme.outlineVariant
         ),
-        shadowElevation = 2.dp
+        shadowElevation = MedElevation.card
     ) {
         Column(
             modifier = Modifier
@@ -622,6 +647,7 @@ fun SquareIconButton(
     photoPath: String? = null
 ) {
     val interaction = remember { MutableInteractionSource() }
+    val haptics = rememberMedHaptics()
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.92f else 1f,
@@ -646,7 +672,10 @@ fun SquareIconButton(
                 .clickable(
                     interactionSource = interaction,
                     indication = ripple(),
-                    onClick = onClick
+                    onClick = {
+                        haptics.tap()
+                        onClick()
+                    }
                 ),
             contentAlignment = Alignment.Center
         ) {
@@ -743,13 +772,15 @@ fun MedConfirmDialog(
 
 @Composable
 fun SplashScreen() {
+    val reduceMotion = LocalReduceMotion.current
     val transition = rememberInfiniteTransition(label = "splash")
-    val scale by transition.animateFloat(
+    val animatedScale by transition.animateFloat(
         initialValue = 1f,
         targetValue = 1.08f,
         animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
         label = "splashScale"
     )
+    val scale = if (reduceMotion) 1f else animatedScale
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -808,7 +839,7 @@ fun GlassIconButton(
             1.dp,
             MaterialTheme.colorScheme.outlineVariant
         ),
-        shadowElevation = 4.dp
+        shadowElevation = MedElevation.raised
     ) {
         Box(modifier = Modifier.size(44.dp), contentAlignment = Alignment.Center) {
             Icon(
@@ -957,7 +988,7 @@ fun SearchField(
             1.dp,
             MaterialTheme.colorScheme.outlineVariant
         ),
-        shadowElevation = 3.dp
+        shadowElevation = MedElevation.raised
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 15.dp, vertical = 13.dp),
@@ -1006,10 +1037,14 @@ fun FilterChipRow(
             .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        val haptics = rememberMedHaptics()
         options.forEachIndexed { index, label ->
             val selected = index == selectedIndex
             Surface(
-                onClick = { onSelect(index) },
+                onClick = {
+                    haptics.tap()
+                    onSelect(index)
+                },
                 shape = RoundedCornerShape(50),
                 color = if (selected) Color.Transparent else MaterialTheme.colorScheme.surface,
                 contentColor = if (selected) MaterialTheme.colorScheme.onPrimary

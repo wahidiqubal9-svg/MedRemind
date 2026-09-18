@@ -3,13 +3,12 @@ package com.medremind.app.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -43,11 +42,13 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -56,6 +57,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,7 +77,7 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.medremind.app.data.DoseStatus
 import com.medremind.app.data.Medicine
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.YearMonth
@@ -89,7 +91,8 @@ fun TodayContent(
     vm: MedicineViewModel,
     onAdd: () -> Unit,
     onOpenMe: () -> Unit,
-    profilePhoto: String? = null
+    profilePhoto: String? = null,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
 ) {
     var expanded by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
@@ -98,7 +101,8 @@ fun TodayContent(
     var dosesLoaded by remember { mutableStateOf(false) }
     var reloadTick by remember { mutableIntStateOf(0) }
     var markedDates by remember { mutableStateOf<Set<LocalDate>>(emptySet()) }
-    var toast by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    val haptics = rememberMedHaptics()
 
     LaunchedEffect(selectedDate, medicines, reloadTick) {
         doses = vm.dosesOn(selectedDate)
@@ -110,10 +114,22 @@ fun TodayContent(
         markedDates = vm.datesWithDoses(today.minusDays(180), today.plusDays(180))
     }
 
-    LaunchedEffect(toast) {
-        if (toast != null) {
-            delay(1600)
-            toast = null
+    fun record(dose: TodayDose, status: String) {
+        if (status == DoseStatus.TAKEN) haptics.confirm() else haptics.reject()
+        val verb = if (status == DoseStatus.TAKEN) "taken" else "skipped"
+        vm.markDose(dose, status) { eventId ->
+            reloadTick++
+            scope.launch {
+                val result = snackbarHostState.showSnackbar(
+                    message = "${dose.medicine.name} $verb",
+                    actionLabel = "Undo",
+                    duration = SnackbarDuration.Short
+                )
+                if (result == SnackbarResult.ActionPerformed) {
+                    haptics.tick()
+                    vm.undoDose(eventId) { reloadTick++ }
+                }
+            }
         }
     }
 
@@ -206,6 +222,14 @@ fun TodayContent(
             profilePhoto = profilePhoto
         )
 
+        CalendarHandle(
+            expanded = expanded,
+            onToggle = {
+                haptics.tap()
+                expanded = !expanded
+            }
+        )
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -280,20 +304,7 @@ fun TodayContent(
         ) {
             if (!dosesLoaded) {
                 item(key = "loading") {
-                    MedHeroCard(modifier = Modifier.fillMaxWidth()) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "Loading today's doses…",
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.weight(1f)
-                            )
-                            CircularProgressIndicator(
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                strokeWidth = 2.dp,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                    }
+                    TodaySkeleton()
                 }
             } else {
             item(key = "summary") {
@@ -332,14 +343,8 @@ fun TodayContent(
                     TimeGroupCard(
                         time = time,
                         doses = list,
-                        onTake = { dose ->
-                            vm.markDose(dose, DoseStatus.TAKEN) { reloadTick++ }
-                            toast = "${dose.medicine.name} taken"
-                        },
-                        onSkip = { dose ->
-                            vm.markDose(dose, DoseStatus.SKIPPED) { reloadTick++ }
-                            toast = "${dose.medicine.name} skipped"
-                        }
+                        onTake = { dose -> record(dose, DoseStatus.TAKEN) },
+                        onSkip = { dose -> record(dose, DoseStatus.SKIPPED) }
                     )
                 }
 
@@ -358,8 +363,8 @@ fun TodayContent(
                         TimeGroupCard(
                             time = time,
                             doses = list,
-                            onTake = { dose -> vm.markDose(dose, DoseStatus.TAKEN) { reloadTick++ } },
-                            onSkip = { dose -> vm.markDose(dose, DoseStatus.SKIPPED) { reloadTick++ } }
+                            onTake = { dose -> record(dose, DoseStatus.TAKEN) },
+                            onSkip = { dose -> record(dose, DoseStatus.SKIPPED) }
                         )
                     }
                 }
@@ -367,44 +372,47 @@ fun TodayContent(
             }
         }
     }
-    AnimatedVisibility(
-        visible = toast != null,
-        enter = fadeIn(tween(160)) + slideInVertically(tween(240)) { it },
-        exit = fadeOut(tween(160)) + slideOutVertically(tween(200)) { it },
-        modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .padding(bottom = 110.dp, start = 16.dp, end = 16.dp)
-    ) {
-        Surface(
-            shape = RoundedCornerShape(50),
-            color = MaterialTheme.colorScheme.inverseSurface,
-            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-            shadowElevation = 6.dp
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.CheckCircle,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = toast ?: "",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
     }
+}
+
+@Composable
+private fun CalendarHandle(expanded: Boolean, onToggle: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = 40.dp, height = 5.dp)
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.outlineVariant)
+        )
+        Spacer(Modifier.height(5.dp))
+        Text(
+            text = if (expanded) "Hide calendar" else "Swipe down for calendar",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
 @Composable
 private fun SummaryCard(taken: Int, total: Int, missed: Int) {
-    val pct = if (total == 0) 0 else taken * 100 / total
+    val targetPct = if (total == 0) 0 else taken * 100 / total
+    val pct by animateIntAsState(
+        targetValue = targetPct,
+        animationSpec = motionTween(MedMotion.Slow, easing = MedMotion.Emphasized),
+        label = "summaryPct"
+    )
+    val takenAnim by animateIntAsState(
+        targetValue = taken,
+        animationSpec = motionTween(MedMotion.Slow, easing = MedMotion.Emphasized),
+        label = "summaryTaken"
+    )
     MedHeroCard(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
@@ -415,13 +423,13 @@ private fun SummaryCard(taken: Int, total: Int, missed: Int) {
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "$taken of $total doses taken",
+                    "$takenAnim of $total doses taken",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SummaryChip(Color(0xFF7EF0B2), "$taken Taken")
+                    SummaryChip(Color(0xFF7EF0B2), "$takenAnim Taken")
                     SummaryChip(Color(0xFFFFB3C4), "$missed Missed")
                 }
             }

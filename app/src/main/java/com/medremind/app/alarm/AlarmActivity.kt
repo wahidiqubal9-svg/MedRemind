@@ -25,9 +25,12 @@ class AlarmActivity : ComponentActivity() {
 
     private var player: MediaPlayer? = null
     private var vibrator: Vibrator? = null
+    private var snoozeMinutes: Int = 5
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        snoozeMinutes = getSharedPreferences("medremind_settings", MODE_PRIVATE)
+            .getInt("snooze_minutes", 5)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -46,6 +49,7 @@ class AlarmActivity : ComponentActivity() {
             MedRemindTheme {
                 AlarmScreen(
                     doseEventId = doseEventId,
+                    snoozeMinutes = snoozeMinutes,
                     onAction = { action -> handleAction(doseEventId, action) }
                 )
             }
@@ -124,16 +128,12 @@ class AlarmActivity : ComponentActivity() {
     }
 
     private fun scheduleSnooze(context: Context, doseEventId: Long) {
-        val triggerAt = System.currentTimeMillis() + SNOOZE_MINUTES * 60_000L
+        val triggerAt = System.currentTimeMillis() + snoozeMinutes * 60_000L
         ReminderScheduler.scheduleSnooze(context, doseEventId, triggerAt)
     }
 
     override fun onDestroy() {
         stopSoundAndVibration()
         super.onDestroy()
-    }
-
-    companion object {
-        const val SNOOZE_MINUTES = 5L
     }
 }

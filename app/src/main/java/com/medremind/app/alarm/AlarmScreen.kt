@@ -58,7 +58,7 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun AlarmScreen(doseEventId: Long, onAction: (String) -> Unit) {
+fun AlarmScreen(doseEventId: Long, snoozeMinutes: Int = 5, onAction: (String) -> Unit) {
     val context = LocalContext.current
     var medicine by remember { mutableStateOf<Medicine?>(null) }
     var scheduledText by remember { mutableStateOf("") }
@@ -208,7 +208,7 @@ fun AlarmScreen(doseEventId: Long, onAction: (String) -> Unit) {
                         .height(54.dp)
                 ) {
                     Text(
-                        "Snooze 5m",
+                        "Snooze ${snoozeMinutes}m",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )

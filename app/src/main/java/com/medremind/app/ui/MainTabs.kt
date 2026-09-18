@@ -41,6 +41,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -97,11 +99,13 @@ fun MainTabs(
     onOpenMe: () -> Unit
 ) {
     val schedulesByMedicine by vm.schedulesByMedicine.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     BackHandler(enabled = tab != 0) { onTabChange(0) }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0.dp),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             MedBottomBar(
                 tab = tab,
@@ -125,11 +129,13 @@ fun MainTabs(
             transitionSpec = {
                 val forward = targetState > initialState
                 val enter = slideInHorizontally(
-                    animationSpec = tween(260)
-                ) { width -> if (forward) width / 5 else -width / 5 } + fadeIn(tween(240))
+                    animationSpec = motionTween(MedMotion.Medium)
+                ) { width -> if (forward) width / 5 else -width / 5 } +
+                    fadeIn(motionTween(MedMotion.Medium, easing = MedMotion.Decelerate))
                 val exit = slideOutHorizontally(
-                    animationSpec = tween(200)
-                ) { width -> if (forward) -width / 5 else width / 5 } + fadeOut(tween(160))
+                    animationSpec = motionTween(MedMotion.Fast, easing = MedMotion.Accelerate)
+                ) { width -> if (forward) -width / 5 else width / 5 } +
+                    fadeOut(motionTween(MedMotion.Fast))
                 enter togetherWith exit
             },
             label = "tabTransition"
@@ -141,7 +147,8 @@ fun MainTabs(
                     vm = vm,
                     onAdd = onAdd,
                     onOpenMe = onOpenMe,
-                    profilePhoto = settings.profilePhoto
+                    profilePhoto = settings.profilePhoto,
+                    snackbarHostState = snackbarHostState
                 )
                 1 -> MedContent(
                     modifier = Modifier.padding(padding),
@@ -233,11 +240,15 @@ private fun RowScope.BottomNavCell(
     onClick: () -> Unit,
     icon: @Composable () -> Unit
 ) {
+    val haptics = rememberMedHaptics()
     Column(
         modifier = Modifier
             .weight(1f)
             .clip(RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick)
+            .clickable {
+                haptics.tap()
+                onClick()
+            }
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {

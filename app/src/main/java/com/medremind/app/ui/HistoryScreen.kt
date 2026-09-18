@@ -1,5 +1,6 @@
 package com.medremind.app.ui
 
+import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,9 +59,11 @@ fun HistoryContent(
 
     var rangeDays by remember { mutableIntStateOf(7) }
     var log by remember { mutableStateOf<List<DoseLogEntry>>(emptyList()) }
+    var logLoaded by remember { mutableStateOf(false) }
 
     LaunchedEffect(rangeDays, history) {
         log = vm.doseLogForRange(rangeDays)
+        logLoaded = true
     }
 
     val taken = log.count { it.status == DoseStatus.TAKEN }
@@ -147,14 +150,18 @@ fun HistoryContent(
 
         if (log.isEmpty()) {
             item(key = "empty") {
-                MedEmptyState(
-                    icon = Icons.Rounded.CalendarMonth,
-                    title = "No doses in this period",
-                    message = "Add a medicine and its scheduled doses will appear here.",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp)
-                )
+                if (!logLoaded) {
+                    ListSkeleton(modifier = Modifier.padding(top = 4.dp))
+                } else {
+                    MedEmptyState(
+                        icon = Icons.Rounded.CalendarMonth,
+                        title = "No doses in this period",
+                        message = "Add a medicine and its scheduled doses will appear here.",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp)
+                    )
+                }
             }
         }
 
@@ -186,12 +193,17 @@ private fun AdherenceChartCard(
     percent: Int
 ) {
     val due = taken + missed + skipped
+    val animatedPercent by animateIntAsState(
+        targetValue = percent,
+        animationSpec = motionTween(MedMotion.Slow, easing = MedMotion.Emphasized),
+        label = "adherencePct"
+    )
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(26.dp),
         color = Color.Transparent,
-        shadowElevation = 3.dp
+        shadowElevation = MedElevation.raised
     ) {
         Box(modifier = Modifier.background(MedGradients.hero())) {
             Column(modifier = Modifier.padding(22.dp)) {
@@ -221,9 +233,9 @@ private fun AdherenceChartCard(
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        ProgressRing(percent = percent, modifier = Modifier.size(124.dp)) {
+                        ProgressRing(percent = animatedPercent, modifier = Modifier.size(124.dp)) {
                             Text(
-                                text = "$percent%",
+                                text = "$animatedPercent%",
                                 style = MaterialTheme.typography.headlineSmall,
                                 color = MaterialTheme.colorScheme.onPrimary,
                                 fontWeight = FontWeight.ExtraBold

@@ -97,15 +97,17 @@ fun AppRoot(
             transitionSpec = {
                 val opening = targetState != "main"
             if (opening) {
-                val enter = slideInVertically(tween(300)) { height -> height / 10 } +
-                    fadeIn(tween(260)) +
-                    scaleIn(tween(300), initialScale = 0.96f)
-                val exit = fadeOut(tween(160)) + scaleOut(tween(220), targetScale = 0.98f)
+                val enter = slideInVertically(motionTween(MedMotion.Slow)) { height -> height / 10 } +
+                    fadeIn(motionTween(MedMotion.Medium)) +
+                    scaleIn(motionTween(MedMotion.Slow), initialScale = 0.96f)
+                val exit = fadeOut(motionTween(MedMotion.Fast)) +
+                    scaleOut(motionTween(MedMotion.Medium), targetScale = 0.98f)
                 enter togetherWith exit
             } else {
-                val enter = fadeIn(tween(260)) + scaleIn(tween(300), initialScale = 0.98f)
-                val exit = slideOutVertically(tween(280)) { height -> height / 10 } +
-                    fadeOut(tween(160))
+                val enter = fadeIn(motionTween(MedMotion.Medium)) +
+                    scaleIn(motionTween(MedMotion.Slow), initialScale = 0.98f)
+                val exit = slideOutVertically(motionTween(MedMotion.Medium)) { height -> height / 10 } +
+                    fadeOut(motionTween(MedMotion.Fast))
                 enter togetherWith exit
             }
         },
