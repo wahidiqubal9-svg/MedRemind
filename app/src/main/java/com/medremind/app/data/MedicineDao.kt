@@ -32,4 +32,10 @@ interface MedicineDao {
 
     @Delete
     suspend fun delete(medicine: Medicine)
+
+    @Query("DELETE FROM medicines")
+    suspend fun clear()
+
+    @Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE)
+    suspend fun insertAll(medicines: List<Medicine>)
 }

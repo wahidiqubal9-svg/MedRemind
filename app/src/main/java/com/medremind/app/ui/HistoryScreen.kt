@@ -1,6 +1,7 @@
 package com.medremind.app.ui
 
 import androidx.compose.animation.core.animateIntAsState
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +21,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -30,21 +34,27 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.medremind.app.data.DoseStatus
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun HistoryContent(
@@ -54,6 +64,8 @@ fun HistoryContent(
     profilePhoto: String? = null
 ) {
     val history by vm.history.collectAsState()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) { vm.markOverdueAsMissed() }
 
@@ -89,6 +101,32 @@ fun HistoryContent(
     ) {
         item(key = "progress_header") {
             ScreenHeader("Progress") {
+                IconButton(
+                    onClick = {
+                        if (log.isNotEmpty()) scope.launch {
+                            val file = withContext(Dispatchers.IO) {
+                                ReportExporter.exportCsv(context, log)
+                            }
+                            val uri = FileProvider.getUriForFile(
+                                context,
+                                context.packageName + ".fileprovider",
+                                file
+                            )
+                            val share = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/csv"
+                                putExtra(Intent.EXTRA_STREAM, uri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(Intent.createChooser(share, "Share report"))
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Share,
+                        contentDescription = "Export report",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 SquareIconButton(
                     icon = Icons.Rounded.Person,
                     contentDescription = "Me",

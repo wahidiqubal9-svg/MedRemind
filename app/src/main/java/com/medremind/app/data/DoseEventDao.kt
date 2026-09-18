@@ -25,4 +25,13 @@ interface DoseEventDao {
 
     @Query("UPDATE dose_events SET status = 'MISSED' WHERE status = 'PENDING' AND scheduledAt < :cutoff")
     suspend fun markMissedBefore(cutoff: Long): Int
+
+    @Query("SELECT * FROM dose_events ORDER BY scheduledAt ASC")
+    suspend fun getAllOnce(): List<DoseEvent>
+
+    @Query("DELETE FROM dose_events")
+    suspend fun clear()
+
+    @Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE)
+    suspend fun insertAll(events: List<DoseEvent>)
 }

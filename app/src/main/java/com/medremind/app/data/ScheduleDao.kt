@@ -32,4 +32,10 @@ interface ScheduleDao {
 
     @Query("SELECT * FROM schedules ORDER BY id ASC")
     fun observeAll(): Flow<List<Schedule>>
+
+    @Query("DELETE FROM schedules")
+    suspend fun clear()
+
+    @Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE)
+    suspend fun insertAll(schedules: List<Schedule>)
 }

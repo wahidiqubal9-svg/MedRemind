@@ -1,7 +1,11 @@
 package com.medremind.app.ui
 
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,11 +23,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Animation
+import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ColorLens
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material.icons.rounded.Warning
@@ -39,11 +45,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.medremind.app.alarm.ReminderScheduler
+import com.medremind.app.data.BackupManager
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsScreen(
@@ -71,6 +87,39 @@ fun SettingsContent(
 ) {
     var showSetPin by remember { mutableStateOf(false) }
     var showRemovePin by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri ->
+        if (uri != null) scope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.IO) { BackupManager.export(context, uri) }
+            }
+            val message = result.fold(
+                onSuccess = { "Backup saved \u00b7 ${it.medicines} medicines" },
+                onFailure = { "Backup failed: ${it.message}" }
+            )
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) scope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.IO) { BackupManager.import(context, uri) }
+            }
+            result.onSuccess { ReminderScheduler.rescheduleAll(context) }
+            val message = result.fold(
+                onSuccess = { "Restored \u00b7 ${it.medicines} medicines" },
+                onFailure = { "Restore failed: ${it.message}" }
+            )
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
 
     Column(
         modifier = modifier
@@ -244,6 +293,60 @@ fun SettingsContent(
                 if (!settings.pin.isNullOrEmpty()) {
                     TextButton(onClick = { showRemovePin = true }) { Text("Remove PIN") }
                 }
+            }
+        }
+
+        SectionHeader("Data")
+        MedCard(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        val name = "medremind-backup-" + SimpleDateFormat(
+                            "yyyyMMdd-HHmm", Locale.getDefault()
+                        ).format(Date()) + ".zip"
+                        exportLauncher.launch(name)
+                    },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SettingIcon(Icons.Rounded.Backup)
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Back up data", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Save a copy of all medicines and history to a file.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Icon(
+                    Icons.Rounded.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Divider()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { importLauncher.launch(arrayOf("*/*")) },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SettingIcon(Icons.Rounded.Restore)
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Restore data", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Replace everything with a backup file.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Icon(
+                    Icons.Rounded.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
