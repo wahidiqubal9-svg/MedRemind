@@ -1,23 +1,14 @@
 package com.medremind.app.ui
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,14 +19,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -47,9 +36,6 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
-import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.HorizontalDivider
@@ -178,13 +164,11 @@ fun TodayContent(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item(key = "summary") {
-                RiseIn(index = 0) {
-                    SummaryCard(
-                        taken = doses.count { it.status == DoseStatus.TAKEN },
-                        total = doses.size,
-                        missed = doses.count { it.status == DoseStatus.MISSED }
-                    )
-                }
+                SummaryCard(
+                    taken = doses.count { it.status == DoseStatus.TAKEN },
+                    total = doses.size,
+                    missed = doses.count { it.status == DoseStatus.MISSED }
+                )
             }
             if (doses.isEmpty()) {
                 item(key = "empty") {
@@ -207,17 +191,14 @@ fun TodayContent(
                     }
                 }
             } else {
-                itemsIndexed(pendingGroups, key = { _, item -> "p-${item.first}" }) { index, item ->
-                    val (time, list) = item
-                    RiseIn(index = index + 1) {
-                        TimeGroupCard(
-                            time = time,
-                            doses = list,
-                            onTake = { dose -> vm.markDose(dose, DoseStatus.TAKEN) { reloadTick++ } },
-                            onSkip = { dose -> vm.markDose(dose, DoseStatus.SKIPPED) { reloadTick++ } },
-                            modifier = Modifier.animateItem()
-                        )
-                    }
+                items(pendingGroups, key = { "p-${it.first}" }) { (time, list) ->
+                    TimeGroupCard(
+                        time = time,
+                        doses = list,
+                        onTake = { dose -> vm.markDose(dose, DoseStatus.TAKEN) { reloadTick++ } },
+                        onSkip = { dose -> vm.markDose(dose, DoseStatus.SKIPPED) { reloadTick++ } },
+                        modifier = Modifier.animateItem()
+                    )
                 }
 
                 if (doneGroups.isNotEmpty()) {
