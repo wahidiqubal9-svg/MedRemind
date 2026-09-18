@@ -13,6 +13,8 @@ import com.medremind.app.data.DoseStatus
 import com.medremind.app.data.PhotoStorage
 import com.medremind.app.data.Schedule
 import com.medremind.app.data.ScheduleType
+import com.medremind.app.widget.NextDoseWidget
+import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -177,6 +179,7 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                     }
                 }
             }
+            refreshWidget()
             onDone()
         }
     }
@@ -190,6 +193,7 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                 db.medicineDao().delete(medicine)
                 PhotoStorage.delete(medicine.photoPath)
             }
+            refreshWidget()
             onDone()
         }
     }
@@ -262,6 +266,7 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                     consumeStock(dose)
                 }
             }
+            refreshWidget()
             onDone(eventId)
         }
     }
@@ -284,11 +289,16 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                     )
                 )
             }
+            refreshWidget()
             onDone(eventId)
         }
     }
 
     /** Decrements pill stock after a dose is taken and warns when supply runs low. */
+    private suspend fun refreshWidget() {
+        runCatching { NextDoseWidget().updateAll(app) }
+    }
+
     private suspend fun consumeStock(dose: TodayDose) {
         val medicine = db.medicineDao().byId(dose.medicine.id) ?: return
         if (medicine.quantity <= 0) return

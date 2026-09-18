@@ -13,8 +13,8 @@ android {
         applicationId = "com.medremind.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 64
-        versionName = "0.63.0"
+        versionCode = 65
+        versionName = "0.64.0"
     }
 
     buildTypes {
@@ -71,6 +71,7 @@ dependencies {
 
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.glance:glance-appwidget:1.1.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
