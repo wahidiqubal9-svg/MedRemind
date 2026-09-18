@@ -1,6 +1,7 @@
 package com.medremind.app.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -215,7 +216,7 @@ fun TodayContent(
                 // state survives collapsing the calendar.
                 val stripHeight by animateDpAsState(
                     targetValue = if (expanded) 0.dp else 78.dp,
-                    animationSpec = tween(280),
+                    animationSpec = tween(320, easing = FastOutSlowInEasing),
                     label = "stripHeight"
                 )
                 Box(
@@ -236,8 +237,10 @@ fun TodayContent(
 
                 AnimatedVisibility(
                     visible = expanded,
-                    enter = expandVertically(tween(300)) + fadeIn(tween(240)),
-                    exit = shrinkVertically(tween(220)) + fadeOut(tween(140))
+                    enter = expandVertically(tween(320, easing = FastOutSlowInEasing)) +
+                        fadeIn(tween(240)),
+                    exit = shrinkVertically(tween(320, easing = FastOutSlowInEasing)) +
+                        fadeOut(tween(160))
                 ) {
                     MonthGrid(
                         month = month,
