@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -120,6 +121,49 @@ fun SettingsContent(
                 subtitle = "Stronger colors for low vision.",
                 checked = settings.highContrast,
                 onCheckedChange = { settings.updateHighContrast(it) }
+            )
+        }
+
+        SectionHeader("Alarm")
+        MedCard(modifier = Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SettingIcon(Icons.Rounded.Notifications)
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Full-screen pop-up", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        when (settings.alarmStyle) {
+                            "fullscreen" -> "Reminder takes over the whole screen."
+                            "banner" -> "Shows a heads-up banner only."
+                            else -> "No pop-up, just the alarm sound."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            MedSegmentedButtons(
+                options = listOf("Full screen", "Banner", "Sound only"),
+                selectedIndex = listOf("fullscreen", "banner", "sound")
+                    .indexOf(settings.alarmStyle).coerceAtLeast(0),
+                onSelect = {
+                    settings.updateAlarmStyle(listOf("fullscreen", "banner", "sound")[it])
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(Modifier.height(18.dp))
+            Text("Alarm sound", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(10.dp))
+            MedSegmentedButtons(
+                options = listOf("Alarm", "Ringtone", "Notification", "Silent"),
+                selectedIndex = listOf("alarm", "ringtone", "notification", "none")
+                    .indexOf(settings.alarmSound).coerceAtLeast(0),
+                onSelect = {
+                    settings.updateAlarmSound(listOf("alarm", "ringtone", "notification", "none")[it])
+                },
+                modifier = Modifier.fillMaxWidth()
             )
         }
 

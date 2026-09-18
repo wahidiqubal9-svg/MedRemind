@@ -6,6 +6,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -64,6 +66,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.medremind.app.data.DoseStatus
 import com.medremind.app.data.Medicine
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.YearMonth
@@ -84,10 +87,24 @@ fun TodayContent(
     var doses by remember { mutableStateOf<List<TodayDose>>(emptyList()) }
     var dosesLoaded by remember { mutableStateOf(false) }
     var reloadTick by remember { mutableIntStateOf(0) }
+    var markedDates by remember { mutableStateOf<Set<LocalDate>>(emptySet()) }
+    var toast by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(selectedDate, medicines, reloadTick) {
         doses = vm.dosesOn(selectedDate)
         dosesLoaded = true
+    }
+
+    LaunchedEffect(medicines) {
+        val today = LocalDate.now()
+        markedDates = vm.datesWithDoses(today.minusDays(180), today.plusDays(180))
+    }
+
+    LaunchedEffect(toast) {
+        if (toast != null) {
+            delay(1600)
+            toast = null
+        }
     }
 
     val doseTimeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
@@ -106,7 +123,8 @@ fun TodayContent(
             .sortedBy { (_, list) -> list.minOf { it.timeMillis } }
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize()) {
         TodayHeader(
             selectedDate = selectedDate,
             expanded = expanded,
@@ -139,6 +157,7 @@ fun TodayContent(
                 ) {
                     WeekStrip(
                         selectedDate = selectedDate,
+                        markedDates = markedDates,
                         onSelect = {
                             selectedDate = it
                             month = YearMonth.from(it)
@@ -154,6 +173,7 @@ fun TodayContent(
                     MonthGrid(
                         month = month,
                         selectedDate = selectedDate,
+                        markedDates = markedDates,
                         onPrevMonth = { month = month.minusMonths(1) },
                         onNextMonth = { month = month.plusMonths(1) },
                         onSelectDay = { date ->
@@ -222,8 +242,14 @@ fun TodayContent(
                     TimeGroupCard(
                         time = time,
                         doses = list,
-                        onTake = { dose -> vm.markDose(dose, DoseStatus.TAKEN) { reloadTick++ } },
-                        onSkip = { dose -> vm.markDose(dose, DoseStatus.SKIPPED) { reloadTick++ } }
+                        onTake = { dose ->
+                            vm.markDose(dose, DoseStatus.TAKEN) { reloadTick++ }
+                            toast = "${dose.medicine.name} taken"
+                        },
+                        onSkip = { dose ->
+                            vm.markDose(dose, DoseStatus.SKIPPED) { reloadTick++ }
+                            toast = "${dose.medicine.name} skipped"
+                        }
                     )
                 }
 
@@ -250,6 +276,39 @@ fun TodayContent(
             }
             }
         }
+    }
+    AnimatedVisibility(
+        visible = toast != null,
+        enter = fadeIn(tween(160)) + slideInVertically(tween(240)) { it },
+        exit = fadeOut(tween(160)) + slideOutVertically(tween(200)) { it },
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(bottom = 110.dp, start = 16.dp, end = 16.dp)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = MaterialTheme.colorScheme.inverseSurface,
+            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+            shadowElevation = 6.dp
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.CheckCircle,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = toast ?: "",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
     }
 }
 
@@ -370,6 +429,7 @@ private fun TodayHeader(
 @Composable
 private fun WeekStrip(
     selectedDate: LocalDate,
+    markedDates: Set<LocalDate>,
     onSelect: (LocalDate) -> Unit
 ) {
     val today = LocalDate.now()
@@ -444,6 +504,16 @@ private fun WeekStrip(
                                 }
                             )
                         }
+                        Spacer(Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(4.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (date in markedDates) MaterialTheme.colorScheme.primary
+                                    else Color.Transparent
+                                )
+                        )
                     }
                 }
             }
@@ -455,6 +525,7 @@ private fun WeekStrip(
 private fun MonthGrid(
     month: YearMonth,
     selectedDate: LocalDate,
+    markedDates: Set<LocalDate>,
     onPrevMonth: () -> Unit,
     onNextMonth: () -> Unit,
     onSelectDay: (LocalDate) -> Unit
@@ -536,6 +607,16 @@ private fun MonthGrid(
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = if (isSelected || isToday) FontWeight.SemiBold
                                     else FontWeight.Normal
+                                )
+                            }
+                            if (date in markedDates) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .padding(bottom = 3.dp)
+                                        .size(4.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary)
                                 )
                             }
                         }

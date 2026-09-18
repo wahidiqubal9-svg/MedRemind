@@ -22,6 +22,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -272,9 +274,31 @@ private fun AdherenceChartCard(
 
                 Spacer(Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    LegendSwatch(Color(0xFF2FBF8F), "✓") { "Taken" }
-                    LegendSwatch(Color(0xFFE4664C), "✕") { "Missed" }
-                    LegendSwatch(Color.White, "–", Color(0xFF4338CA)) { "Skipped" }
+                    LegendSwatch(Color(0xFF2FBF8F), {
+                        Icon(
+                            Icons.Rounded.Check,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(7.dp)
+                        )
+                    }) { "Taken" }
+                    LegendSwatch(Color(0xFFE4664C), {
+                        Icon(
+                            Icons.Rounded.Close,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(7.dp)
+                        )
+                    }) { "Missed" }
+                    LegendSwatch(Color.White, {
+                        Box(
+                            modifier = Modifier
+                                .width(6.dp)
+                                .height(1.5.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(Color(0xFF4338CA))
+                        )
+                    }) { "Skipped" }
                 }
             }
         }
@@ -355,7 +379,12 @@ private fun SegBlock(status: String) {
             ),
             contentAlignment = Alignment.Center
         ) {
-            Text("✓", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+            Icon(
+                imageVector = Icons.Rounded.Check,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(11.dp)
+            )
         }
         DoseStatus.MISSED -> Box(
             modifier = base.background(
@@ -363,13 +392,24 @@ private fun SegBlock(status: String) {
             ),
             contentAlignment = Alignment.Center
         ) {
-            Text("✕", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+            Icon(
+                imageVector = Icons.Rounded.Close,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(10.dp)
+            )
         }
         DoseStatus.SKIPPED -> Box(
             modifier = base.background(Color.White.copy(alpha = 0.92f)),
             contentAlignment = Alignment.Center
         ) {
-            Text("–", color = Color(0xFF4338CA), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+            Box(
+                modifier = Modifier
+                    .width(8.dp)
+                    .height(2.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color(0xFF4338CA))
+            )
         }
         else -> Box(
             modifier = base
@@ -398,8 +438,7 @@ private fun HeroChip(text: String) {
 @Composable
 private fun LegendSwatch(
     color: Color,
-    glyph: String? = null,
-    glyphColor: Color = Color.White,
+    symbol: (@Composable () -> Unit)? = null,
     label: @Composable () -> String
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -411,8 +450,8 @@ private fun LegendSwatch(
                 .background(color),
             contentAlignment = Alignment.Center
         ) {
-            if (glyph != null) {
-                Text(glyph, color = glyphColor, fontWeight = FontWeight.Bold, fontSize = 8.sp)
+            if (symbol != null) {
+                symbol()
             }
         }
         Spacer(Modifier.width(7.dp))

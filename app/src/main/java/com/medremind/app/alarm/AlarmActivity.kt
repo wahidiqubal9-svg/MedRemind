@@ -53,21 +53,28 @@ class AlarmActivity : ComponentActivity() {
     }
 
     private fun startSoundAndVibration() {
-        runCatching {
-            val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-            val mp = MediaPlayer()
-            mp.setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build()
-            )
-            mp.setDataSource(this, uri)
-            mp.isLooping = true
-            mp.prepare()
-            mp.start()
-            player = mp
+        val soundKey = getSharedPreferences("medremind_settings", MODE_PRIVATE)
+            .getString("alarm_sound", "alarm") ?: "alarm"
+        if (soundKey != "none") {
+            runCatching {
+                val uri = when (soundKey) {
+                    "ringtone" -> RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                    "notification" -> RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                    else -> RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                } ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                val mp = MediaPlayer()
+                mp.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                mp.setDataSource(this, uri)
+                mp.isLooping = true
+                mp.prepare()
+                mp.start()
+                player = mp
+            }
         }
         runCatching {
             val vib = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

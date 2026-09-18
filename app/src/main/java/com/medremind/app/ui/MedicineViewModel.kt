@@ -65,6 +65,21 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
     suspend fun schedulesFor(medicineId: Long): List<Schedule> =
         withContext(Dispatchers.IO) { db.scheduleDao().forMedicine(medicineId) }
 
+    suspend fun datesWithDoses(from: LocalDate, to: LocalDate): Set<LocalDate> =
+        withContext(Dispatchers.IO) {
+            val schedules = db.scheduleDao().getAllOnce().filter { it.enabled }
+            if (schedules.isEmpty()) return@withContext emptySet()
+            val result = mutableSetOf<LocalDate>()
+            var day = from
+            while (!day.isAfter(to)) {
+                if (schedules.any { ReminderScheduler.occurrencesOn(it, day).isNotEmpty() }) {
+                    result.add(day)
+                }
+                day = day.plusDays(1)
+            }
+            result
+        }
+
     fun saveMedicine(medicine: Medicine, schedules: List<Schedule>, onDone: () -> Unit) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
