@@ -59,7 +59,8 @@ fun MedContent(
     onEdit: (Medicine) -> Unit,
     onDelete: (Medicine) -> Unit,
     onAdd: () -> Unit,
-    onOpenMe: () -> Unit
+    onOpenMe: () -> Unit,
+    profilePhoto: String? = null
 ) {
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableIntStateOf(0) }
@@ -79,7 +80,8 @@ fun MedContent(
                 SquareIconButton(
                     icon = Icons.Rounded.Person,
                     contentDescription = "Me",
-                    onClick = onOpenMe
+                    onClick = onOpenMe,
+                    photoPath = profilePhoto
                 )
             }
             Box(
@@ -116,7 +118,8 @@ fun MedContent(
                 SquareIconButton(
                     icon = Icons.Rounded.Person,
                     contentDescription = "Me",
-                    onClick = onOpenMe
+                    onClick = onOpenMe,
+                    photoPath = profilePhoto
                 )
             }
         }

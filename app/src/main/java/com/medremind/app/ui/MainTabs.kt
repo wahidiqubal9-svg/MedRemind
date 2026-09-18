@@ -140,7 +140,8 @@ fun MainTabs(
                     medicines = medicines,
                     vm = vm,
                     onAdd = onAdd,
-                    onOpenMe = onOpenMe
+                    onOpenMe = onOpenMe,
+                    profilePhoto = settings.profilePhoto
                 )
                 1 -> MedContent(
                     modifier = Modifier.padding(padding),
@@ -149,12 +150,14 @@ fun MainTabs(
                     onEdit = onEdit,
                     onDelete = onDelete,
                     onAdd = onAdd,
-                    onOpenMe = onOpenMe
+                    onOpenMe = onOpenMe,
+                    profilePhoto = settings.profilePhoto
                 )
                 2 -> HistoryContent(
                     modifier = Modifier.padding(padding),
                     vm = vm,
-                    onOpenMe = onOpenMe
+                    onOpenMe = onOpenMe,
+                    profilePhoto = settings.profilePhoto
                 )
                 else -> HealthScreen(
                     modifier = Modifier.padding(padding),
@@ -287,7 +290,8 @@ private fun HealthScreen(
             SquareIconButton(
                 icon = Icons.Rounded.Person,
                 contentDescription = "Me",
-                onClick = onOpenMe
+                onClick = onOpenMe,
+                photoPath = settings.profilePhoto
             )
         }
 

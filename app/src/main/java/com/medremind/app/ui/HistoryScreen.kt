@@ -49,7 +49,8 @@ import java.util.Locale
 fun HistoryContent(
     modifier: Modifier = Modifier,
     vm: MedicineViewModel,
-    onOpenMe: () -> Unit
+    onOpenMe: () -> Unit,
+    profilePhoto: String? = null
 ) {
     val history by vm.history.collectAsState()
 
@@ -88,7 +89,8 @@ fun HistoryContent(
                 SquareIconButton(
                     icon = Icons.Rounded.Person,
                     contentDescription = "Me",
-                    onClick = onOpenMe
+                    onClick = onOpenMe,
+                    photoPath = profilePhoto
                 )
             }
         }

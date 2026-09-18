@@ -88,7 +88,8 @@ fun TodayContent(
     medicines: List<Medicine>,
     vm: MedicineViewModel,
     onAdd: () -> Unit,
-    onOpenMe: () -> Unit
+    onOpenMe: () -> Unit,
+    profilePhoto: String? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
@@ -201,7 +202,8 @@ fun TodayContent(
             selectedDate = selectedDate,
             expanded = expanded,
             onToggleCalendar = { expanded = !expanded },
-            onOpenMe = onOpenMe
+            onOpenMe = onOpenMe,
+            profilePhoto = profilePhoto
         )
 
         Box(
@@ -475,7 +477,8 @@ private fun TodayHeader(
     selectedDate: LocalDate,
     expanded: Boolean,
     onToggleCalendar: () -> Unit,
-    onOpenMe: () -> Unit
+    onOpenMe: () -> Unit,
+    profilePhoto: String? = null
 ) {
     val isToday = selectedDate == LocalDate.now()
     val title = if (isToday) {
@@ -509,7 +512,8 @@ private fun TodayHeader(
         SquareIconButton(
             icon = Icons.Rounded.Person,
             contentDescription = "Me",
-            onClick = onOpenMe
+            onClick = onOpenMe,
+            photoPath = profilePhoto
         )
     }
 }

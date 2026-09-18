@@ -618,7 +618,8 @@ fun SquareIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     container: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    tint: Color = MaterialTheme.colorScheme.onSurface
+    tint: Color = MaterialTheme.colorScheme.onSurface,
+    photoPath: String? = null
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -645,12 +646,23 @@ fun SquareIconButton(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = tint,
-                modifier = Modifier.size(22.dp)
-            )
+            if (photoPath != null) {
+                AsyncImage(
+                    model = File(photoPath),
+                    contentDescription = contentDescription,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = contentDescription,
+                    tint = tint,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
         }
     }
 }
