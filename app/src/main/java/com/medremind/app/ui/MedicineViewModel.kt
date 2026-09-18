@@ -44,14 +44,16 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         db.medicineDao().observeAll()
     ) { events, medicines ->
         val byId = medicines.associateBy { it.id }
-        events.map { event ->
-            val medicine = byId[event.medicineId]
-            DoseHistoryItem(
-                event = event,
-                medicineName = medicine?.name ?: "Medicine",
-                photoPath = medicine?.photoPath
-            )
-        }
+        events
+            .filter { it.scheduleId != 0L }
+            .map { event ->
+                val medicine = byId[event.medicineId]
+                DoseHistoryItem(
+                    event = event,
+                    medicineName = medicine?.name ?: "Medicine",
+                    photoPath = medicine?.photoPath
+                )
+            }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun markOverdueAsMissed() {
@@ -65,7 +67,7 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
     suspend fun schedulesFor(medicineId: Long): List<Schedule> =
         withContext(Dispatchers.IO) { db.scheduleDao().forMedicine(medicineId) }
 
-    suspend fun doseStatsForRange(days: Int): List<DayDoseStat> = withContext(Dispatchers.IO) {
+    suspend fun doseLogForRange(days: Int): List<DoseLogEntry> = withContext(Dispatchers.IO) {
         val zone = ZoneId.systemDefault()
         val today = LocalDate.now()
         val start = today.minusDays((days - 1).toLong())
@@ -73,13 +75,14 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         val endMillis = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
         val schedules = db.scheduleDao().getAllOnce().filter { it.enabled }
         val medicinesById = db.medicineDao().getAllOnce().associateBy { it.id }
-        val events = db.doseEventDao().between(startMillis, endMillis)
+        // scheduleId == 0 marks the "test alarm" - exclude it.
+        val events = db.doseEventDao().between(startMillis, endMillis).filter { it.scheduleId != 0L }
         val now = System.currentTimeMillis()
-        (0 until days).map { offset ->
+        val result = mutableListOf<DoseLogEntry>()
+        (0 until days).forEach { offset ->
             val date = start.plusDays(offset.toLong())
-            val statuses = mutableListOf<String>()
             schedules.forEach { schedule ->
-                if (medicinesById[schedule.medicineId] == null) return@forEach
+                val medicine = medicinesById[schedule.medicineId] ?: return@forEach
                 ReminderScheduler.occurrencesOn(schedule, date).forEach { trigger ->
                     val status = if (date.isAfter(today)) {
                         FUTURE_STATUS
@@ -93,11 +96,18 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                             else -> DoseStatus.MISSED
                         }
                     }
-                    statuses.add(status)
+                    result.add(
+                        DoseLogEntry(
+                            medicineName = medicine.name,
+                            photoPath = medicine.photoPath,
+                            scheduledAt = trigger,
+                            status = status
+                        )
+                    )
                 }
             }
-            DayDoseStat(date, statuses)
         }
+        result.sortedByDescending { it.scheduledAt }
     }
 
     suspend fun datesWithDoses(from: LocalDate, to: LocalDate): Set<LocalDate> =
@@ -258,6 +268,13 @@ data class DoseHistoryItem(
 )
 
 data class DayDoseStat(val date: LocalDate, val statuses: List<String>)
+
+data class DoseLogEntry(
+    val medicineName: String,
+    val photoPath: String?,
+    val scheduledAt: Long,
+    val status: String
+)
 
 data class TodayDose(
     val timeMillis: Long,

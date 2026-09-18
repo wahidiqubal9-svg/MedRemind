@@ -1,6 +1,7 @@
 package com.medremind.app.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -27,6 +29,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.medremind.app.data.Medicine
+import kotlinx.coroutines.delay
 
 @Composable
 fun AppRoot(
@@ -35,6 +38,13 @@ fun AppRoot(
 ) {
     val medicines by vm.medicines.collectAsState()
     val loaded by vm.loaded.collectAsState()
+    var splashDone by remember { mutableStateOf(false) }
+    LaunchedEffect(loaded) {
+        if (loaded) {
+            delay(1000)
+            splashDone = true
+        }
+    }
     var tab by remember { mutableIntStateOf(0) }
     var showEditor by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
@@ -80,9 +90,6 @@ fun AppRoot(
                 )
             )
         }
-        if (!loaded) {
-            LoadingBox(modifier = Modifier.fillMaxSize())
-        } else {
         AnimatedContent(
             targetState = screen,
             transitionSpec = {
@@ -157,6 +164,12 @@ fun AppRoot(
             )
         }
     }
+        AnimatedVisibility(
+            visible = !splashDone,
+            exit = fadeOut(tween(450)),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            SplashScreen()
         }
     }
 

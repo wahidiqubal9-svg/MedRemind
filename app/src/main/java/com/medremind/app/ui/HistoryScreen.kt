@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
@@ -68,22 +67,39 @@ fun HistoryContent(
     LaunchedEffect(Unit) { vm.markOverdueAsMissed() }
 
     var rangeDays by remember { mutableIntStateOf(7) }
-    var stats by remember { mutableStateOf<List<DayDoseStat>>(emptyList()) }
+    var log by remember { mutableStateOf<List<DoseLogEntry>>(emptyList()) }
 
     LaunchedEffect(rangeDays, history) {
-        stats = vm.doseStatsForRange(rangeDays)
+        log = vm.doseLogForRange(rangeDays)
     }
 
-    val allStatuses = stats.flatMap { it.statuses }
-    val taken = allStatuses.count { it == DoseStatus.TAKEN }
-    val missed = allStatuses.count { it == DoseStatus.MISSED }
-    val skipped = allStatuses.count { it == DoseStatus.SKIPPED }
-    val pending = allStatuses.count { it == DoseStatus.PENDING }
+    val zone = remember { ZoneId.systemDefault() }
+    val dayStats = remember(log, rangeDays, zone) {
+        ((rangeDays - 1) downTo 0).map { offset ->
+            val date = LocalDate.now().minusDays(offset.toLong())
+            val statuses = log
+                .filter { Instant.ofEpochMilli(it.scheduledAt).atZone(zone).toLocalDate() == date }
+                .map { it.status }
+            DayDoseStat(date, statuses)
+        }
+    }
+
+    val taken = log.count { it.status == DoseStatus.TAKEN }
+    val missed = log.count { it.status == DoseStatus.MISSED }
+    val skipped = log.count { it.status == DoseStatus.SKIPPED }
+    val pending = log.count { it.status == DoseStatus.PENDING }
+    val future = log.count { it.status == FUTURE_STATUS }
     val due = taken + missed + skipped
     val percent = if (due == 0) 0 else taken * 100 / due
 
     val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
-    val grouped = remember(history) { history.groupBy { dateKey(it.event.scheduledAt) } }
+    val grouped = remember(log) {
+        val map = linkedMapOf<String, MutableList<DoseLogEntry>>()
+        log.forEach { entry ->
+            map.getOrPut(dateKey(entry.scheduledAt)) { mutableListOf() }.add(entry)
+        }
+        map
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -115,12 +131,13 @@ fun HistoryContent(
 
         item(key = "adherence") {
             AdherenceChartCard(
-                stats = stats,
+                stats = dayStats,
                 rangeDays = rangeDays,
                 taken = taken,
                 missed = missed,
                 skipped = skipped,
                 pending = pending,
+                future = future,
                 percent = percent
             )
         }
@@ -151,12 +168,12 @@ fun HistoryContent(
             }
         }
 
-        if (history.isEmpty()) {
+        if (log.isEmpty()) {
             item(key = "empty") {
                 MedEmptyState(
                     icon = Icons.Rounded.CalendarMonth,
-                    title = "No activity yet",
-                    message = "No doses recorded in this period.",
+                    title = "No doses in this period",
+                    message = "Add a medicine and its scheduled doses will appear here.",
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 16.dp)
@@ -164,7 +181,7 @@ fun HistoryContent(
             }
         }
 
-        grouped.forEach { (day, dayItems) ->
+        grouped.forEach { (day, entries) ->
             item(key = "day-$day") {
                 Text(
                     day,
@@ -172,8 +189,8 @@ fun HistoryContent(
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
-            items(dayItems, key = { it.event.id }) { item ->
-                HistoryRow(item = item, timeFormat = timeFormat)
+            items(entries, key = { it.scheduledAt.toString() + it.medicineName }) { entry ->
+                DoseLogRow(entry = entry, timeFormat = timeFormat)
             }
         }
     }
@@ -187,6 +204,7 @@ private fun AdherenceChartCard(
     missed: Int,
     skipped: Int,
     pending: Int,
+    future: Int,
     percent: Int
 ) {
     val visibleDays = stats.takeLast(minOf(rangeDays, 7))
@@ -222,6 +240,7 @@ private fun AdherenceChartCard(
                             HeroChip("$missed missed")
                             if (skipped > 0) HeroChip("$skipped skipped")
                             if (pending > 0) HeroChip("$pending pending")
+                            if (future > 0) HeroChip("$future upcoming")
                         }
                     }
                     Spacer(Modifier.width(12.dp))
@@ -468,18 +487,18 @@ private fun LegendSwatch(
 }
 
 @Composable
-private fun HistoryRow(
-    item: DoseHistoryItem,
+private fun DoseLogRow(
+    entry: DoseLogEntry,
     timeFormat: SimpleDateFormat,
     modifier: Modifier = Modifier
 ) {
     MedCard(modifier = modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            val photo = item.photoPath
+            val photo = entry.photoPath
             if (photo != null) {
                 AsyncImage(
                     model = File(photo),
-                    contentDescription = item.medicineName,
+                    contentDescription = entry.medicineName,
                     modifier = Modifier
                         .size(44.dp)
                         .clip(RoundedCornerShape(12.dp)),
@@ -494,7 +513,7 @@ private fun HistoryRow(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = item.medicineName.take(1).uppercase(),
+                        text = entry.medicineName.take(1).uppercase(),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -502,14 +521,14 @@ private fun HistoryRow(
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(item.medicineName, style = MaterialTheme.typography.titleSmall)
+                Text(entry.medicineName, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    timeFormat.format(Date(item.event.scheduledAt)),
+                    timeFormat.format(Date(entry.scheduledAt)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            StatusChip(status = item.event.status)
+            StatusChip(status = entry.status)
         }
     }
 }
