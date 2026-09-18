@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.math.abs
@@ -83,6 +84,8 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
             val date = start.plusDays(offset.toLong())
             schedules.forEach { schedule ->
                 val medicine = medicinesById[schedule.medicineId] ?: return@forEach
+                val createdDate = Instant.ofEpochMilli(medicine.createdAt).atZone(zone).toLocalDate()
+                if (date.isBefore(createdDate)) return@forEach
                 ReminderScheduler.occurrencesOn(schedule, date).forEach { trigger ->
                     val status = if (date.isAfter(today)) {
                         FUTURE_STATUS
@@ -112,14 +115,20 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
 
     suspend fun datesWithDoses(from: LocalDate, to: LocalDate): Set<LocalDate> =
         withContext(Dispatchers.IO) {
+            val zone = ZoneId.systemDefault()
             val schedules = db.scheduleDao().getAllOnce().filter { it.enabled }
             if (schedules.isEmpty()) return@withContext emptySet()
+            val medicinesById = db.medicineDao().getAllOnce().associateBy { it.id }
             val result = mutableSetOf<LocalDate>()
             var day = from
             while (!day.isAfter(to)) {
-                if (schedules.any { ReminderScheduler.occurrencesOn(it, day).isNotEmpty() }) {
-                    result.add(day)
+                val hasDose = schedules.any { schedule ->
+                    val medicine = medicinesById[schedule.medicineId] ?: return@any false
+                    val createdDate = Instant.ofEpochMilli(medicine.createdAt).atZone(zone).toLocalDate()
+                    !day.isBefore(createdDate) &&
+                        ReminderScheduler.occurrencesOn(schedule, day).isNotEmpty()
                 }
+                if (hasDose) result.add(day)
                 day = day.plusDays(1)
             }
             result
