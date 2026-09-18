@@ -38,6 +38,7 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -81,10 +82,12 @@ fun TodayContent(
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var month by remember { mutableStateOf(YearMonth.now()) }
     var doses by remember { mutableStateOf<List<TodayDose>>(emptyList()) }
+    var dosesLoaded by remember { mutableStateOf(false) }
     var reloadTick by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(selectedDate, medicines, reloadTick) {
         doses = vm.dosesOn(selectedDate)
+        dosesLoaded = true
     }
 
     val doseTimeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
@@ -169,6 +172,20 @@ fun TodayContent(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            if (!dosesLoaded) {
+                item(key = "loading") {
+                    MedCard(modifier = Modifier.fillMaxWidth()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 40.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            } else {
             item(key = "summary") {
                 SummaryCard(
                     taken = doses.count { it.status == DoseStatus.TAKEN },
@@ -230,6 +247,7 @@ fun TodayContent(
                         )
                     }
                 }
+            }
             }
         }
     }

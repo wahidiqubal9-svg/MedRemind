@@ -34,6 +34,7 @@ fun AppRoot(
     vm: MedicineViewModel = viewModel()
 ) {
     val medicines by vm.medicines.collectAsState()
+    val loaded by vm.loaded.collectAsState()
     var tab by remember { mutableIntStateOf(0) }
     var showEditor by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
@@ -79,10 +80,13 @@ fun AppRoot(
                 )
             )
         }
+        if (!loaded) {
+            LoadingBox(modifier = Modifier.fillMaxSize())
+        } else {
         AnimatedContent(
             targetState = screen,
             transitionSpec = {
-            val opening = targetState != "main"
+                val opening = targetState != "main"
             if (opening) {
                 val enter = slideInVertically(tween(300)) { height -> height / 10 } +
                     fadeIn(tween(260)) +
@@ -153,6 +157,7 @@ fun AppRoot(
             )
         }
     }
+        }
     }
 
     val action = pendingAction

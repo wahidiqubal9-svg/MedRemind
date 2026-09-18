@@ -31,6 +31,10 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
     val medicines: StateFlow<List<Medicine>> = db.medicineDao().getAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val loaded: StateFlow<Boolean> = db.medicineDao().getAll()
+        .map { true }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     val schedulesByMedicine: StateFlow<Map<Long, List<Schedule>>> = db.scheduleDao().observeAll()
         .map { list -> list.groupBy { it.medicineId } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
