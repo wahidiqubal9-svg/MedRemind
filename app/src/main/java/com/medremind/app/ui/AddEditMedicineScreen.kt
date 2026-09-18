@@ -11,6 +11,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
@@ -938,6 +939,14 @@ private fun SuccessScreen(
     onDone: () -> Unit,
     onAddAnother: () -> Unit
 ) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(320)) +
+            slideInVertically(tween(440)) { it / 6 } +
+            scaleIn(tween(440), initialScale = 0.94f)
+    ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -999,6 +1008,7 @@ private fun SuccessScreen(
         ) {
             Text("Add another")
         }
+    }
     }
 }
 

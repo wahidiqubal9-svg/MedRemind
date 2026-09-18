@@ -87,17 +87,21 @@ fun TodayContent(
         doses = vm.dosesOn(selectedDate)
     }
 
-    val pendingGroups = doses
-        .filter { it.status == DoseStatus.PENDING }
-        .groupBy { formatDoseTime(it.timeMillis) }
-        .toList()
-        .sortedBy { (_, list) -> list.minOf { it.timeMillis } }
-
-    val doneGroups = doses
-        .filter { it.status != DoseStatus.PENDING }
-        .groupBy { formatDoseTime(it.timeMillis) }
-        .toList()
-        .sortedBy { (_, list) -> list.minOf { it.timeMillis } }
+    val doseTimeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
+    val pendingGroups = remember(doses) {
+        doses
+            .filter { it.status == DoseStatus.PENDING }
+            .groupBy { doseTimeFormat.format(Date(it.timeMillis)).lowercase(Locale.getDefault()) }
+            .toList()
+            .sortedBy { (_, list) -> list.minOf { it.timeMillis } }
+    }
+    val doneGroups = remember(doses) {
+        doses
+            .filter { it.status != DoseStatus.PENDING }
+            .groupBy { doseTimeFormat.format(Date(it.timeMillis)).lowercase(Locale.getDefault()) }
+            .toList()
+            .sortedBy { (_, list) -> list.minOf { it.timeMillis } }
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         TodayHeader(
@@ -159,7 +163,9 @@ fun TodayContent(
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
@@ -191,7 +197,11 @@ fun TodayContent(
                     }
                 }
             } else {
-                items(pendingGroups, key = { "p-${it.first}" }) { (time, list) ->
+                items(
+                    items = pendingGroups,
+                    key = { "p-${it.first}" },
+                    contentType = { "dose_group" }
+                ) { (time, list) ->
                     TimeGroupCard(
                         time = time,
                         doses = list,
@@ -208,7 +218,11 @@ fun TodayContent(
                             modifier = Modifier.padding(top = 10.dp)
                         )
                     }
-                    items(doneGroups, key = { "d-${it.first}" }) { (time, list) ->
+                    items(
+                        items = doneGroups,
+                        key = { "d-${it.first}" },
+                        contentType = { "dose_group" }
+                    ) { (time, list) ->
                         TimeGroupCard(
                             time = time,
                             doses = list,
@@ -539,7 +553,6 @@ private fun TimeGroupCard(
                     .get(java.util.Calendar.HOUR_OF_DAY)
             }
             val allDone = doses.all { it.status != DoseStatus.PENDING }
-            val anyMissed = doses.any { it.status == DoseStatus.MISSED }
             val accentColor = timeOfDayColor(hour)
             Row(
                 modifier = Modifier
@@ -574,18 +587,9 @@ private fun TimeGroupCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                StatusChip(
-                    status = when {
-                        !allDone -> DoseStatus.PENDING
-                        anyMissed -> DoseStatus.MISSED
-                        else -> DoseStatus.TAKEN
-                    },
-                    label = when {
-                        !allDone -> "Upcoming"
-                        anyMissed -> "Missed"
-                        else -> "Completed"
-                    }
-                )
+                if (!allDone) {
+                    StatusChip(status = DoseStatus.PENDING, label = "Upcoming")
+                }
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -704,9 +708,6 @@ private fun doseSubtitle(dose: TodayDose): String {
     val pattern = schedulePatternLabel(dose.schedule)
     return "$doseText  |  $pattern"
 }
-
-private fun formatDoseTime(millis: Long): String =
-    SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(millis)).lowercase(Locale.getDefault())
 
 private fun weekdayLetter(date: LocalDate): String =
     date.dayOfWeek.getDisplayName(java.time.format.TextStyle.NARROW, Locale.getDefault())
