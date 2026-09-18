@@ -50,6 +50,7 @@ fun AppRoot(
     var showEditor by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showMe by remember { mutableStateOf(false) }
+    var showAccount by remember { mutableStateOf(false) }
     var showPermissions by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Medicine?>(null) }
     var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -63,6 +64,7 @@ fun AppRoot(
         showEditor -> "editor"
         showPermissions -> "permissions"
         showMe -> "me"
+        showAccount -> "account"
         showSettings -> "settings"
         else -> "main"
     }
@@ -145,8 +147,14 @@ fun AppRoot(
                 onOpenPermissions = {
                     showSettings = false
                     showPermissions = true
+                },
+                onOpenAccount = {
+                    showSettings = false
+                    showAccount = true
                 }
             )
+
+            "account" -> AccountScreen(onBack = { showAccount = false })
 
             "permissions" -> PermissionScreen(
                 onBack = { showPermissions = false },

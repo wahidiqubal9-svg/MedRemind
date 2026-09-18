@@ -29,6 +29,7 @@ import androidx.compose.material.icons.rounded.ColorLens
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Vibration
@@ -65,7 +66,8 @@ import kotlinx.coroutines.withContext
 fun SettingsScreen(
     settings: SettingsViewModel,
     onBack: () -> Unit,
-    onOpenPermissions: () -> Unit
+    onOpenPermissions: () -> Unit,
+    onOpenAccount: () -> Unit
 ) {
     BackHandler { onBack() }
     Scaffold(contentWindowInsets = WindowInsets(0.dp)) { padding ->
@@ -73,6 +75,7 @@ fun SettingsScreen(
             modifier = Modifier.padding(padding),
             settings = settings,
             onOpenPermissions = onOpenPermissions,
+            onOpenAccount = onOpenAccount,
             onBack = onBack
         )
     }
@@ -83,6 +86,7 @@ fun SettingsContent(
     modifier: Modifier = Modifier,
     settings: SettingsViewModel,
     onOpenPermissions: () -> Unit,
+    onOpenAccount: () -> Unit = {},
     onBack: () -> Unit = {}
 ) {
     var showSetPin by remember { mutableStateOf(false) }
@@ -144,6 +148,30 @@ fun SettingsContent(
                     Text("Alarm permissions", style = MaterialTheme.typography.titleMedium)
                     Text(
                         "Notifications, exact alarms, full-screen alarms, battery.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Icon(
+                    Icons.Rounded.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        SectionHeader("Account")
+        MedClickableCard(
+            onClick = onOpenAccount,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SettingIcon(Icons.Rounded.Person)
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Sign in", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Back up and sync across devices (coming soon).",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
