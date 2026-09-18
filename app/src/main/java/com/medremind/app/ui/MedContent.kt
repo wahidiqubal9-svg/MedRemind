@@ -169,7 +169,7 @@ private fun MedicineCard(
             1.dp,
             MaterialTheme.colorScheme.outlineVariant
         ),
-        shadowElevation = 6.dp
+        shadowElevation = 2.dp
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

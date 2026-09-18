@@ -175,7 +175,7 @@ fun HistoryContent(
                 )
             }
             items(dayItems, key = { it.event.id }) { item ->
-                HistoryRow(item = item, timeFormat = timeFormat, modifier = Modifier.animateItem())
+                HistoryRow(item = item, timeFormat = timeFormat)
             }
         }
     }
@@ -197,7 +197,7 @@ private fun AdherenceChartCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(26.dp),
         color = Color.Transparent,
-        shadowElevation = 8.dp
+        shadowElevation = 3.dp
     ) {
         Box(modifier = Modifier.background(MedGradients.hero())) {
             Column(modifier = Modifier.padding(22.dp)) {
@@ -245,6 +245,15 @@ private fun AdherenceChartCard(
                 }
 
                 Spacer(Modifier.height(22.dp))
+
+                if (rangeDays > 7) {
+                    Text(
+                        text = "Chart shows the last 7 days · totals cover $rangeDays days",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f),
+                        modifier = Modifier.padding(bottom = 10.dp)
+                    )
+                }
 
                 Row(
                     modifier = Modifier
@@ -316,7 +325,10 @@ private fun DayColumn(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    maxLines = 1,
+                    softWrap = false,
+                    fontSize = 9.sp,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                 )
             }
         } else {

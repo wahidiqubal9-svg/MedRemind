@@ -240,7 +240,7 @@ fun MedCard(
             1.dp,
             MaterialTheme.colorScheme.outlineVariant
         ),
-        shadowElevation = 6.dp
+        shadowElevation = 2.dp
     ) {
         Column(modifier = Modifier.padding(16.dp), content = content)
     }
@@ -270,7 +270,7 @@ fun MedClickableCard(
             1.dp,
             MaterialTheme.colorScheme.outlineVariant
         ),
-        shadowElevation = 6.dp
+        shadowElevation = 2.dp
     ) {
         Box(
             modifier = Modifier.clickable(
@@ -293,7 +293,7 @@ fun MedHeroCard(
         modifier = modifier,
         shape = MaterialTheme.shapes.extraLarge,
         color = Color.Transparent,
-        shadowElevation = 4.dp
+        shadowElevation = 2.dp
     ) {
         Box(
             modifier = Modifier.background(MedGradients.hero())
@@ -506,7 +506,7 @@ fun StatCard(
             1.dp,
             MaterialTheme.colorScheme.outlineVariant
         ),
-        shadowElevation = 6.dp
+        shadowElevation = 2.dp
     ) {
         Column(
             modifier = Modifier

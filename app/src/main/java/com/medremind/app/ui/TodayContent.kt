@@ -166,7 +166,7 @@ fun TodayContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 120.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item(key = "summary") {
@@ -206,8 +206,7 @@ fun TodayContent(
                         time = time,
                         doses = list,
                         onTake = { dose -> vm.markDose(dose, DoseStatus.TAKEN) { reloadTick++ } },
-                        onSkip = { dose -> vm.markDose(dose, DoseStatus.SKIPPED) { reloadTick++ } },
-                        modifier = Modifier.animateItem()
+                        onSkip = { dose -> vm.markDose(dose, DoseStatus.SKIPPED) { reloadTick++ } }
                     )
                 }
 
@@ -227,8 +226,7 @@ fun TodayContent(
                             time = time,
                             doses = list,
                             onTake = { dose -> vm.markDose(dose, DoseStatus.TAKEN) { reloadTick++ } },
-                            onSkip = { dose -> vm.markDose(dose, DoseStatus.SKIPPED) { reloadTick++ } },
-                            modifier = Modifier.animateItem()
+                            onSkip = { dose -> vm.markDose(dose, DoseStatus.SKIPPED) { reloadTick++ } }
                         )
                     }
                 }
