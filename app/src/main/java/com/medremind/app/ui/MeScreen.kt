@@ -24,7 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PhotoCamera
@@ -99,12 +98,7 @@ fun MeScreen(
         if (!editing && hasProfile) {
             ProfileCard(
                 settings = settings,
-                onEdit = { editing = true },
-                onPickPhoto = {
-                    pickImage.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
-                }
+                onEdit = { editing = true }
             )
         } else {
             ProfileForm(
@@ -119,16 +113,13 @@ fun MeScreen(
                 onCancel = { editing = false }
             )
         }
-
-        SettingsListCard(onOpenSettings = onOpenSettings)
     }
 }
 
 @Composable
 private fun ProfileCard(
     settings: SettingsViewModel,
-    onEdit: () -> Unit,
-    onPickPhoto: () -> Unit
+    onEdit: () -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -152,7 +143,7 @@ private fun ProfileCard(
                     .padding(top = 44.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                AvatarWithBadge(settings = settings, onPickPhoto = onPickPhoto)
+                AvatarWithBadge(settings = settings, onClick = onEdit, showCamera = false)
                 Spacer(Modifier.height(12.dp))
                 Text(
                     text = settings.profileName.ifBlank { "Your profile" },
@@ -226,10 +217,12 @@ private fun ProfileCard(
 @Composable
 private fun AvatarWithBadge(
     settings: SettingsViewModel,
-    onPickPhoto: () -> Unit
+    onClick: () -> Unit,
+    showCamera: Boolean = true
 ) {
     Box(modifier = Modifier.size(96.dp)) {
         Surface(
+            onClick = onClick,
             modifier = Modifier.size(96.dp),
             shape = CircleShape,
             color = MaterialTheme.colorScheme.primaryContainer,
@@ -257,22 +250,24 @@ private fun AvatarWithBadge(
                 }
             }
         }
-        Surface(
-            onClick = onPickPhoto,
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-            border = BorderStroke(3.dp, MaterialTheme.colorScheme.surface),
-            modifier = Modifier
-                .size(32.dp)
-                .align(Alignment.BottomEnd)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Rounded.PhotoCamera,
-                    contentDescription = "Change photo",
-                    modifier = Modifier.size(14.dp)
-                )
+        if (showCamera) {
+            Surface(
+                onClick = onClick,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                border = BorderStroke(3.dp, MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .size(32.dp)
+                    .align(Alignment.BottomEnd)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Rounded.PhotoCamera,
+                        contentDescription = "Change photo",
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
             }
         }
     }
@@ -302,53 +297,6 @@ private fun StatBox(
                 text = value,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.ExtraBold
-            )
-        }
-    }
-}
-
-@Composable
-private fun SettingsListCard(onOpenSettings: () -> Unit) {
-    Surface(
-        onClick = onOpenSettings,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 16.dp),
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 6.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                shape = RoundedCornerShape(13.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh
-            ) {
-                Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Rounded.Settings,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(19.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.width(14.dp))
-            Text(
-                text = "Settings",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.ExtraBold,
-                modifier = Modifier.weight(1f)
-            )
-            Icon(
-                imageVector = Icons.Rounded.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

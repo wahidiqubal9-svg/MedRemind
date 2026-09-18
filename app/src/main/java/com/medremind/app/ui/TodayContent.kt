@@ -71,6 +71,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.medremind.app.data.DoseStatus
 import com.medremind.app.data.Medicine
@@ -165,6 +166,15 @@ fun TodayContent(
                     return Offset(0f, available.y)
                 }
                 return Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                // Stop any fling from scrolling the list right after opening/collapsing.
+                return if (expanded || System.currentTimeMillis() < suppressUntil[0]) {
+                    available
+                } else {
+                    Velocity.Zero
+                }
             }
         }
     }
