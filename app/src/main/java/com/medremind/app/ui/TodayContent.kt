@@ -57,8 +57,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -104,6 +108,40 @@ fun TodayContent(
         if (toast != null) {
             delay(1600)
             toast = null
+        }
+    }
+
+    // Pull the list down (like pull-to-refresh) to open the calendar; drag up to collapse.
+    val pullAmount = remember { floatArrayOf(0f) }
+    val pullToCalendar = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (!expanded && available.y > 0f) {
+                    pullAmount[0] += available.y
+                    if (pullAmount[0] >= 140f) {
+                        expanded = true
+                        pullAmount[0] = 0f
+                    }
+                    return Offset(0f, available.y)
+                }
+                return Offset.Zero
+            }
+
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (expanded && available.y < 0f) {
+                    pullAmount[0] += -available.y
+                    if (pullAmount[0] >= 110f) {
+                        expanded = false
+                        pullAmount[0] = 0f
+                    }
+                    return Offset(0f, available.y)
+                }
+                return Offset.Zero
+            }
         }
     }
 
@@ -188,7 +226,8 @@ fun TodayContent(
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .weight(1f)
+                .nestedScroll(pullToCalendar),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
