@@ -497,13 +497,28 @@ private fun WeekStrip(
     onSelect: (LocalDate) -> Unit
 ) {
     val today = LocalDate.now()
+    val todayWeekStart = weekStartOf(today)
     val pageCount = 1201
     val center = pageCount / 2
-    val pagerState = rememberPagerState(initialPage = center, pageCount = { pageCount })
+    val pagerState = rememberPagerState(
+        initialPage = (center + weeksBetween(todayWeekStart, selectedDate)).coerceIn(0, pageCount - 1),
+        pageCount = { pageCount }
+    )
 
+    // Keep the strip on the week that contains the selected date (so after picking
+    // a day in the full calendar, the strip shows that date's week).
+    LaunchedEffect(selectedDate, todayWeekStart) {
+        val target = (center + weeksBetween(todayWeekStart, selectedDate)).coerceIn(0, pageCount - 1)
+        if (target != pagerState.currentPage && !pagerState.isScrollInProgress) {
+            pagerState.animateScrollToPage(target)
+        }
+    }
+
+    // When the user swipes to another week, keep the same weekday selected.
     LaunchedEffect(pagerState.settledPage) {
-        val anchor = today.plusDays(((pagerState.settledPage - center) * 7).toLong())
-        if (anchor != selectedDate) onSelect(anchor)
+        val weekStart = todayWeekStart.plusDays(((pagerState.settledPage - center) * 7).toLong())
+        val candidate = weekStart.plusDays((selectedDate.dayOfWeek.value % 7).toLong())
+        if (candidate != selectedDate) onSelect(candidate)
     }
 
     HorizontalPager(
@@ -512,7 +527,7 @@ private fun WeekStrip(
             .fillMaxWidth()
             .height(78.dp)
     ) { page ->
-        val start = today.plusDays(((page - center) * 7).toLong()).minusDays(3)
+        val start = todayWeekStart.plusDays(((page - center) * 7).toLong())
         Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -872,6 +887,12 @@ private fun doseSubtitle(dose: TodayDose): String {
 
 private fun weekdayLetter(date: LocalDate): String =
     date.dayOfWeek.getDisplayName(java.time.format.TextStyle.NARROW, Locale.getDefault())
+
+private fun weekStartOf(date: LocalDate): LocalDate =
+    date.minusDays((date.dayOfWeek.value % 7).toLong())
+
+private fun weeksBetween(base: LocalDate, date: LocalDate): Int =
+    ((weekStartOf(date).toEpochDay() - base.toEpochDay()) / 7).toInt()
 
 
 
