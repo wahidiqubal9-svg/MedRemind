@@ -26,6 +26,7 @@ object BackupManager {
         val medicines = db.medicineDao().getAllOnce()
         val schedules = db.scheduleDao().getAllOnce()
         val events = db.doseEventDao().getAllOnce()
+        val metrics = db.metricDao().getAllOnce()
 
         val json = JSONObject().apply {
             put("version", 3)
@@ -70,6 +71,17 @@ object BackupManager {
                         put("status", e.status)
                         put("actedAt", e.actedAt ?: JSONObject.NULL)
                         put("snoozeCount", e.snoozeCount)
+                    })
+                }
+            })
+            put("metrics", JSONArray().apply {
+                metrics.forEach { m ->
+                    put(JSONObject().apply {
+                        put("id", m.id)
+                        put("type", m.type)
+                        put("value", m.value.toDouble())
+                        put("value2", m.value2.toDouble())
+                        put("recordedAt", m.recordedAt)
                     })
                 }
             })
@@ -180,13 +192,30 @@ object BackupManager {
             )
         }
 
+        val metrics = mutableListOf<Metric>()
+        val mets = json.optJSONArray("metrics") ?: JSONArray()
+        for (i in 0 until mets.length()) {
+            val o = mets.getJSONObject(i)
+            metrics.add(
+                Metric(
+                    id = o.optLong("id"),
+                    type = o.optString("type"),
+                    value = o.optDouble("value", 0.0).toFloat(),
+                    value2 = o.optDouble("value2", 0.0).toFloat(),
+                    recordedAt = o.optLong("recordedAt", System.currentTimeMillis())
+                )
+            )
+        }
+
         val db = AppDatabase.get(context)
         db.doseEventDao().clear()
         db.scheduleDao().clear()
         db.medicineDao().clear()
+        db.metricDao().clear()
         db.medicineDao().insertAll(medicines)
         db.scheduleDao().insertAll(schedules)
         db.doseEventDao().insertAll(events)
+        db.metricDao().insertAll(metrics)
 
         return Summary(medicines.size, schedules.size, events.size, photoPaths.size)
     }

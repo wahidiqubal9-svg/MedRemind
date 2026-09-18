@@ -31,23 +31,29 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -55,12 +61,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.medremind.app.R
 import com.medremind.app.data.Medicine
+import com.medremind.app.data.Metric
+import com.medremind.app.data.MetricType
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private data class NavSpec(
     val label: String,
@@ -169,6 +182,7 @@ fun MainTabs(
                 else -> HealthScreen(
                     modifier = Modifier.padding(padding),
                     settings = settings,
+                    vm = vm,
                     onOpenMe = onOpenMe
                 )
             }
@@ -283,11 +297,14 @@ private fun RowScope.BottomNavCell(
 private fun HealthScreen(
     modifier: Modifier = Modifier,
     settings: SettingsViewModel,
+    vm: MedicineViewModel,
     onOpenMe: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     val selected = settings.profileDiseases
     val atMax = selected.size >= MAX_DISEASES
+    val metrics by vm.metrics.collectAsState()
+    var showAddMetric by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -397,18 +414,179 @@ private fun HealthScreen(
             }
         }
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 24.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            MedEmptyState(
-                icon = Icons.Rounded.Favorite,
-                title = "Health insights",
-                message = "Trends and insights are coming soon.",
-                modifier = Modifier.fillMaxWidth()
+        MedCard(modifier = Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Health log",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = { showAddMetric = true }) {
+                    Icon(
+                        Icons.Rounded.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text("Add reading")
+                }
+            }
+            if (metrics.isEmpty()) {
+                Text(
+                    "Log blood pressure, glucose or weight to keep a simple history here.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    metrics.take(10).forEach { metric ->
+                        MetricRow(metric = metric, onDelete = { vm.deleteMetric(metric) })
+                    }
+                }
+            }
+        }
+    }
+
+    if (showAddMetric) {
+        AddMetricDialog(
+            onDismiss = { showAddMetric = false },
+            onSave = { type, v1, v2 ->
+                vm.addMetric(type, v1, v2)
+                showAddMetric = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun MetricRow(metric: Metric, onDelete: () -> Unit) {
+    val format = remember { SimpleDateFormat("d MMM, h:mm a", Locale.getDefault()) }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.MonitorHeart,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                MetricType.label(metric.type),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                format.format(Date(metric.recordedAt)),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Text(
+            formatMetric(metric),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold
+        )
+        IconButton(onClick = onDelete) {
+            Icon(
+                Icons.Rounded.DeleteOutline,
+                contentDescription = "Delete reading",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
             )
         }
     }
+}
+
+private fun formatMetric(metric: Metric): String {
+    val unit = MetricType.unit(metric.type)
+    return when (metric.type) {
+        MetricType.BP -> "${metric.value.toInt()}/${metric.value2.toInt()} $unit"
+        else -> {
+            val number = if (metric.value % 1f == 0f) metric.value.toInt().toString()
+            else String.format(Locale.getDefault(), "%.1f", metric.value)
+            "$number $unit"
+        }
+    }
+}
+
+@Composable
+private fun AddMetricDialog(
+    onDismiss: () -> Unit,
+    onSave: (String, Float, Float) -> Unit
+) {
+    var typeIndex by remember { mutableIntStateOf(0) }
+    val types = listOf(MetricType.BP, MetricType.GLUCOSE, MetricType.WEIGHT)
+    var first by remember { mutableStateOf("") }
+    var second by remember { mutableStateOf("") }
+    val type = types[typeIndex]
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add reading") },
+        text = {
+            Column {
+                MedSegmentedButtons(
+                    options = listOf("BP", "Glucose", "Weight"),
+                    selectedIndex = typeIndex,
+                    onSelect = {
+                        typeIndex = it
+                        first = ""
+                        second = ""
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(14.dp))
+                if (type == MetricType.BP) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedTextField(
+                            value = first,
+                            onValueChange = { first = it.filter { c -> c.isDigit() }.take(3) },
+                            label = { Text("Systolic") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = second,
+                            onValueChange = { second = it.filter { c -> c.isDigit() }.take(3) },
+                            label = { Text("Diastolic") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = first,
+                        onValueChange = {
+                            first = it.filter { c -> c.isDigit() || c == '.' }.take(6)
+                        },
+                        label = { Text(MetricType.label(type)) },
+                        suffix = { Text(MetricType.unit(type)) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            val valid = first.toFloatOrNull() != null &&
+                (type != MetricType.BP || second.toFloatOrNull() != null)
+            TextButton(
+                enabled = valid,
+                onClick = {
+                    onSave(type, first.toFloatOrNull() ?: 0f, second.toFloatOrNull() ?: 0f)
+                }
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }

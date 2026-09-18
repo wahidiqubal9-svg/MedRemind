@@ -8,6 +8,7 @@ import com.medremind.app.alarm.AlarmNotifier
 import com.medremind.app.alarm.ReminderScheduler
 import com.medremind.app.data.AppDatabase
 import com.medremind.app.data.Medicine
+import com.medremind.app.data.Metric
 import com.medremind.app.data.DoseEvent
 import com.medremind.app.data.DoseStatus
 import com.medremind.app.data.PhotoStorage
@@ -53,6 +54,25 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
             .map { it.medicineId }.toSet()
         medicines.filter { it.id in ids }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val metrics: StateFlow<List<Metric>> = db.metricDao().observeAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun addMetric(type: String, value: Float, value2: Float = 0f, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                db.metricDao().insert(Metric(type = type, value = value, value2 = value2))
+            }
+            onDone()
+        }
+    }
+
+    fun deleteMetric(metric: Metric, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { db.metricDao().delete(metric) }
+            onDone()
+        }
+    }
 
     val history: StateFlow<List<DoseHistoryItem>> = combine(
         db.doseEventDao().observeAll(),
