@@ -65,7 +65,26 @@ object AlarmNotifier {
         nm.createNotificationChannel(channel)
     }
 
-    fun show(context: Context, doseEventId: Long) {
+    private fun actionIntent(
+        context: Context,
+        doseEventId: Long,
+        action: String,
+        requestCode: Int
+    ): PendingIntent {
+        val intent = Intent(context, AlarmActionReceiver::class.java).apply {
+            this.action = action
+            putExtra(AlarmActionReceiver.EXTRA_DOSE_EVENT_ID, doseEventId)
+            putExtra(AlarmActionReceiver.EXTRA_ACTION, action)
+        }
+        return PendingIntent.getBroadcast(
+            context,
+            (doseEventId.toInt() * 10) + requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    fun show(context: Context, doseEventId: Long, medicineName: String? = null) {
         ensureChannel(context)
         val intent = Intent(context, AlarmActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -80,14 +99,29 @@ object AlarmNotifier {
         val fullScreen = style(context) == "fullscreen"
         val builder = NotificationCompat.Builder(context, channelId(context))
             .setSmallIcon(R.drawable.ic_stat_pill)
-            .setContentTitle("Medicine time")
-            .setContentText("Tap to open your reminder")
+            .setContentTitle(medicineName ?: "Medicine time")
+            .setContentText("Time to take your medicine")
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(pi)
             .setOngoing(true)
             .setAutoCancel(false)
+            .addAction(
+                0,
+                "Taken",
+                actionIntent(context, doseEventId, AlarmActionReceiver.ACTION_TAKE, 1)
+            )
+            .addAction(
+                0,
+                "Snooze",
+                actionIntent(context, doseEventId, AlarmActionReceiver.ACTION_SNOOZE, 2)
+            )
+            .addAction(
+                0,
+                "Skip",
+                actionIntent(context, doseEventId, AlarmActionReceiver.ACTION_SKIP, 3)
+            )
         if (fullScreen) {
             builder.setFullScreenIntent(pi, true)
         }

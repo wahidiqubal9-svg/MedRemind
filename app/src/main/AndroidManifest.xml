@@ -43,6 +43,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".alarm.AlarmActionReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".alarm.BootReceiver"
             android:exported="true">
             <intent-filter>

@@ -19,7 +19,9 @@ class AlarmReceiver : BroadcastReceiver() {
             try {
                 val db = AppDatabase.get(context)
                 if (snoozeEventId > 0L) {
-                    AlarmNotifier.show(context, snoozeEventId)
+                    val event = db.doseEventDao().byId(snoozeEventId)
+                    val name = event?.let { db.medicineDao().byId(it.medicineId)?.name }
+                    AlarmNotifier.show(context, snoozeEventId, name)
                 } else if (scheduleId > 0L) {
                     val schedule = db.scheduleDao().byId(scheduleId)
                     if (schedule != null && schedule.enabled) {
@@ -30,7 +32,8 @@ class AlarmReceiver : BroadcastReceiver() {
                                 scheduledAt = System.currentTimeMillis()
                             )
                         )
-                        AlarmNotifier.show(context, eventId)
+                        val name = db.medicineDao().byId(schedule.medicineId)?.name
+                        AlarmNotifier.show(context, eventId, name)
                         ReminderScheduler.schedule(context, schedule)
                     }
                 }

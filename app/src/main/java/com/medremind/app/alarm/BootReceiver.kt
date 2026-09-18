@@ -3,6 +3,7 @@ package com.medremind.app.alarm
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.medremind.app.data.AppDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -19,6 +20,8 @@ class BootReceiver : BroadcastReceiver() {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     ReminderScheduler.rescheduleAll(context)
+                    AppDatabase.get(context).doseEventDao()
+                        .markMissedBefore(System.currentTimeMillis() - 2 * 60 * 60 * 1000L)
                 } finally {
                     pending.finish()
                 }
