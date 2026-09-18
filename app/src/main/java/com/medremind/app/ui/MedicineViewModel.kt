@@ -205,6 +205,8 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         val result = mutableListOf<TodayDose>()
         schedules.forEach { schedule ->
             val medicine = medicinesById[schedule.medicineId] ?: return@forEach
+            val createdDate = Instant.ofEpochMilli(medicine.createdAt).atZone(zone).toLocalDate()
+            if (date.isBefore(createdDate)) return@forEach
             ReminderScheduler.occurrencesOn(schedule, date).forEach { trigger ->
                 val event = events.firstOrNull {
                     it.medicineId == schedule.medicineId && abs(it.scheduledAt - trigger) < 90_000L
