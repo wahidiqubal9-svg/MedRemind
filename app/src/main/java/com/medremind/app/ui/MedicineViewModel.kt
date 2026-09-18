@@ -143,6 +143,41 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         result.sortedBy { it.timeMillis }
     }
 
+    suspend fun doseStatsForRange(days: Int): List<DayDoseStat> = withContext(Dispatchers.IO) {
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now()
+        val start = today.minusDays((days - 1).toLong())
+        val startMillis = start.atStartOfDay(zone).toInstant().toEpochMilli()
+        val endMillis = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        val schedules = db.scheduleDao().getAllOnce().filter { it.enabled }
+        val medicinesById = db.medicineDao().getAllOnce().associateBy { it.id }
+        val events = db.doseEventDao().between(startMillis, endMillis)
+        val now = System.currentTimeMillis()
+        (0 until days).map { offset ->
+            val date = start.plusDays(offset.toLong())
+            val statuses = mutableListOf<String>()
+            schedules.forEach { schedule ->
+                if (medicinesById[schedule.medicineId] == null) return@forEach
+                ReminderScheduler.occurrencesOn(schedule, date).forEach { trigger ->
+                    val status = if (date.isAfter(today)) {
+                        FUTURE_STATUS
+                    } else {
+                        val event = events.firstOrNull {
+                            it.medicineId == schedule.medicineId && abs(it.scheduledAt - trigger) < 90_000L
+                        }
+                        when {
+                            event != null -> event.status
+                            trigger >= now -> DoseStatus.PENDING
+                            else -> DoseStatus.MISSED
+                        }
+                    }
+                    statuses.add(status)
+                }
+            }
+            DayDoseStat(date, statuses)
+        }
+    }
+
     fun markDose(dose: TodayDose, status: String, onDone: () -> Unit = {}) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
@@ -203,6 +238,8 @@ data class DoseHistoryItem(
     val photoPath: String?
 )
 
+data class DayDoseStat(val date: LocalDate, val statuses: List<String>)
+
 data class TodayDose(
     val timeMillis: Long,
     val medicine: Medicine,
@@ -212,3 +249,4 @@ data class TodayDose(
 )
 
 private const val MISSED_AFTER_MILLIS = 2 * 60 * 60 * 1000L
+const val FUTURE_STATUS = "FUTURE"
