@@ -32,7 +32,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -48,18 +47,12 @@ import coil.compose.AsyncImage
 import com.medremind.app.data.DoseStatus
 import java.io.File
 import java.text.SimpleDateFormat
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Date
 import java.util.Locale
-
-private val chartTakenStart = Color(0xFF43D19E)
-private val chartTakenEnd = Color(0xFF1EA478)
-private val chartMissStart = Color(0xFFF07B5F)
-private val chartMissEnd = Color(0xFFC9482F)
-private val chartAmber = Color(0xFFF0B35C)
-private val chartInk2 = Color(0xFF9DB5AA)
-private val chartInk3 = Color(0x8C9DB5AA)
 
 @Composable
 fun HistoryContent(
@@ -72,18 +65,23 @@ fun HistoryContent(
     LaunchedEffect(Unit) { vm.markOverdueAsMissed() }
 
     var rangeDays by remember { mutableIntStateOf(7) }
-    var stats by remember { mutableStateOf<List<DayDoseStat>>(emptyList()) }
+    val zone = remember { ZoneId.systemDefault() }
+    val today = LocalDate.now()
 
-    LaunchedEffect(rangeDays, history) {
-        stats = vm.doseStatsForRange(rangeDays)
+    val days = remember(history, rangeDays, zone) {
+        val byDate = history.groupBy {
+            Instant.ofEpochMilli(it.event.scheduledAt).atZone(zone).toLocalDate()
+        }
+        ((rangeDays - 1) downTo 0).map { offset ->
+            val date = today.minusDays(offset.toLong())
+            date to byDate[date].orEmpty().map { it.event.status }
+        }
     }
 
-    val allStatuses = stats.flatMap { it.statuses }
+    val allStatuses = days.flatMap { it.second }
     val taken = allStatuses.count { it == DoseStatus.TAKEN }
     val missed = allStatuses.count { it == DoseStatus.MISSED }
     val skipped = allStatuses.count { it == DoseStatus.SKIPPED }
-    val pending = allStatuses.count { it == DoseStatus.PENDING }
-    val future = allStatuses.count { it == FUTURE_STATUS }
     val due = taken + missed + skipped
     val percent = if (due == 0) 0 else taken * 100 / due
 
@@ -120,12 +118,11 @@ fun HistoryContent(
 
         item(key = "adherence") {
             AdherenceChartCard(
-                stats = stats,
+                days = days,
                 rangeDays = rangeDays,
                 taken = taken,
                 missed = missed,
-                pending = pending,
-                future = future,
+                skipped = skipped,
                 percent = percent
             )
         }
@@ -186,36 +183,30 @@ fun HistoryContent(
 
 @Composable
 private fun AdherenceChartCard(
-    stats: List<DayDoseStat>,
+    days: List<Pair<LocalDate, List<String>>>,
     rangeDays: Int,
     taken: Int,
     missed: Int,
-    pending: Int,
-    future: Int,
+    skipped: Int,
     percent: Int
 ) {
-    val days = stats.takeLast(minOf(rangeDays, 7))
-    val due = taken + missed
-    val shape = RoundedCornerShape(26.dp)
+    val visibleDays = days.takeLast(minOf(rangeDays, 7))
+    val due = taken + missed + skipped
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = shape,
-        color = Color(0xFF0C2019),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
-        shadowElevation = 12.dp
+        shape = RoundedCornerShape(26.dp),
+        color = Color.Transparent,
+        shadowElevation = 8.dp
     ) {
-        Box(
-            modifier = Modifier.background(
-                Brush.verticalGradient(listOf(Color(0xFF122B24), Color(0xFF0C2019)))
-            )
-        ) {
+        Box(modifier = Modifier.background(MedGradients.hero())) {
             Column(modifier = Modifier.padding(22.dp)) {
                 Row(verticalAlignment = Alignment.Top) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "MEDIREMIND · ADHERENCE",
+                            text = "ADHERENCE",
                             style = MaterialTheme.typography.labelSmall,
-                            color = chartAmber,
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.5.sp
                         )
@@ -223,40 +214,32 @@ private fun AdherenceChartCard(
                         Text(
                             text = "Last $rangeDays days",
                             style = MaterialTheme.typography.headlineSmall,
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onPrimary,
                             fontWeight = FontWeight.ExtraBold
                         )
                         Spacer(Modifier.height(12.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                            ChartChip(chartTakenStart, "$taken of $due due taken")
-                            ChartChip(chartMissStart, "$missed missed")
-                        }
-                        Spacer(Modifier.height(7.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                            ChartChip(chartAmber, "$pending pending")
-                            ChartChip(null, "$future upcoming")
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            HeroChip("$taken of $due taken")
+                            HeroChip("$missed missed")
+                            if (skipped > 0) HeroChip("$skipped skipped")
                         }
                     }
                     Spacer(Modifier.width(12.dp))
-                    Column(horizontalAlignment = Alignment.End) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        ProgressRing(percent = percent, modifier = Modifier.size(100.dp)) {
+                            Text(
+                                text = "$percent%",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                        Spacer(Modifier.height(6.dp))
                         Text(
-                            text = "$percent%",
-                            style = MaterialTheme.typography.displaySmall,
-                            color = Color.White,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                        Text(
-                            text = "OF DUE DOSES",
+                            text = "of due doses",
                             style = MaterialTheme.typography.labelSmall,
-                            color = chartInk2,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = "1 block = 1 dose",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = chartInk3
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
@@ -266,18 +249,23 @@ private fun AdherenceChartCard(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(196.dp),
+                        .height(190.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    days.forEach { day -> DayColumn(day = day, modifier = Modifier.weight(1f)) }
+                    visibleDays.forEach { (date, statuses) ->
+                        DayColumn(
+                            date = date,
+                            statuses = statuses,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    LegendSwatch(chartTakenStart) { "Taken" }
-                    LegendSwatch(chartAmber) { "Pending" }
-                    LegendSwatch(chartMissStart) { "Missed" }
-                    LegendSwatch(null) { "Upcoming" }
+                    LegendSwatch(Color.White) { "Taken" }
+                    LegendSwatch(Color(0xFFFFC9B8)) { "Missed" }
+                    LegendSwatch(Color.White.copy(alpha = 0.4f)) { "Skipped" }
                 }
             }
         }
@@ -285,17 +273,16 @@ private fun AdherenceChartCard(
 }
 
 @Composable
-private fun DayColumn(day: DayDoseStat, modifier: Modifier = Modifier) {
-    val isToday = day.date == LocalDate.now()
-    val n = day.statuses.size
-    val takenN = day.statuses.count { it == DoseStatus.TAKEN }
-    val allFuture = n > 0 && day.statuses.all { it == FUTURE_STATUS }
-    val fracColor = when {
-        allFuture -> chartInk3
-        day.statuses.contains(DoseStatus.MISSED) -> chartMissStart
-        day.statuses.contains(DoseStatus.PENDING) -> chartAmber
-        else -> chartTakenStart
-    }
+private fun DayColumn(
+    date: LocalDate,
+    statuses: List<String>,
+    modifier: Modifier = Modifier
+) {
+    val isToday = date == LocalDate.now()
+    val n = statuses.size
+    val takenN = statuses.count { it == DoseStatus.TAKEN }
+    val anyMissed = statuses.contains(DoseStatus.MISSED)
+    val onPrimary = MaterialTheme.colorScheme.onPrimary
 
     Column(
         modifier = modifier.fillMaxHeight(),
@@ -311,35 +298,32 @@ private fun DayColumn(day: DayDoseStat, modifier: Modifier = Modifier) {
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                day.statuses.forEach { status -> SegBlock(status) }
+                statuses.forEach { status -> SegBlock(status) }
             }
         }
         Spacer(Modifier.height(6.dp))
         Text(
-            text = if (allFuture || n == 0) "—" else "$takenN/$n",
+            text = if (n == 0) "—" else "$takenN/$n",
             style = MaterialTheme.typography.labelMedium,
-            color = fracColor,
+            color = if (anyMissed) Color(0xFFFFC9B8) else onPrimary,
             fontWeight = FontWeight.ExtraBold
         )
         Spacer(Modifier.height(3.dp))
         if (isToday) {
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = chartTakenEnd
-            ) {
+            Surface(shape = RoundedCornerShape(50), color = onPrimary) {
                 Text(
                     text = "Today",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF06120E),
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                 )
             }
         } else {
             Text(
-                text = day.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                text = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
                 style = MaterialTheme.typography.labelSmall,
-                color = chartInk2,
+                color = onPrimary.copy(alpha = 0.8f),
                 fontWeight = FontWeight.Bold
             )
         }
@@ -355,90 +339,59 @@ private fun SegBlock(status: String) {
     when (status) {
         DoseStatus.TAKEN -> Box(
             modifier = base.background(
-                Brush.verticalGradient(listOf(chartTakenStart, chartTakenEnd))
+                Brush.verticalGradient(listOf(Color.White, Color.White.copy(alpha = 0.82f)))
             )
         )
         DoseStatus.MISSED -> Box(
             modifier = base.background(
-                Brush.verticalGradient(listOf(chartMissStart, chartMissEnd))
+                Brush.verticalGradient(listOf(Color(0xFFFF9C8A), Color(0xFFE4664C)))
             ),
             contentAlignment = Alignment.Center
         ) {
             Text("!", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
         }
         DoseStatus.SKIPPED -> Box(
-            modifier = base.background(
-                Brush.verticalGradient(listOf(Color(0xFF94A3B8), Color(0xFF64748B)))
-            )
-        )
-        FUTURE_STATUS -> Box(
-            modifier = base
-                .border(1.5.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(50))
-                .background(Color.White.copy(alpha = 0.04f))
+            modifier = base.background(Color.White.copy(alpha = 0.4f))
         )
         else -> Box(
             modifier = base
-                .border(1.5.dp, Color(0xFF2FBF8F).copy(alpha = 0.75f), RoundedCornerShape(50))
-                .background(Color(0xFF2FBF8F).copy(alpha = 0.15f))
+                .border(1.5.dp, Color.White.copy(alpha = 0.7f), RoundedCornerShape(50))
+                .background(Color.White.copy(alpha = 0.15f))
         )
     }
 }
 
 @Composable
-private fun ChartChip(dot: Color?, text: String) {
+private fun HeroChip(text: String) {
     Surface(
         shape = RoundedCornerShape(50),
-        color = Color.White.copy(alpha = 0.05f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+        color = Color.White.copy(alpha = 0.18f),
+        contentColor = MaterialTheme.colorScheme.onPrimary
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (dot != null) {
-                Box(
-                    modifier = Modifier
-                        .size(7.dp)
-                        .clip(CircleShape)
-                        .background(dot)
-                )
-                Spacer(Modifier.width(6.dp))
-            }
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelSmall,
-                color = chartInk2,
-                fontWeight = FontWeight.Bold
-            )
-        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 5.dp)
+        )
     }
 }
 
 @Composable
-private fun LegendSwatch(color: Color?, label: @Composable () -> String) {
+private fun LegendSwatch(color: Color, label: @Composable () -> String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        if (color != null) {
-            Box(
-                modifier = Modifier
-                    .width(14.dp)
-                    .height(10.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(color)
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .width(14.dp)
-                    .height(10.dp)
-                    .clip(RoundedCornerShape(50))
-                    .border(1.5.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(50))
-            )
-        }
+        Box(
+            modifier = Modifier
+                .width(14.dp)
+                .height(10.dp)
+                .clip(RoundedCornerShape(50))
+                .background(color)
+        )
         Spacer(Modifier.width(7.dp))
         Text(
             text = label(),
             style = MaterialTheme.typography.labelSmall,
-            color = chartInk2,
+            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f),
             fontWeight = FontWeight.Bold
         )
     }

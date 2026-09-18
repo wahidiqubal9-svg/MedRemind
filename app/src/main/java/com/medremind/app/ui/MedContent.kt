@@ -40,6 +40,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.medremind.app.data.Medicine
@@ -208,57 +210,32 @@ private fun MedicineCard(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Spacer(Modifier.height(16.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                val timing = timingText(schedules)
+            val timing = timingText(schedules)
+            val patternText = schedules.map { schedulePatternLabel(it) }.distinct().joinToString(", ")
+            val stackTags = timing.isNotBlank() && patternText.isNotBlank() &&
+                (timing.length + patternText.length) > 16
+            val tags: @Composable () -> Unit = {
                 if (timing.isNotBlank()) {
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Schedule,
-                                contentDescription = null,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                timing,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
+                    TagPill(
+                        icon = Icons.Rounded.Schedule,
+                        text = timing,
+                        container = MaterialTheme.colorScheme.primaryContainer,
+                        content = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                 }
-                val patterns = schedules.map { schedulePatternLabel(it) }.distinct()
-                if (patterns.isNotEmpty()) {
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.tertiaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Repeat,
-                                contentDescription = null,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                patterns.joinToString(", "),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
+                if (patternText.isNotBlank()) {
+                    TagPill(
+                        icon = Icons.Rounded.Repeat,
+                        text = patternText,
+                        container = MaterialTheme.colorScheme.tertiaryContainer,
+                        content = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
                 }
+            }
+            if (stackTags) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { tags() }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { tags() }
             }
         }
     }
@@ -273,6 +250,33 @@ private fun MedicineCard(
             },
             onDismiss = { showDelete = false }
         )
+    }
+}
+
+@Composable
+private fun TagPill(
+    icon: ImageVector,
+    text: String,
+    container: Color,
+    content: Color
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = container,
+        contentColor = content
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(15.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 
