@@ -628,14 +628,18 @@ fun SquareIconButton(
         animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow),
         label = "squareScale"
     )
-    Surface(
-        modifier = modifier.graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-        },
-        shape = RoundedCornerShape(16.dp),
-        color = container
-    ) {
+        Surface(
+            modifier = modifier.graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            },
+            shape = CircleShape,
+            color = container,
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant
+            )
+        ) {
         Box(
             modifier = Modifier
                 .size(46.dp)
