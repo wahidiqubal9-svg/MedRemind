@@ -405,6 +405,7 @@ internal fun schedulePatternLabel(schedule: Schedule): String = when (schedule.t
         if (days.isEmpty()) "No days" else days.joinToString(", ")
     }
     ScheduleType.INTERVAL -> "Every ${schedule.intervalHours} h"
+    ScheduleType.AS_NEEDED -> "As needed"
     ScheduleType.COURSE -> {
         if (schedule.endDate != null) {
             "Course until " + SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(schedule.endDate))

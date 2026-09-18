@@ -10,6 +10,7 @@ object ScheduleType {
     const val WEEKDAYS = "WEEKDAYS"
     const val INTERVAL = "INTERVAL"
     const val COURSE = "COURSE"
+    const val AS_NEEDED = "AS_NEEDED"
 }
 
 @Entity(

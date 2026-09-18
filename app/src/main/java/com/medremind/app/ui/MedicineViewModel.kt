@@ -42,6 +42,16 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         .map { list -> list.groupBy { it.medicineId } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
+    /** Medicines whose schedule is "as needed" rather than fixed times. */
+    val prnMedicines: StateFlow<List<Medicine>> = combine(
+        db.medicineDao().observeAll(),
+        db.scheduleDao().observeAll()
+    ) { medicines, schedules ->
+        val ids = schedules.filter { it.type == ScheduleType.AS_NEEDED }
+            .map { it.medicineId }.toSet()
+        medicines.filter { it.id in ids }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     val history: StateFlow<List<DoseHistoryItem>> = combine(
         db.doseEventDao().observeAll(),
         db.medicineDao().observeAll()
@@ -251,6 +261,28 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                 if (status == DoseStatus.TAKEN) {
                     consumeStock(dose)
                 }
+            }
+            onDone(eventId)
+        }
+    }
+
+    /** Logs an as-needed dose as taken, right now. */
+    fun logPrnDose(medicine: Medicine, onDone: (Long?) -> Unit = {}) {
+        viewModelScope.launch {
+            var eventId: Long? = null
+            withContext(Dispatchers.IO) {
+                val schedule = db.scheduleDao().forMedicine(medicine.id)
+                    .firstOrNull { it.type == ScheduleType.AS_NEEDED } ?: return@withContext
+                val now = System.currentTimeMillis()
+                eventId = db.doseEventDao().insert(
+                    DoseEvent(
+                        scheduleId = schedule.id,
+                        medicineId = medicine.id,
+                        scheduledAt = now,
+                        status = DoseStatus.TAKEN,
+                        actedAt = now
+                    )
+                )
             }
             onDone(eventId)
         }

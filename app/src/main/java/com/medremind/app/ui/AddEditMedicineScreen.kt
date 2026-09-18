@@ -169,6 +169,7 @@ fun AddEditMedicineScreen(
 
     var timesCount by remember { mutableIntStateOf(2) }
     var isCustomCount by remember { mutableStateOf(false) }
+    var asNeeded by rememberSaveable { mutableStateOf(false) }
     var specificDaysOnly by remember { mutableStateOf(false) }
     var daysMask by remember { mutableIntStateOf(0b0011111) }
     var durationDays by remember { mutableIntStateOf(0) }
@@ -189,6 +190,7 @@ fun AddEditMedicineScreen(
                     .ifEmpty { listOf("08:00") }
                 timesCount = times.size.coerceIn(1, 10)
                 isCustomCount = timesCount > 4
+                asNeeded = first.type == ScheduleType.AS_NEEDED
                 specificDaysOnly = first.type == ScheduleType.WEEKDAYS
                 daysMask = if (first.type == ScheduleType.WEEKDAYS) first.daysMask.let {
                     if (it == 0) 0b0011111 else it
@@ -235,6 +237,7 @@ fun AddEditMedicineScreen(
                 refillBelow = ""
                 timesCount = 2
                 isCustomCount = false
+                asNeeded = false
                 specificDaysOnly = false
                 daysMask = 0b0011111
                 durationDays = 0
@@ -324,6 +327,8 @@ fun AddEditMedicineScreen(
                         onRefillBelow = { refillBelow = it }
                     )
                     1 -> ScheduleStep(
+                        asNeeded = asNeeded,
+                        onAsNeeded = { asNeeded = it },
                         timesCount = timesCount,
                         isCustomCount = isCustomCount,
                         onSelectCount = { count, custom ->
@@ -349,9 +354,12 @@ fun AddEditMedicineScreen(
                         doseLabel = "$qtyAmount $qtyUnit".trim(),
                         photoPath = photoPath,
                         onEdit = { step = 0 },
-                        timeLabel = times.joinToString(" · ") { formatTimeLabel(it) },
-                        daysLabel = if (specificDaysOnly) daysLabel(daysMask) else "Every day",
-                        durationLabel = if (durationDays == 0) "Continue" else "$durationDays days"
+                        timeLabel = if (asNeeded) "Take when needed"
+                        else times.joinToString(" · ") { formatTimeLabel(it) },
+                        daysLabel = if (asNeeded) "As needed"
+                        else if (specificDaysOnly) daysLabel(daysMask) else "Every day",
+                        durationLabel = if (asNeeded) "Ongoing"
+                        else if (durationDays == 0) "Continue" else "$durationDays days"
                     )
                         }
                     }
@@ -402,11 +410,15 @@ fun AddEditMedicineScreen(
                                 val schedule = Schedule(
                                     id = initial?.let { 0L } ?: 0L,
                                     medicineId = base.id,
-                                    type = if (specificDaysOnly) ScheduleType.WEEKDAYS else ScheduleType.DAILY,
-                                    times = times.joinToString(","),
-                                    daysMask = if (specificDaysOnly) daysMask else 0,
+                                    type = when {
+                                        asNeeded -> ScheduleType.AS_NEEDED
+                                        specificDaysOnly -> ScheduleType.WEEKDAYS
+                                        else -> ScheduleType.DAILY
+                                    },
+                                    times = if (asNeeded) "" else times.joinToString(","),
+                                    daysMask = if (specificDaysOnly && !asNeeded) daysMask else 0,
                                     doseLabel = "$qtyAmount $qtyUnit".trim(),
-                                    endDate = if (durationDays > 0) {
+                                    endDate = if (!asNeeded && durationDays > 0) {
                                         System.currentTimeMillis() + durationDays * 86_400_000L
                                     } else null,
                                     enabled = true
@@ -626,6 +638,8 @@ private fun DetailsStep(
 
 @Composable
 private fun ScheduleStep(
+    asNeeded: Boolean,
+    onAsNeeded: (Boolean) -> Unit,
     timesCount: Int,
     isCustomCount: Boolean,
     onSelectCount: (Int, Boolean) -> Unit,
@@ -653,6 +667,30 @@ private fun ScheduleStep(
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
+    Spacer(Modifier.height(16.dp))
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("As needed", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "No fixed times \u2014 log a dose whenever you take it.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(checked = asNeeded, onCheckedChange = onAsNeeded)
+        }
+    }
+
+    if (!asNeeded) {
     Spacer(Modifier.height(18.dp))
 
     FieldLabel("1. Times per day")
@@ -810,6 +848,7 @@ private fun ScheduleStep(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
     }
 }
 

@@ -53,6 +53,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -103,6 +104,7 @@ fun TodayContent(
     var markedDates by remember { mutableStateOf<Set<LocalDate>>(emptySet()) }
     val scope = rememberCoroutineScope()
     val haptics = rememberMedHaptics()
+    val prnMeds by vm.prnMedicines.collectAsState()
 
     LaunchedEffect(selectedDate, medicines, reloadTick) {
         doses = vm.dosesOn(selectedDate)
@@ -307,14 +309,16 @@ fun TodayContent(
                     TodaySkeleton()
                 }
             } else {
-            item(key = "summary") {
-                SummaryCard(
-                    taken = doses.count { it.status == DoseStatus.TAKEN },
-                    total = doses.size,
-                    missed = doses.count { it.status == DoseStatus.MISSED }
-                )
+            if (doses.isNotEmpty()) {
+                item(key = "summary") {
+                    SummaryCard(
+                        taken = doses.count { it.status == DoseStatus.TAKEN },
+                        total = doses.size,
+                        missed = doses.count { it.status == DoseStatus.MISSED }
+                    )
+                }
             }
-            if (doses.isEmpty()) {
+            if (doses.isEmpty() && prnMeds.isEmpty()) {
                 item(key = "empty") {
                     MedCard(modifier = Modifier.fillMaxWidth()) {
                         MedEmptyState(
@@ -368,10 +372,68 @@ fun TodayContent(
                         )
                     }
                 }
+
+                if (prnMeds.isNotEmpty()) {
+                    item(key = "prn_header") {
+                        SectionHeader("As needed", modifier = Modifier.padding(top = 10.dp))
+                    }
+                    items(prnMeds, key = { "prn-${it.id}" }) { med ->
+                        PrnCard(
+                            medicine = med,
+                            onLog = {
+                                haptics.confirm()
+                                vm.logPrnDose(med) {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "${med.name} logged",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
             }
             }
         }
     }
+    }
+}
+
+@Composable
+private fun PrnCard(medicine: Medicine, onLog: () -> Unit) {
+    MedCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            MedAvatar(
+                name = medicine.name,
+                photoPath = medicine.photoPath,
+                size = 46.dp,
+                accent = medicineAccent(medicine.id)
+            )
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(medicine.name, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Take when needed",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Surface(
+                onClick = onLog,
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Text(
+                    "Log dose",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
+                )
+            }
+        }
     }
 }
 
