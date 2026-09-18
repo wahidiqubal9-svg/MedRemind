@@ -10,5 +10,9 @@ data class Medicine(
     val strength: String = "",
     val notes: String = "",
     val photoPath: String? = null,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    /** Pills currently on hand. 0 means refill tracking is off. */
+    val quantity: Int = 0,
+    /** Show a refill reminder when [quantity] drops to or below this. */
+    val refillThreshold: Int = 0
 )

@@ -62,6 +62,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -158,6 +159,14 @@ fun AddEditMedicineScreen(
     var showPhotoSheet by remember { mutableStateOf(false) }
     var unitTarget by remember { mutableStateOf<Int?>(null) }
 
+    var trackRefill by rememberSaveable { mutableStateOf((initial?.quantity ?: 0) > 0) }
+    var stockAmount by rememberSaveable {
+        mutableStateOf((initial?.quantity ?: 0).takeIf { it > 0 }?.toString() ?: "")
+    }
+    var refillBelow by rememberSaveable {
+        mutableStateOf((initial?.refillThreshold ?: 0).takeIf { it > 0 }?.toString() ?: "")
+    }
+
     var timesCount by remember { mutableIntStateOf(2) }
     var isCustomCount by remember { mutableStateOf(false) }
     var specificDaysOnly by remember { mutableStateOf(false) }
@@ -221,6 +230,9 @@ fun AddEditMedicineScreen(
                 qtyAmount = "1"
                 qtyUnit = "tablet"
                 photoPath = null
+                trackRefill = false
+                stockAmount = ""
+                refillBelow = ""
                 timesCount = 2
                 isCustomCount = false
                 specificDaysOnly = false
@@ -303,7 +315,13 @@ fun AddEditMedicineScreen(
                         qtyUnit = qtyUnit,
                         photoPath = photoPath,
                         onPhotoClick = { showPhotoSheet = true },
-                        onOpenUnit = { target -> unitTarget = target }
+                        onOpenUnit = { target -> unitTarget = target },
+                        trackRefill = trackRefill,
+                        onTrackRefill = { trackRefill = it },
+                        stockAmount = stockAmount,
+                        onStockAmount = { stockAmount = it },
+                        refillBelow = refillBelow,
+                        onRefillBelow = { refillBelow = it }
                     )
                     1 -> ScheduleStep(
                         timesCount = timesCount,
@@ -396,7 +414,11 @@ fun AddEditMedicineScreen(
                                 val medicine = base.copy(
                                     name = name.trim(),
                                     strength = "$doseAmount $doseUnit".trim(),
-                                    photoPath = photoPath
+                                    photoPath = photoPath,
+                                    quantity = if (trackRefill) (stockAmount.toIntOrNull() ?: 0) else 0,
+                                    refillThreshold = if (trackRefill) {
+                                        refillBelow.toIntOrNull() ?: 0
+                                    } else 0
                                 )
                                 vm.saveMedicine(medicine, listOf(schedule)) { saved = true }
                             }
@@ -471,7 +493,13 @@ private fun DetailsStep(
     qtyUnit: String,
     photoPath: String?,
     onPhotoClick: () -> Unit,
-    onOpenUnit: (Int) -> Unit
+    onOpenUnit: (Int) -> Unit,
+    trackRefill: Boolean,
+    onTrackRefill: (Boolean) -> Unit,
+    stockAmount: String,
+    onStockAmount: (String) -> Unit,
+    refillBelow: String,
+    onRefillBelow: (String) -> Unit
 ) {
     Text(
         "Add medicine",
@@ -550,6 +578,49 @@ private fun DetailsStep(
         )
         Spacer(Modifier.width(10.dp))
         UnitButton(value = qtyUnit, onClick = { onOpenUnit(1) })
+    }
+
+    Spacer(Modifier.height(20.dp))
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Track refills", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Count pills and remind me when supply is low.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(checked = trackRefill, onCheckedChange = onTrackRefill)
+            }
+            if (trackRefill) {
+                Spacer(Modifier.height(14.dp))
+                FieldLabel("Pills remaining")
+                OutlinedTextField(
+                    value = stockAmount,
+                    onValueChange = { onStockAmount(it.filter { c -> c.isDigit() }.take(6)) },
+                    placeholder = { Text("30") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(12.dp))
+                FieldLabel("Remind me when below")
+                OutlinedTextField(
+                    value = refillBelow,
+                    onValueChange = { onRefillBelow(it.filter { c -> c.isDigit() }.take(6)) },
+                    placeholder = { Text("5") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
     }
 }
 

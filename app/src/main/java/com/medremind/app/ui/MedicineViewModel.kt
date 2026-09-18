@@ -1,8 +1,10 @@
 package com.medremind.app.ui
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.medremind.app.alarm.AlarmNotifier
 import com.medremind.app.alarm.ReminderScheduler
 import com.medremind.app.data.AppDatabase
 import com.medremind.app.data.Medicine
@@ -246,8 +248,28 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                         )
                     )
                 }
+                if (status == DoseStatus.TAKEN) {
+                    consumeStock(dose)
+                }
             }
             onDone(eventId)
+        }
+    }
+
+    /** Decrements pill stock after a dose is taken and warns when supply runs low. */
+    private suspend fun consumeStock(dose: TodayDose) {
+        val medicine = db.medicineDao().byId(dose.medicine.id) ?: return
+        if (medicine.quantity <= 0) return
+        val per = dose.schedule.doseLabel.trim().split(Regex("\\s+"))
+            .firstOrNull()?.toFloatOrNull()?.toInt()?.coerceAtLeast(1) ?: 1
+        val newQty = (medicine.quantity - per).coerceAtLeast(0)
+        db.medicineDao().update(medicine.copy(quantity = newQty))
+        val prefs = app.getSharedPreferences("medremind_settings", Context.MODE_PRIVATE)
+        val key = "refill_notified_${medicine.id}"
+        val last = prefs.getInt(key, -1)
+        if (newQty <= medicine.refillThreshold && last != newQty) {
+            prefs.edit().putInt(key, newQty).apply()
+            AlarmNotifier.showRefill(app, medicine.name, newQty)
         }
     }
 

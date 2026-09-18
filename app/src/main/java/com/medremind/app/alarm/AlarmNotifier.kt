@@ -138,4 +138,34 @@ object AlarmNotifier {
     fun cancel(context: Context, doseEventId: Long) {
         runCatching { NotificationManagerCompat.from(context).cancel(doseEventId.toInt()) }
     }
+
+    fun showRefill(context: Context, medicineName: String, remaining: Int) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val nm = context.getSystemService(NotificationManager::class.java)
+            if (nm != null && nm.getNotificationChannel(REFILL_CHANNEL_ID) == null) {
+                nm.createNotificationChannel(
+                    NotificationChannel(
+                        REFILL_CHANNEL_ID,
+                        "Refill reminders",
+                        NotificationManager.IMPORTANCE_DEFAULT
+                    ).apply { description = "Alerts when a medicine is running low" }
+                )
+            }
+        }
+        val text = if (remaining <= 0) "$medicineName has run out"
+        else "Only $remaining left of $medicineName"
+        val notification = NotificationCompat.Builder(context, REFILL_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_pill)
+            .setContentTitle("Time to refill")
+            .setContentText(text)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .build()
+        runCatching {
+            NotificationManagerCompat.from(context)
+                .notify(("refill_" + medicineName).hashCode(), notification)
+        }
+    }
+
+    const val REFILL_CHANNEL_ID = "med_refill"
 }

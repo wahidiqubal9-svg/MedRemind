@@ -172,7 +172,7 @@ private fun MedicineCard(
             1.dp,
             MaterialTheme.colorScheme.outlineVariant
         ),
-        shadowElevation = 2.dp
+        shadowElevation = MedElevation.card
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -232,6 +232,18 @@ private fun MedicineCard(
                         text = patternText,
                         container = MaterialTheme.colorScheme.tertiaryContainer,
                         content = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                }
+                if (medicine.quantity > 0) {
+                    val low = medicine.quantity <= medicine.refillThreshold
+                    TagPill(
+                        icon = Icons.Rounded.Medication,
+                        text = if (low) "Refill \u00b7 ${medicine.quantity} left"
+                        else "${medicine.quantity} left",
+                        container = if (low) MaterialTheme.colorScheme.errorContainer
+                        else MaterialTheme.colorScheme.secondaryContainer,
+                        content = if (low) MaterialTheme.colorScheme.onErrorContainer
+                        else MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 }
             }
