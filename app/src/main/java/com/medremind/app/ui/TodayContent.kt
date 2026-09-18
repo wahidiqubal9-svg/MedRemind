@@ -1,6 +1,7 @@
 package com.medremind.app.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -57,6 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -108,6 +111,15 @@ fun TodayContent(
         if (toast != null) {
             delay(1600)
             toast = null
+        }
+    }
+
+    val listState = rememberLazyListState()
+    // When the calendar collapses, bring the list back to the top so the whole
+    // progress card is visible; further upward scrolling then behaves normally.
+    LaunchedEffect(expanded) {
+        if (!expanded) {
+            listState.scrollToItem(0)
         }
     }
 
@@ -188,10 +200,18 @@ fun TodayContent(
                 }
         ) {
             Column {
-                AnimatedVisibility(
-                    visible = !expanded,
-                    enter = expandVertically(tween(280)) + fadeIn(tween(220)),
-                    exit = shrinkVertically(tween(200)) + fadeOut(tween(140))
+                // Kept composed (only the height animates) so the selected date / pager
+                // state survives collapsing the calendar.
+                val stripHeight by animateDpAsState(
+                    targetValue = if (expanded) 0.dp else 78.dp,
+                    animationSpec = tween(280),
+                    label = "stripHeight"
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(stripHeight)
+                        .clipToBounds()
                 ) {
                     WeekStrip(
                         selectedDate = selectedDate,
@@ -224,6 +244,7 @@ fun TodayContent(
         }
 
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
