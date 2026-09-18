@@ -125,6 +125,7 @@ fun TodayContent(
 
     // Pull the list down (like pull-to-refresh) to open the calendar; drag up to collapse.
     val pullAmount = remember { floatArrayOf(0f) }
+    val suppressUntil = remember { longArrayOf(0L) }
     val pullToCalendar = remember {
         object : NestedScrollConnection {
             override fun onPostScroll(
@@ -137,7 +138,12 @@ fun TodayContent(
                     if (pullAmount[0] >= 140f) {
                         expanded = true
                         pullAmount[0] = 0f
+                        suppressUntil[0] = System.currentTimeMillis() + 450
                     }
+                    return Offset(0f, available.y)
+                }
+                // Swallow the remainder of the opening gesture so the list doesn't scroll.
+                if (System.currentTimeMillis() < suppressUntil[0] && available.y > 0f) {
                     return Offset(0f, available.y)
                 }
                 return Offset.Zero
@@ -149,7 +155,12 @@ fun TodayContent(
                     if (pullAmount[0] >= 110f) {
                         expanded = false
                         pullAmount[0] = 0f
+                        suppressUntil[0] = System.currentTimeMillis() + 450
                     }
+                    return Offset(0f, available.y)
+                }
+                // Swallow the remainder of the collapse gesture so the list stays put.
+                if (System.currentTimeMillis() < suppressUntil[0] && available.y < 0f) {
                     return Offset(0f, available.y)
                 }
                 return Offset.Zero
