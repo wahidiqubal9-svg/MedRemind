@@ -48,6 +48,7 @@ fun AppRoot(
     var tab by remember { mutableIntStateOf(0) }
     var showEditor by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var showMe by remember { mutableStateOf(false) }
     var showPermissions by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Medicine?>(null) }
     var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -59,6 +60,7 @@ fun AppRoot(
     val screen = when {
         showEditor -> "editor"
         showPermissions -> "permissions"
+        showMe -> "me"
         showSettings -> "settings"
         else -> "main"
     }
@@ -123,6 +125,11 @@ fun AppRoot(
                 }
             )
 
+            "me" -> MeScreen(
+                settings = settings,
+                onBack = { showMe = false }
+            )
+
             "settings" -> SettingsScreen(
                 settings = settings,
                 onBack = { showSettings = false },
@@ -160,7 +167,8 @@ fun AppRoot(
                         vm.deleteMedicine(medicine) {}
                     }
                 },
-                onOpenSettings = { showSettings = true }
+                onOpenSettings = { showSettings = true },
+                onOpenMe = { showMe = true }
             )
         }
     }

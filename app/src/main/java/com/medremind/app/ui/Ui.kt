@@ -805,38 +805,6 @@ fun GlassIconButton(
     }
 }
 
-@Composable
-fun PageHeader(
-    eyebrow: String,
-    title: String,
-    modifier: Modifier = Modifier,
-    actions: @Composable RowScope.() -> Unit = {}
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(start = 4.dp, end = 4.dp, top = 12.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = eyebrow.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.2.sp
-            )
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.ExtraBold
-            )
-        }
-        actions()
-    }
-}
-
 private val medIconBg = listOf(
     listOf(Color(0xFFE0E7FF), Color(0xFFF3E8FF)),
     listOf(Color(0xFFDCFCE7), Color(0xFFD1FAE5)),

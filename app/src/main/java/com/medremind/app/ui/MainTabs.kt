@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -67,8 +69,7 @@ private val navSpecs = listOf(
     NavSpec("Today", R.drawable.ic_nav_today),
     NavSpec("Med", R.drawable.ic_nav_med),
     NavSpec("Progress", R.drawable.ic_nav_progress),
-    NavSpec("Health", R.drawable.ic_nav_health),
-    NavSpec("Me", R.drawable.ic_nav_me)
+    NavSpec("Health", R.drawable.ic_nav_health)
 )
 
 private val commonDiseases = listOf(
@@ -92,7 +93,8 @@ fun MainTabs(
     onAdd: () -> Unit,
     onEdit: (Medicine) -> Unit,
     onDelete: (Medicine) -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenMe: () -> Unit
 ) {
     val schedulesByMedicine by vm.schedulesByMedicine.collectAsState()
 
@@ -100,7 +102,13 @@ fun MainTabs(
 
     Scaffold(
         contentWindowInsets = WindowInsets(0.dp),
-        bottomBar = { MedBottomBar(tab = tab, onTabChange = onTabChange) },
+        bottomBar = {
+            MedBottomBar(
+                tab = tab,
+                onTabChange = onTabChange,
+                onOpenSettings = onOpenSettings
+            )
+        },
         floatingActionButton = {
             when (tab) {
                 0, 1 -> GradientPillButton(
@@ -132,7 +140,7 @@ fun MainTabs(
                     medicines = medicines,
                     vm = vm,
                     onAdd = onAdd,
-                    onOpenSettings = onOpenSettings
+                    onOpenMe = onOpenMe
                 )
                 1 -> MedContent(
                     modifier = Modifier.padding(padding),
@@ -141,22 +149,17 @@ fun MainTabs(
                     onEdit = onEdit,
                     onDelete = onDelete,
                     onAdd = onAdd,
-                    onOpenSettings = onOpenSettings
+                    onOpenMe = onOpenMe
                 )
                 2 -> HistoryContent(
                     modifier = Modifier.padding(padding),
                     vm = vm,
-                    onOpenSettings = onOpenSettings
+                    onOpenMe = onOpenMe
                 )
-                3 -> HealthScreen(
+                else -> HealthScreen(
                     modifier = Modifier.padding(padding),
                     settings = settings,
-                    onOpenSettings = onOpenSettings
-                )
-                else -> MeScreen(
-                    modifier = Modifier.padding(padding),
-                    settings = settings,
-                    onOpenSettings = onOpenSettings
+                    onOpenMe = onOpenMe
                 )
             }
         }
@@ -166,7 +169,8 @@ fun MainTabs(
 @Composable
 private fun MedBottomBar(
     tab: Int,
-    onTabChange: (Int) -> Unit
+    onTabChange: (Int) -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -189,45 +193,30 @@ private fun MedBottomBar(
             ) {
                 navSpecs.forEachIndexed { index, spec ->
                     val selected = tab == index
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(18.dp))
-                            .clickable { onTabChange(index) }
-                            .padding(vertical = 4.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    BottomNavCell(
+                        selected = selected,
+                        label = spec.label,
+                        onClick = { onTabChange(index) }
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(width = 48.dp, height = 30.dp)
-                                .clip(RoundedCornerShape(50))
-                                .then(
-                                    if (selected) {
-                                        Modifier.background(MaterialTheme.colorScheme.primaryContainer)
-                                    } else Modifier
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                painter = painterResource(spec.icon),
-                                contentDescription = spec.label,
-                                tint = Color.Unspecified,
-                                modifier = Modifier.size(if (selected) 28.dp else 25.dp)
-                            )
-                        }
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = spec.label,
-                            style = MaterialTheme.typography.labelSmall,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Clip,
-                            color = if (selected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = if (selected) FontWeight.ExtraBold
-                            else FontWeight.SemiBold
+                        Icon(
+                            painter = painterResource(spec.icon),
+                            contentDescription = spec.label,
+                            tint = Color.Unspecified,
+                            modifier = Modifier.size(if (selected) 28.dp else 25.dp)
                         )
                     }
+                }
+                BottomNavCell(
+                    selected = false,
+                    label = "Settings",
+                    onClick = onOpenSettings
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Settings,
+                        contentDescription = "Settings",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(25.dp)
+                    )
                 }
             }
         }
@@ -235,10 +224,52 @@ private fun MedBottomBar(
 }
 
 @Composable
+private fun RowScope.BottomNavCell(
+    selected: Boolean,
+    label: String,
+    onClick: () -> Unit,
+    icon: @Composable () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .clip(RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = 48.dp, height = 30.dp)
+                .clip(RoundedCornerShape(50))
+                .then(
+                    if (selected) {
+                        Modifier.background(MaterialTheme.colorScheme.primaryContainer)
+                    } else Modifier
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            icon()
+        }
+        Spacer(Modifier.height(2.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Clip,
+            color = if (selected) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold
+        )
+    }
+}
+
+@Composable
 private fun HealthScreen(
     modifier: Modifier = Modifier,
     settings: SettingsViewModel,
-    onOpenSettings: () -> Unit
+    onOpenMe: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     val selected = settings.profileDiseases
@@ -254,9 +285,9 @@ private fun HealthScreen(
     ) {
         ScreenHeader("Health") {
             SquareIconButton(
-                icon = Icons.Rounded.Settings,
-                contentDescription = "Settings",
-                onClick = onOpenSettings
+                icon = Icons.Rounded.Person,
+                contentDescription = "Me",
+                onClick = onOpenMe
             )
         }
 

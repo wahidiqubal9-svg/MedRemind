@@ -42,7 +42,7 @@ import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Schedule
-import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -88,7 +88,7 @@ fun TodayContent(
     medicines: List<Medicine>,
     vm: MedicineViewModel,
     onAdd: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenMe: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
@@ -201,7 +201,7 @@ fun TodayContent(
             selectedDate = selectedDate,
             expanded = expanded,
             onToggleCalendar = { expanded = !expanded },
-            onOpenSettings = onOpenSettings
+            onOpenMe = onOpenMe
         )
 
         Box(
@@ -475,7 +475,7 @@ private fun TodayHeader(
     selectedDate: LocalDate,
     expanded: Boolean,
     onToggleCalendar: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenMe: () -> Unit
 ) {
     val isToday = selectedDate == LocalDate.now()
     val title = if (isToday) {
@@ -507,9 +507,9 @@ private fun TodayHeader(
         )
         Spacer(Modifier.width(10.dp))
         SquareIconButton(
-            icon = Icons.Rounded.Settings,
-            contentDescription = "Settings",
-            onClick = onOpenSettings
+            icon = Icons.Rounded.Person,
+            contentDescription = "Me",
+            onClick = onOpenMe
         )
     }
 }

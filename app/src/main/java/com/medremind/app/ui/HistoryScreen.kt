@@ -18,7 +18,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
-import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -49,7 +49,7 @@ import java.util.Locale
 fun HistoryContent(
     modifier: Modifier = Modifier,
     vm: MedicineViewModel,
-    onOpenSettings: () -> Unit
+    onOpenMe: () -> Unit
 ) {
     val history by vm.history.collectAsState()
 
@@ -86,9 +86,9 @@ fun HistoryContent(
         item(key = "progress_header") {
             ScreenHeader("Progress") {
                 SquareIconButton(
-                    icon = Icons.Rounded.Settings,
-                    contentDescription = "Settings",
-                    onClick = onOpenSettings
+                    icon = Icons.Rounded.Person,
+                    contentDescription = "Me",
+                    onClick = onOpenMe
                 )
             }
         }

@@ -26,7 +26,7 @@ import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Schedule
-import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -59,7 +59,7 @@ fun MedContent(
     onEdit: (Medicine) -> Unit,
     onDelete: (Medicine) -> Unit,
     onAdd: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenMe: () -> Unit
 ) {
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableIntStateOf(0) }
@@ -77,9 +77,9 @@ fun MedContent(
         Column(modifier = modifier.fillMaxSize()) {
             ScreenHeader("Medicines", modifier = Modifier.padding(horizontal = 16.dp)) {
                 SquareIconButton(
-                    icon = Icons.Rounded.Settings,
-                    contentDescription = "Settings",
-                    onClick = onOpenSettings
+                    icon = Icons.Rounded.Person,
+                    contentDescription = "Me",
+                    onClick = onOpenMe
                 )
             }
             Box(
@@ -114,9 +114,9 @@ fun MedContent(
         item(key = "med_header") {
             ScreenHeader("Medicines") {
                 SquareIconButton(
-                    icon = Icons.Rounded.Settings,
-                    contentDescription = "Settings",
-                    onClick = onOpenSettings
+                    icon = Icons.Rounded.Person,
+                    contentDescription = "Me",
+                    onClick = onOpenMe
                 )
             }
         }

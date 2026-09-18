@@ -1,5 +1,6 @@
 package com.medremind.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -24,10 +26,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PhotoCamera
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -58,8 +60,9 @@ private val sexOptions = listOf("Female", "Male", "Other")
 fun MeScreen(
     modifier: Modifier = Modifier,
     settings: SettingsViewModel,
-    onOpenSettings: () -> Unit
+    onBack: () -> Unit
 ) {
+    BackHandler { onBack() }
     val context = LocalContext.current
     var editing by remember { mutableStateOf(false) }
 
@@ -85,12 +88,33 @@ fun MeScreen(
             .padding(horizontal = 20.dp)
             .padding(bottom = 110.dp)
     ) {
-        PageHeader(eyebrow = "Your account", title = "Me") {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(start = 4.dp, end = 4.dp, top = 12.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             GlassIconButton(
-                icon = Icons.Rounded.Settings,
-                contentDescription = "Settings",
-                onClick = onOpenSettings
+                icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                contentDescription = "Back",
+                onClick = onBack
             )
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = "YOUR ACCOUNT",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.2.sp
+                )
+                Text(
+                    text = "Me",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
         }
 
         Spacer(Modifier.height(6.dp))
