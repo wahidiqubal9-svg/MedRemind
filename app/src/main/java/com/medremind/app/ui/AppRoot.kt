@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -52,6 +53,7 @@ fun AppRoot(
     var showPermissions by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Medicine?>(null) }
     var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var unlocked by remember { mutableStateOf(!settings.appLock) }
 
     fun guarded(action: () -> Unit) {
         if (settings.pin.isNullOrEmpty()) action() else pendingAction = action
@@ -92,6 +94,11 @@ fun AppRoot(
                 )
             )
         }
+        if (!settings.onboardingDone) {
+            OnboardingScreen(onDone = { settings.finishOnboarding() })
+        } else if (settings.appLock && !unlocked) {
+            AppLockScreen(pin = settings.pin, onUnlocked = { unlocked = true })
+        } else {
         AnimatedContent(
             targetState = screen,
             transitionSpec = {
@@ -172,8 +179,9 @@ fun AppRoot(
                 onOpenSettings = { showSettings = true },
                 onOpenMe = { showMe = true }
             )
+            }
         }
-    }
+        }
         AnimatedVisibility(
             visible = !splashDone,
             exit = fadeOut(tween(450)),

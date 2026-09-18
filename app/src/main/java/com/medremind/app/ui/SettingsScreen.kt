@@ -294,6 +294,16 @@ fun SettingsContent(
                     TextButton(onClick = { showRemovePin = true }) { Text("Remove PIN") }
                 }
             }
+            if (BiometricLock.canAuthenticate(context)) {
+                Divider()
+                SettingSwitchRow(
+                    icon = Icons.Rounded.Lock,
+                    title = "App lock",
+                    subtitle = "Require fingerprint or face to open the app.",
+                    checked = settings.appLock,
+                    onCheckedChange = { settings.updateAppLock(it) }
+                )
+            }
         }
 
         SectionHeader("Data")

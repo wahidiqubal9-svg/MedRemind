@@ -39,8 +39,24 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     var reduceMotion by mutableStateOf(prefs.getBoolean("reduce_motion", false))
         private set
 
+    var appLock by mutableStateOf(prefs.getBoolean("app_lock", false))
+        private set
+
+    var onboardingDone by mutableStateOf(prefs.getBoolean("onboarding_done", false))
+        private set
+
     init {
         HapticPrefs.enabled = hapticsEnabled
+    }
+
+    fun updateAppLock(value: Boolean) {
+        appLock = value
+        prefs.edit().putBoolean("app_lock", value).apply()
+    }
+
+    fun finishOnboarding() {
+        onboardingDone = true
+        prefs.edit().putBoolean("onboarding_done", true).apply()
     }
 
     fun updateSnoozeMinutes(value: Int) {
