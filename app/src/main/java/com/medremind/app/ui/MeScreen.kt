@@ -265,11 +265,11 @@ private fun AvatarWithBadge(
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    Text(
-                        text = initials(settings.profileName),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.ExtraBold
+                    Icon(
+                        imageVector = Icons.Rounded.Person,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(52.dp)
                     )
                 }
             }
@@ -516,11 +516,3 @@ private fun ProfileField(
     )
 }
 
-private fun initials(name: String): String {
-    val parts = name.trim().split(" ").filter { it.isNotEmpty() }
-    return when {
-        parts.isEmpty() -> "ME"
-        parts.size == 1 -> parts[0].take(2).uppercase()
-        else -> (parts[0].take(1) + parts[1].take(1)).uppercase()
-    }
-}
