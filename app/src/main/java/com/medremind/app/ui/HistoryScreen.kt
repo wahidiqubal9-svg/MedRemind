@@ -272,9 +272,9 @@ private fun AdherenceChartCard(
 
                 Spacer(Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    LegendSwatch(Color.White) { "Taken" }
-                    LegendSwatch(Color(0xFFFFC9B8)) { "Missed" }
-                    LegendSwatch(Color.White.copy(alpha = 0.4f)) { "Skipped" }
+                    LegendSwatch(Color(0xFF2FBF8F), "✓") { "Taken" }
+                    LegendSwatch(Color(0xFFE4664C), "✕") { "Missed" }
+                    LegendSwatch(Color.White, "–", Color(0xFF4338CA)) { "Skipped" }
                 }
             }
         }
@@ -351,20 +351,26 @@ private fun SegBlock(status: String) {
     when (status) {
         DoseStatus.TAKEN -> Box(
             modifier = base.background(
-                Brush.verticalGradient(listOf(Color.White, Color.White.copy(alpha = 0.82f)))
-            )
-        )
-        DoseStatus.MISSED -> Box(
-            modifier = base.background(
-                Brush.verticalGradient(listOf(Color(0xFFFF9C8A), Color(0xFFE4664C)))
+                Brush.verticalGradient(listOf(Color(0xFF43D19E), Color(0xFF1EA478)))
             ),
             contentAlignment = Alignment.Center
         ) {
-            Text("!", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+            Text("✓", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+        }
+        DoseStatus.MISSED -> Box(
+            modifier = base.background(
+                Brush.verticalGradient(listOf(Color(0xFFF07B5F), Color(0xFFC9482F)))
+            ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("✕", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 10.sp)
         }
         DoseStatus.SKIPPED -> Box(
-            modifier = base.background(Color.White.copy(alpha = 0.4f))
-        )
+            modifier = base.background(Color.White.copy(alpha = 0.92f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("–", color = Color(0xFF4338CA), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+        }
         else -> Box(
             modifier = base
                 .border(1.5.dp, Color.White.copy(alpha = 0.7f), RoundedCornerShape(50))
@@ -390,15 +396,25 @@ private fun HeroChip(text: String) {
 }
 
 @Composable
-private fun LegendSwatch(color: Color, label: @Composable () -> String) {
+private fun LegendSwatch(
+    color: Color,
+    glyph: String? = null,
+    glyphColor: Color = Color.White,
+    label: @Composable () -> String
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
                 .width(14.dp)
                 .height(10.dp)
                 .clip(RoundedCornerShape(50))
-                .background(color)
-        )
+                .background(color),
+            contentAlignment = Alignment.Center
+        ) {
+            if (glyph != null) {
+                Text(glyph, color = glyphColor, fontWeight = FontWeight.Bold, fontSize = 8.sp)
+            }
+        }
         Spacer(Modifier.width(7.dp))
         Text(
             text = label(),

@@ -666,7 +666,7 @@ private fun DoseRow(
             StatusChip(status = dose.status)
         } else {
             DoseActionButton(
-                text = "Taken",
+                text = "Take",
                 icon = Icons.Rounded.CheckCircle,
                 container = MaterialTheme.colorScheme.primaryContainer,
                 content = MaterialTheme.colorScheme.onPrimaryContainer,
