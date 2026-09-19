@@ -42,6 +42,28 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     var appLock by mutableStateOf(prefs.getBoolean("app_lock", false))
         private set
 
+    var pharmacyName by mutableStateOf(prefs.getString("pharmacy_name", "") ?: "")
+        private set
+    var pharmacyPhone by mutableStateOf(prefs.getString("pharmacy_phone", "") ?: "")
+        private set
+    var pharmacyAddress by mutableStateOf(prefs.getString("pharmacy_address", "") ?: "")
+        private set
+    var pharmacyHours by mutableStateOf(prefs.getString("pharmacy_hours", "") ?: "")
+        private set
+
+    fun updatePharmacy(name: String, phone: String, address: String, hours: String) {
+        pharmacyName = name
+        pharmacyPhone = phone
+        pharmacyAddress = address
+        pharmacyHours = hours
+        prefs.edit()
+            .putString("pharmacy_name", name)
+            .putString("pharmacy_phone", phone)
+            .putString("pharmacy_address", address)
+            .putString("pharmacy_hours", hours)
+            .apply()
+    }
+
     var onboardingDone by mutableStateOf(prefs.getBoolean("onboarding_done", false))
         private set
 

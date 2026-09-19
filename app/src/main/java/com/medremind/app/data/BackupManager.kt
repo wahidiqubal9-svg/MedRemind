@@ -42,6 +42,13 @@ object BackupManager {
                         put("quantity", m.quantity)
                         put("refillThreshold", m.refillThreshold)
                         put("intakeInstruction", m.intakeInstruction)
+                        put("category", m.category)
+                        put("form", m.form)
+                        put("prescriber", m.prescriber)
+                        put("rxNumber", m.rxNumber)
+                        put("refillsLeft", m.refillsLeft)
+                        put("packSize", m.packSize)
+                        put("autoRefillDate", m.autoRefillDate ?: JSONObject.NULL)
                         put("photoName", m.photoPath?.let { File(it).name })
                     })
                 }
@@ -152,7 +159,14 @@ object BackupManager {
                     createdAt = o.optLong("createdAt", System.currentTimeMillis()),
                     quantity = o.optInt("quantity", 0),
                     refillThreshold = o.optInt("refillThreshold", 0),
-                    intakeInstruction = o.optString("intakeInstruction", "")
+                    intakeInstruction = o.optString("intakeInstruction", ""),
+                    category = o.optString("category", MedicineCategory.PRESCRIPTION),
+                    form = o.optString("form", MedicineForm.TABLET),
+                    prescriber = o.optString("prescriber", ""),
+                    rxNumber = o.optString("rxNumber", ""),
+                    refillsLeft = o.optInt("refillsLeft", 0),
+                    packSize = o.optInt("packSize", 0),
+                    autoRefillDate = if (o.isNull("autoRefillDate")) null else o.optLong("autoRefillDate")
                 )
             )
         }

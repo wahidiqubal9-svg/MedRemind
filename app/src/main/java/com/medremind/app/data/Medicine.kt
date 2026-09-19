@@ -19,6 +19,32 @@ object IntakeInstruction {
     }
 }
 
+object MedicineCategory {
+    const val PRESCRIPTION = "PRESCRIPTION"
+    const val SUPPLEMENT = "SUPPLEMENT"
+    const val OTC = "OTC"
+
+    fun label(value: String): String = when (value) {
+        SUPPLEMENT -> "Supplement"
+        OTC -> "OTC"
+        else -> "Prescription"
+    }
+}
+
+object MedicineForm {
+    const val TABLET = "tablet"
+    const val CAPSULE = "capsule"
+    const val SOFTGEL = "softgel"
+    const val LIQUID = "liquid"
+    const val INJECTION = "injection"
+    const val OTHER = "other"
+
+    val all = listOf(TABLET, CAPSULE, SOFTGEL, LIQUID, INJECTION, OTHER)
+
+    fun label(value: String): String =
+        value.replaceFirstChar { it.uppercase() }
+}
+
 @Entity(tableName = "medicines")
 data class Medicine(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
@@ -32,5 +58,13 @@ data class Medicine(
     /** Show a refill reminder when [quantity] drops to or below this. */
     val refillThreshold: Int = 0,
     /** How the medicine should be taken, relative to food. */
-    val intakeInstruction: String = IntakeInstruction.NONE
+    val intakeInstruction: String = IntakeInstruction.NONE,
+    val category: String = MedicineCategory.PRESCRIPTION,
+    val form: String = MedicineForm.TABLET,
+    val prescriber: String = "",
+    val rxNumber: String = "",
+    val refillsLeft: Int = 0,
+    /** Total units in a full pack; 0 means unknown. Powers the stock gauge. */
+    val packSize: Int = 0,
+    val autoRefillDate: Long? = null
 )

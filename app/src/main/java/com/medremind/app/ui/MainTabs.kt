@@ -158,6 +158,7 @@ fun MainTabs(
                     modifier = Modifier.padding(padding),
                     medicines = medicines,
                     schedulesByMedicine = schedulesByMedicine,
+                    settings = settings,
                     onEdit = onEdit,
                     onDelete = onDelete,
                     onAdd = onAdd,

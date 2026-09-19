@@ -96,6 +96,8 @@ import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.medremind.app.data.IntakeInstruction
 import com.medremind.app.data.Medicine
+import com.medremind.app.data.MedicineCategory
+import com.medremind.app.data.MedicineForm
 import com.medremind.app.data.PhotoStorage
 import com.medremind.app.data.Schedule
 import com.medremind.app.data.ScheduleType
@@ -174,6 +176,20 @@ fun AddEditMedicineScreen(
         mutableStateOf((initial?.refillThreshold ?: 0).takeIf { it > 0 }?.toString() ?: "")
     }
     var intake by rememberSaveable { mutableStateOf(initial?.intakeInstruction ?: "") }
+    var category by rememberSaveable {
+        mutableStateOf(initial?.category ?: com.medremind.app.data.MedicineCategory.PRESCRIPTION)
+    }
+    var form by rememberSaveable {
+        mutableStateOf(initial?.form ?: com.medremind.app.data.MedicineForm.TABLET)
+    }
+    var prescriber by rememberSaveable { mutableStateOf(initial?.prescriber ?: "") }
+    var rxNumber by rememberSaveable { mutableStateOf(initial?.rxNumber ?: "") }
+    var packSize by rememberSaveable {
+        mutableStateOf((initial?.packSize ?: 0).takeIf { it > 0 }?.toString() ?: "")
+    }
+    var refillsLeft by rememberSaveable {
+        mutableStateOf((initial?.refillsLeft ?: 0).toString())
+    }
 
     var timesCount by remember { mutableIntStateOf(2) }
     var isCustomCount by remember { mutableStateOf(false) }
@@ -244,6 +260,12 @@ fun AddEditMedicineScreen(
                 stockAmount = ""
                 refillBelow = ""
                 intake = ""
+                category = MedicineCategory.PRESCRIPTION
+                form = MedicineForm.TABLET
+                prescriber = ""
+                rxNumber = ""
+                packSize = ""
+                refillsLeft = "0"
                 timesCount = 2
                 isCustomCount = false
                 asNeeded = false
@@ -327,7 +349,15 @@ fun AddEditMedicineScreen(
                         qtyUnit = qtyUnit,
                         photoPath = photoPath,
                         onPhotoClick = { showPhotoSheet = true },
-                        onOpenUnit = { target -> unitTarget = target }
+                        onOpenUnit = { target -> unitTarget = target },
+                        category = category,
+                        onCategory = { category = it },
+                        form = form,
+                        onForm = { form = it },
+                        prescriber = prescriber,
+                        onPrescriber = { prescriber = it },
+                        rxNumber = rxNumber,
+                        onRxNumber = { rxNumber = it }
                     )
                     1 -> ScheduleStep(
                         asNeeded = asNeeded,
@@ -370,7 +400,11 @@ fun AddEditMedicineScreen(
                         stockAmount = stockAmount,
                         onStockAmount = { stockAmount = it },
                         refillBelow = refillBelow,
-                        onRefillBelow = { refillBelow = it }
+                        onRefillBelow = { refillBelow = it },
+                        packSize = packSize,
+                        onPackSize = { packSize = it },
+                        refillsLeft = refillsLeft,
+                        onRefillsLeft = { refillsLeft = it }
                     )
                         }
                     }
@@ -442,7 +476,13 @@ fun AddEditMedicineScreen(
                                     refillThreshold = if (trackRefill) {
                                         refillBelow.toIntOrNull() ?: 0
                                     } else 0,
-                                    intakeInstruction = intake
+                                    intakeInstruction = intake,
+                                    category = category,
+                                    form = form,
+                                    prescriber = prescriber.trim(),
+                                    rxNumber = rxNumber.trim(),
+                                    refillsLeft = refillsLeft.toIntOrNull() ?: 0,
+                                    packSize = packSize.toIntOrNull() ?: 0
                                 )
                                 vm.saveMedicine(medicine, listOf(schedule)) { saved = true }
                             }
@@ -517,7 +557,15 @@ private fun DetailsStep(
     qtyUnit: String,
     photoPath: String?,
     onPhotoClick: () -> Unit,
-    onOpenUnit: (Int) -> Unit
+    onOpenUnit: (Int) -> Unit,
+    category: String,
+    onCategory: (String) -> Unit,
+    form: String,
+    onForm: (String) -> Unit,
+    prescriber: String,
+    onPrescriber: (String) -> Unit,
+    rxNumber: String,
+    onRxNumber: (String) -> Unit
 ) {
     Text(
         "Add medicine",
@@ -541,6 +589,49 @@ private fun DetailsStep(
         singleLine = true,
         modifier = Modifier.fillMaxWidth()
     )
+
+    Spacer(Modifier.height(16.dp))
+    FieldLabel("Type")
+    val categoryValues = listOf(
+        MedicineCategory.PRESCRIPTION,
+        MedicineCategory.SUPPLEMENT,
+        MedicineCategory.OTC
+    )
+    MedSegmentedButtons(
+        options = listOf("Prescription", "Supplement", "OTC"),
+        selectedIndex = categoryValues.indexOf(category).coerceAtLeast(0),
+        onSelect = { onCategory(categoryValues[it]) },
+        modifier = Modifier.fillMaxWidth()
+    )
+
+    Spacer(Modifier.height(16.dp))
+    FieldLabel("Form")
+    FilterChipRow(
+        options = MedicineForm.all.map { MedicineForm.label(it) },
+        selectedIndex = MedicineForm.all.indexOf(form).coerceAtLeast(0),
+        onSelect = { onForm(MedicineForm.all[it]) }
+    )
+
+    if (category == MedicineCategory.PRESCRIPTION) {
+        Spacer(Modifier.height(16.dp))
+        FieldLabel("Prescribed by", hint = "(optional)")
+        OutlinedTextField(
+            value = prescriber,
+            onValueChange = onPrescriber,
+            placeholder = { Text("e.g. Dr. Chen") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(12.dp))
+        FieldLabel("Rx number", hint = "(optional)")
+        OutlinedTextField(
+            value = rxNumber,
+            onValueChange = onRxNumber,
+            placeholder = { Text("e.g. 649210") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
 
     Spacer(Modifier.height(16.dp))
     FieldLabel("Dose", hint = "(amount per intake)")
@@ -1013,7 +1104,11 @@ private fun ReviewStep(
     stockAmount: String,
     onStockAmount: (String) -> Unit,
     refillBelow: String,
-    onRefillBelow: (String) -> Unit
+    onRefillBelow: (String) -> Unit,
+    packSize: String,
+    onPackSize: (String) -> Unit,
+    refillsLeft: String,
+    onRefillsLeft: (String) -> Unit
 ) {
     Text(
         "Check the details",
@@ -1127,6 +1222,12 @@ private fun ReviewStep(
             Spacer(Modifier.height(12.dp))
             FieldLabel("Remind me when below")
             QuantityStepper(value = refillBelow, onValueChange = onRefillBelow)
+            Spacer(Modifier.height(12.dp))
+            FieldLabel("Pack size", hint = "(total per pack)")
+            QuantityStepper(value = packSize, onValueChange = onPackSize)
+            Spacer(Modifier.height(12.dp))
+            FieldLabel("Refills left")
+            QuantityStepper(value = refillsLeft, onValueChange = onRefillsLeft)
         }
     }
 
