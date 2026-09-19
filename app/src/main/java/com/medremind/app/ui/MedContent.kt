@@ -7,6 +7,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
@@ -38,13 +39,20 @@ import androidx.compose.material.icons.rounded.LocalPharmacy
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.AccessTime
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.HourglassEmpty
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.PriorityHigh
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -64,11 +72,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -87,6 +97,7 @@ fun MedContent(
     medicines: List<Medicine>,
     schedulesByMedicine: Map<Long, List<Schedule>>,
     settings: SettingsViewModel,
+    vm: MedicineViewModel,
     onEdit: (Medicine) -> Unit,
     onDelete: (Medicine) -> Unit,
     onAdd: () -> Unit,
@@ -94,6 +105,21 @@ fun MedContent(
     profilePhoto: String? = null
 ) {
     val context = LocalContext.current
+    var pendingDelete by remember { mutableStateOf<Medicine?>(null) }
+
+    fun shareMedicine(medicine: Medicine, schedules: List<Schedule>) {
+        val text = buildString {
+            append(medicine.name)
+            if (medicine.strength.isNotBlank()) append(" ${medicine.strength}")
+            append("\nTime: ").append(timesLabel(schedules))
+            append("\nFrequency: ").append(frequencyLabel(schedules))
+        }
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        runCatching { context.startActivity(Intent.createChooser(intent, "Share medicine")) }
+    }
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableIntStateOf(0) }
     var showPharmacyDialog by remember { mutableStateOf(false) }
@@ -180,10 +206,14 @@ fun MedContent(
                 }
             }
             items(filteredMedicines, key = { it.id }) { medicine ->
+                val schedules = schedulesByMedicine[medicine.id].orEmpty()
                 MedicineCard(
                     medicine = medicine,
-                    schedules = schedulesByMedicine[medicine.id].orEmpty(),
-                    onClick = { onEdit(medicine) },
+                    schedules = schedules,
+                    onEdit = { onEdit(medicine) },
+                    onDuplicate = { vm.duplicateMedicine(medicine, schedules) },
+                    onShare = { shareMedicine(medicine, schedules) },
+                    onDelete = { pendingDelete = medicine },
                     modifier = Modifier.animateItem()
                 )
             }
@@ -205,6 +235,19 @@ fun MedContent(
             }
         }
 
+    }
+
+    val toDelete = pendingDelete
+    if (toDelete != null) {
+        MedConfirmDialog(
+            title = "Delete medicine?",
+            message = "\"${toDelete.name}\" and all of its schedules will be permanently removed. This cannot be undone.",
+            onConfirm = {
+                pendingDelete = null
+                onDelete(toDelete)
+            },
+            onDismiss = { pendingDelete = null }
+        )
     }
 
     if (showPharmacyDialog) {
@@ -356,233 +399,454 @@ private fun MedHeader(
 private fun MedicineCard(
     medicine: Medicine,
     schedules: List<Schedule>,
-    onClick: () -> Unit,
+    onEdit: () -> Unit,
+    onDuplicate: () -> Unit,
+    onShare: () -> Unit,
+    onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val haptics = rememberMedHaptics()
-    val low = medicine.quantity > 0 && medicine.quantity <= medicine.refillThreshold
-    val accent = if (low) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-    val pattern = schedules.firstOrNull()?.let { schedulePatternLabel(it) }.orEmpty()
-    val intake = com.medremind.app.data.IntakeInstruction.label(medicine.intakeInstruction)
-    val supplyStatus = when {
-        low -> "Needs refill"
-        medicine.quantity > 0 -> "Well-stocked"
-        schedules.isEmpty() -> "No schedule"
-        else -> pattern.ifBlank { "Scheduled" }
-    }
+    var menuExpanded by remember { mutableStateOf(false) }
+    val line = MaterialTheme.colorScheme.outlineVariant
+    val soft = MaterialTheme.colorScheme.surfaceContainerLow
+    val doseLabel = schedules.firstNotNullOfOrNull { s -> s.doseLabel.takeIf { it.isNotBlank() } }.orEmpty()
+    val sub = listOf(doseLabel, MedicineForm.label(medicine.form))
+        .filter { it.isNotBlank() }.joinToString(" \u00b7 ")
+    val daysSchedule = schedules.firstOrNull { it.type == ScheduleType.WEEKDAYS }
+    val tracked = medicine.quantity > 0
 
     Surface(
         onClick = {
             haptics.tap()
-            onClick()
+            onEdit()
         },
         modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
+        shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(
-            if (low) 1.4.dp else 1.dp,
-            if (low) accent.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant
-        ),
-        shadowElevation = if (low) MedElevation.raised else MedElevation.card
+        border = androidx.compose.foundation.BorderStroke(1.dp, line),
+        shadowElevation = MedElevation.raised
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (low) {
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer
-                        ) {
-                            Text(
-                                "Refill due",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                    if (!low && medicine.refillsLeft > 0) {
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        ) {
-                            Text(
-                                "${medicine.refillsLeft} refills left",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(10.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MedIconSquare(
+                    label = medicine.name,
+                    seed = medicine.id,
+                    size = 56.dp,
+                    photoPath = medicine.photoPath
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.Bottom) {
                         Text(
-                            text = listOf(medicine.name, medicine.strength)
-                                .filter { it.isNotBlank() }.joinToString(" "),
+                            medicine.name,
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.ExtraBold
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        if (medicine.strength.isNotBlank()) {
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                medicine.strength,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                    if (sub.isNotBlank()) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            sub,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
                         )
                     }
-                    Spacer(Modifier.width(10.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .background(
-                                accent.copy(alpha = 0.14f),
-                                RoundedCornerShape(15.dp)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Medication,
-                            contentDescription = null,
-                            tint = accent,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
                 }
-
-                Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (pattern.isNotBlank()) {
-                        BadgeChip(pattern, Icons.Rounded.Schedule)
-                    }
-                    if (intake.isNotBlank()) {
-                        BadgeChip(intake, Icons.Rounded.Restaurant)
-                    }
-                }
-
-                if (medicine.quantity > 0) {
-                    Spacer(Modifier.height(14.dp))
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
-                    Spacer(Modifier.height(10.dp))
-                    StockGauge(medicine = medicine, schedules = schedules)
-                }
-
-                Spacer(Modifier.height(14.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = supplyStatus,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f)
-                    )
+                Spacer(Modifier.width(10.dp))
+                Box {
                     Surface(
                         onClick = {
                             haptics.tap()
-                            onClick()
+                            menuExpanded = true
                         },
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainer,
-                        contentColor = MaterialTheme.colorScheme.onSurface
+                        shape = RoundedCornerShape(12.dp),
+                        color = soft,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, line)
                     ) {
-                        Text(
-                            "Edit dose",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                        Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Rounded.MoreVert,
+                                contentDescription = "More options",
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Edit medicine") },
+                            leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                onEdit()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Duplicate") },
+                            leadingIcon = {
+                                Icon(Icons.Rounded.ContentCopy, contentDescription = null)
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onDuplicate()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Share") },
+                            leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                onShare()
+                            }
+                        )
+                        HorizontalDivider(color = line)
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    "Delete medicine",
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Rounded.DeleteOutline,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onDelete()
+                            }
                         )
                     }
                 }
             }
-    }
-}
 
-@Composable
-private fun BadgeChip(text: String, icon: ImageVector) {
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(5.dp))
-            Text(text, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(14.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DetailItem(
+                    icon = Icons.Rounded.Medication,
+                    label = "Form",
+                    value = MedicineForm.label(medicine.form),
+                    modifier = Modifier.weight(1f)
+                )
+                DetailItem(
+                    icon = Icons.Rounded.Restaurant,
+                    label = "Intake",
+                    value = com.medremind.app.data.IntakeInstruction
+                        .label(medicine.intakeInstruction).ifBlank { "\u2014" },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            DetailItem(
+                icon = Icons.Rounded.AccessTime,
+                label = "Time",
+                value = timesLabel(schedules),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DetailItem(
+                    icon = Icons.Rounded.HourglassEmpty,
+                    label = "Duration",
+                    value = durationLabel(schedules),
+                    modifier = Modifier.weight(1f)
+                )
+                DetailItem(
+                    icon = Icons.Rounded.Repeat,
+                    label = "Frequency",
+                    value = frequencyLabel(schedules),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            if (daysSchedule != null) {
+                Spacer(Modifier.height(10.dp))
+                DaysPanel(
+                    daysMask = daysSchedule.daysMask,
+                    note = offDaysLabel(daysSchedule.daysMask)
+                )
+            }
+
+            if (tracked) {
+                Spacer(Modifier.height(12.dp))
+                StockPanel(medicine = medicine, schedules = schedules)
+            }
         }
     }
 }
 
 @Composable
-private fun StockGauge(medicine: Medicine, schedules: List<Schedule>) {
-    val percent = if (medicine.packSize > 0) {
-        (medicine.quantity * 100 / medicine.packSize).coerceIn(0, 100)
-    } else null
+private fun DetailItem(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    val line = MaterialTheme.colorScheme.outlineVariant
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .border(1.dp, line, RoundedCornerShape(14.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .border(1.dp, line, RoundedCornerShape(10.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(15.dp)
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                label.uppercase(),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.6.sp
+            )
+            Text(
+                value,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun DaysPanel(daysMask: Int, note: String) {
+    val line = MaterialTheme.colorScheme.outlineVariant
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .border(1.dp, line, RoundedCornerShape(14.dp))
+            .padding(12.dp)
+    ) {
+        Text(
+            "DAYS OF THE WEEK",
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.6.sp
+        )
+        Spacer(Modifier.height(9.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            repeat(7) { index ->
+                val on = (daysMask and (1 shl index)) != 0
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(38.dp)
+                        .clip(RoundedCornerShape(11.dp))
+                        .background(
+                            if (on) MedGradients.heroHorizontal()
+                            else SolidColor(MaterialTheme.colorScheme.surface)
+                        )
+                        .then(
+                            if (on) Modifier
+                            else Modifier.border(1.dp, line, RoundedCornerShape(11.dp))
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        weekdayShort[index].take(1),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (on) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+        if (note.isNotBlank()) {
+            Spacer(Modifier.height(9.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Rounded.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(13.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    note,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StockPanel(medicine: Medicine, schedules: List<Schedule>) {
+    val line = MaterialTheme.colorScheme.outlineVariant
     val daily = dailyDose(schedules)
     val daysLeft = if (daily > 0f) (medicine.quantity / daily).toInt() else null
     val low = medicine.quantity <= medicine.refillThreshold
-    val gaugeColor = when {
-        low -> MaterialTheme.colorScheme.error
-        percent != null && percent <= 25 -> MaterialTheme.colorScheme.error
-        percent != null && percent <= 50 -> Color(0xFFB45309)
-        else -> MaterialTheme.colorScheme.primary
-    }
-    val fraction = when {
-        percent != null -> percent / 100f
-        else -> 1f
-    }
+    val fraction = if (daysLeft != null) (daysLeft / 30f).coerceIn(0.05f, 1f) else 1f
     val animated by animateFloatAsState(
         targetValue = fraction,
         animationSpec = motionTween(MedMotion.Slow, easing = MedMotion.Emphasized),
         label = "stock-${medicine.id}"
     )
+    val statusColor = if (low) MaterialTheme.colorScheme.error else Color(0xFF12B76A)
 
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            val amountText = buildString {
-                append(medicine.quantity)
-                if (medicine.packSize > 0) append(" / ${medicine.packSize}")
-                append(" ")
-                append(unitLabel(medicine.form, medicine.quantity != 1))
-            }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .border(1.dp, line, RoundedCornerShape(16.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.Bottom) {
             Text(
-                text = amountText,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
-                color = if (low) MaterialTheme.colorScheme.error
-                else MaterialTheme.colorScheme.onSurface
+                "${medicine.quantity} in stock",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.ExtraBold
             )
-            if (daysLeft != null) {
-                Spacer(Modifier.width(6.dp))
+            if (medicine.refillThreshold > 0) {
                 Text(
-                    text = "($daysLeft day" + (if (daysLeft == 1) "" else "s") + " left)",
-                    style = MaterialTheme.typography.labelSmall,
+                    "  \u00b7  remind below ${medicine.refillThreshold}",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Spacer(Modifier.weight(1f))
-            Text(
-                text = if (percent != null) "$percent% left" else "tracked",
-                style = MaterialTheme.typography.labelSmall,
-                color = gaugeColor,
-                fontWeight = FontWeight.Bold
-            )
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ) {
+                Text(
+                    "TRACKED",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.4.sp,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                )
+            }
         }
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(10.dp))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(8.dp)
-                .background(
-                    MaterialTheme.colorScheme.surfaceContainerHigh,
-                    RoundedCornerShape(50)
-                )
+                .height(6.dp)
+                .clip(RoundedCornerShape(50))
+                .background(Color(0xFFE3E6F0))
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(animated.coerceIn(0.02f, 1f))
+                    .fillMaxWidth(animated)
                     .fillMaxHeight()
-                    .background(gaugeColor, RoundedCornerShape(50))
+                    .background(
+                        if (low) SolidColor(MaterialTheme.colorScheme.error)
+                        else MedGradients.heroHorizontal()
+                    )
+            )
+        }
+        Spacer(Modifier.height(9.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(statusColor)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                if (low) "Needs refill" else "Well-stocked",
+                style = MaterialTheme.typography.bodySmall,
+                color = statusColor,
+                fontWeight = FontWeight.Bold
             )
         }
     }
+}
+
+private fun timesLabel(schedules: List<Schedule>): String {
+    if (schedules.isNotEmpty() && schedules.all { it.type == ScheduleType.AS_NEEDED }) {
+        return "As needed"
+    }
+    val times = schedules
+        .filter { it.type != ScheduleType.AS_NEEDED }
+        .flatMap { it.times.split(',').map { t -> t.trim() }.filter { it.isNotEmpty() } }
+        .distinct()
+    return if (times.isEmpty()) "As needed" else times.joinToString("  \u00b7  ") { to12Hour(it) }
+}
+
+private fun frequencyLabel(schedules: List<Schedule>): String {
+    val s = schedules.firstOrNull() ?: return "\u2014"
+    return when (s.type) {
+        ScheduleType.DAILY -> "Every day"
+        ScheduleType.WEEKDAYS -> "${Integer.bitCount(s.daysMask)} days / week"
+        ScheduleType.INTERVAL -> "Every ${s.intervalHours} h"
+        ScheduleType.AS_NEEDED -> "As needed"
+        ScheduleType.COURSE -> "Course"
+        else -> "Every day"
+    }
+}
+
+private fun durationLabel(schedules: List<Schedule>): String {
+    val s = schedules.firstOrNull() ?: return "\u2014"
+    if (s.type == ScheduleType.AS_NEEDED) return "As needed"
+    val end = s.endDate ?: return "Ongoing"
+    return "Until " + SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(Date(end))
+}
+
+private fun offDaysLabel(mask: Int): String {
+    val off = weekdayShort.filterIndexed { index, _ -> (mask and (1 shl index)) == 0 }
+    return if (off.isEmpty()) "" else "Skipped on " + off.joinToString(", ")
+}
+
+private fun to12Hour(time: String): String {
+    val parts = time.trim().split(':')
+    val hour = parts.getOrNull(0)?.toIntOrNull() ?: return time.trim()
+    val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
+    val suffix = if (hour < 12) "AM" else "PM"
+    val h = when {
+        hour == 0 -> 12
+        hour > 12 -> hour - 12
+        else -> hour
+    }
+    return String.format(Locale.getDefault(), "%d:%02d %s", h, minute, suffix)
 }
 
 @Composable

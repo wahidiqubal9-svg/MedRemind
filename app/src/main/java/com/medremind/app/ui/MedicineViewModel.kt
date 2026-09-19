@@ -204,6 +204,26 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun duplicateMedicine(medicine: Medicine, schedules: List<Schedule>, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val copy = medicine.copy(
+                    id = 0L,
+                    name = medicine.name + " (copy)",
+                    createdAt = System.currentTimeMillis()
+                )
+                val newId = db.medicineDao().insert(copy)
+                schedules.forEach { schedule ->
+                    val newSchedule = schedule.copy(id = 0L, medicineId = newId)
+                    val scheduleId = db.scheduleDao().insert(newSchedule)
+                    ReminderScheduler.schedule(app, newSchedule.copy(id = scheduleId))
+                }
+            }
+            refreshWidget()
+            onDone()
+        }
+    }
+
     fun deleteMedicine(medicine: Medicine, onDone: () -> Unit) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {

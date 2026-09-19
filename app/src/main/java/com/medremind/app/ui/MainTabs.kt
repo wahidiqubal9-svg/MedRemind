@@ -159,6 +159,7 @@ fun MainTabs(
                     medicines = medicines,
                     schedulesByMedicine = schedulesByMedicine,
                     settings = settings,
+                    vm = vm,
                     onEdit = onEdit,
                     onDelete = onDelete,
                     onAdd = onAdd,
