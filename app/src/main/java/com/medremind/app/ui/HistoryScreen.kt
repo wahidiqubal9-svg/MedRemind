@@ -26,7 +26,6 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.FileDownload
-import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PictureAsPdf
@@ -242,12 +241,6 @@ fun HistoryContent(
 
         item(key = "reliability") {
             ReliabilityCard(buckets = buckets)
-        }
-
-        if (logLoaded && due > 0) {
-            item(key = "insight") {
-                InsightCard(buckets = buckets, percent = percent)
-            }
         }
 
         item(key = "export") {
@@ -604,65 +597,6 @@ private fun ReliabilityRow(bucket: BucketAdherence) {
             color = MaterialTheme.colorScheme.primary,
             trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
         )
-    }
-}
-
-@Composable
-private fun InsightCard(buckets: List<BucketAdherence>, percent: Int) {
-    val weakest = buckets.filter { it.due >= 2 }.minByOrNull { it.percent }
-    val message = when {
-        weakest == null -> null
-        weakest.percent < 90 ->
-            "Tip: your ${weakest.label.lowercase()} doses are your weakest link at " +
-                "${weakest.percent}%. A slightly earlier reminder could help."
-        percent >= 95 ->
-            "Great consistency! You're at ${percent}% adherence. Keep your reminders " +
-                "exactly where they are."
-        else ->
-            "Steady progress. Try taking doses within 30 minutes of the scheduled time " +
-                "to lift your average."
-    } ?: return
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-        )
-    ) {
-        Row(modifier = Modifier.padding(16.dp)) {
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Lightbulb,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .padding(9.dp)
-                        .size(20.dp)
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(
-                    "SMART INSIGHT",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-        }
     }
 }
 

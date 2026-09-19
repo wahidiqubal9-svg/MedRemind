@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.LocalPharmacy
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PriorityHigh
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Schedule
@@ -63,6 +64,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medremind.app.data.DoseStatus
@@ -163,6 +165,7 @@ fun MedContent(
                     LowSupplyBanner(
                         medicine = low,
                         schedules = schedulesByMedicine[low.id].orEmpty(),
+                        pharmacyName = settings.pharmacyName,
                         onRefill = {
                             val phone = settings.pharmacyPhone
                             if (phone.isNotBlank()) {
@@ -510,32 +513,46 @@ private fun StockGauge(medicine: Medicine, schedules: List<Schedule>) {
 private fun LowSupplyBanner(
     medicine: Medicine,
     schedules: List<Schedule>,
+    pharmacyName: String,
     onRefill: () -> Unit,
     onLater: () -> Unit
 ) {
     val daily = dailyDose(schedules)
     val daysLeft = if (daily > 0f) (medicine.quantity / daily).toInt() else 0
+    val unit = unitLabel(medicine.form, medicine.quantity != 1)
+    val body = androidx.compose.ui.text.buildAnnotatedString {
+        withStyle(
+            androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold)
+        ) { append(medicine.name) }
+        append(" has only ${medicine.quantity} $unit remaining.")
+        if (pharmacyName.isNotBlank()) {
+            append(" Tap to request a refill from $pharmacyName.")
+        } else {
+            append(" Tap to request a refill.")
+        }
+    }
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            MaterialTheme.colorScheme.error.copy(alpha = 0.3f)
-        )
+            MaterialTheme.colorScheme.error.copy(alpha = 0.25f)
+        ),
+        shadowElevation = MedElevation.card
     ) {
         Row(modifier = Modifier.padding(14.dp)) {
             Box(
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(36.dp)
                     .background(
                         MaterialTheme.colorScheme.errorContainer,
-                        RoundedCornerShape(12.dp)
+                        RoundedCornerShape(10.dp)
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.Warning,
+                    imageVector = Icons.Rounded.PriorityHigh,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(20.dp)
@@ -553,12 +570,12 @@ private fun LowSupplyBanner(
                         modifier = Modifier.weight(1f)
                     )
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
+                        shape = RoundedCornerShape(4.dp),
                         color = MaterialTheme.colorScheme.error,
                         contentColor = MaterialTheme.colorScheme.onError
                     ) {
                         Text(
-                            "$daysLeft day" + (if (daysLeft == 1) "" else "s") + " left",
+                            "$daysLeft Day" + (if (daysLeft == 1) "" else "s") + " Left",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -567,8 +584,7 @@ private fun LowSupplyBanner(
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "${medicine.name} has only ${medicine.quantity} " +
-                        unitLabel(medicine.form, medicine.quantity != 1) + " remaining.",
+                    text = body,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -581,13 +597,13 @@ private fun LowSupplyBanner(
                         contentColor = MaterialTheme.colorScheme.onError
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 Icons.Rounded.LocalPharmacy,
                                 contentDescription = null,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
@@ -610,7 +626,7 @@ private fun LowSupplyBanner(
                         Text(
                             "Remind Later",
                             style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
                         )
                     }
                 }
