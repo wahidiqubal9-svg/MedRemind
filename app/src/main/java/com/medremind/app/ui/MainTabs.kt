@@ -107,26 +107,27 @@ fun MainTabs(
 
     Scaffold(
         contentWindowInsets = WindowInsets(0.dp),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        bottomBar = {
-            MedBottomBar(
-                tab = tab,
-                onTabChange = onTabChange,
-                onOpenSettings = onOpenSettings
-            )
+        snackbarHost = {
+            Box(modifier = Modifier.padding(bottom = 96.dp)) {
+                SnackbarHost(snackbarHostState)
+            }
         },
         floatingActionButton = {
             when (tab) {
-                0, 1 -> GradientPillButton(
-                    text = "Add medicine",
-                    icon = Icons.Rounded.Add,
-                    onClick = onAdd
-                )
+                0, 1 -> Box(modifier = Modifier.padding(bottom = 96.dp)) {
+                    GradientPillButton(
+                        text = "Add medicine",
+                        icon = Icons.Rounded.Add,
+                        onClick = onAdd
+                    )
+                }
                 else -> {}
             }
         }
     ) { padding ->
+        Box(modifier = Modifier.fillMaxSize()) {
         AnimatedContent(
+            modifier = Modifier.fillMaxSize(),
             targetState = tab,
             transitionSpec = {
                 val forward = targetState > initialState
@@ -176,6 +177,13 @@ fun MainTabs(
                 )
             }
         }
+        MedBottomBar(
+            tab = tab,
+            onTabChange = onTabChange,
+            onOpenSettings = onOpenSettings,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
+        }
     }
 }
 
@@ -183,10 +191,11 @@ fun MainTabs(
 private fun MedBottomBar(
     tab: Int,
     onTabChange: (Int) -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 10.dp)
@@ -297,7 +306,8 @@ private fun HealthScreen(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .navigationBarsPadding()
-            .padding(16.dp),
+            .padding(16.dp)
+            .padding(bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         ScreenHeader("Health") {

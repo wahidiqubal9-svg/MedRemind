@@ -127,23 +127,7 @@ fun HistoryContent(
         }
     }
 
-    // Streak: consecutive fully-taken days ending today (or yesterday if today is open).
     val today = LocalDate.now()
-    val streak = run {
-        var count = 0
-        var day = today
-        val todayOk = byDay[day]?.let { it.first > 0 && it.second == it.first } == true
-        if (!todayOk) day = day.minusDays(1)
-        while (true) {
-            val d = byDay[day]
-            if (d != null && d.first > 0 && d.second == d.first) {
-                count++
-                day = day.minusDays(1)
-            } else break
-        }
-        count
-    }
-
     val weekDays = (6 downTo 0).map { today.minusDays(it.toLong()) }
 
     // Time-of-day reliability.
@@ -229,23 +213,25 @@ fun HistoryContent(
         item(key = "stats") {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                MiniMetricCard(
-                    label = "Current streak",
-                    value = if (streak == 1) "1 day" else "$streak days",
-                    sub = if (streak > 0) "Keep it going!" else "Start a streak today",
-                    icon = Icons.Rounded.LocalFireDepartment,
-                    accent = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.weight(1f)
+                StatCard(
+                    modifier = Modifier.weight(1f),
+                    label = "Taken",
+                    value = taken,
+                    tint = statusTint(DoseStatus.TAKEN)
                 )
-                MiniMetricCard(
-                    label = "Doses taken",
-                    value = "$taken",
-                    sub = "of $due due",
-                    icon = Icons.Rounded.TaskAlt,
-                    accent = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f)
+                StatCard(
+                    modifier = Modifier.weight(1f),
+                    label = "Missed",
+                    value = missed,
+                    tint = statusTint(DoseStatus.MISSED)
+                )
+                StatCard(
+                    modifier = Modifier.weight(1f),
+                    label = "Skipped",
+                    value = skipped,
+                    tint = statusTint(DoseStatus.SKIPPED)
                 )
             }
         }
@@ -422,65 +408,6 @@ private fun AdherenceHeroCard(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun MiniMetricCard(
-    label: String,
-    value: String,
-    sub: String,
-    icon: ImageVector,
-    accent: Color,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier,
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant
-        ),
-        shadowElevation = MedElevation.card
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = label.uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp,
-                    modifier = Modifier.weight(1f)
-                )
-                Surface(
-                    shape = CircleShape,
-                    color = accent.copy(alpha = 0.14f),
-                    contentColor = accent
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .padding(7.dp)
-                            .size(16.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.ExtraBold
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = sub,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }
