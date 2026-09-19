@@ -169,11 +169,7 @@ fun MedContent(
                         onRefill = {
                             val phone = settings.pharmacyPhone
                             if (phone.isNotBlank()) {
-                                runCatching {
-                                    context.startActivity(
-                                        Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
-                                    )
-                                }
+                                openWhatsAppRefill(context, phone, low)
                             } else {
                                 onEdit(low)
                             }
@@ -301,14 +297,7 @@ private fun MedicineCard(
         ),
         shadowElevation = if (low) MedElevation.raised else MedElevation.card
     ) {
-        Row(modifier = Modifier.height(IntrinsicSize.Min)) {
-            Box(
-                modifier = Modifier
-                    .width(5.dp)
-                    .fillMaxHeight()
-                    .background(accent)
-            )
-            Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (low) {
                         Surface(
@@ -412,7 +401,6 @@ private fun MedicineCard(
                     }
                 }
             }
-        }
     }
 }
 
@@ -739,7 +727,8 @@ private fun PharmacyDialog(
                 OutlinedTextField(
                     value = phone,
                     onValueChange = { phone = it },
-                    label = { Text("Phone") },
+                    label = { Text("WhatsApp number") },
+                    placeholder = { Text("e.g. +1 555 123 4567") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -804,6 +793,29 @@ private fun unitLabel(form: String, plural: Boolean): String {
         else -> "tablet"
     }
     return if (plural) base + "s" else base
+}
+
+private fun openWhatsAppRefill(
+    context: android.content.Context,
+    phone: String,
+    medicine: Medicine
+) {
+    val digits = phone.filter { it.isDigit() }
+    if (digits.isBlank()) return
+    val name = listOf(medicine.name, medicine.strength)
+        .filter { it.isNotBlank() }.joinToString(" ")
+    val unit = unitLabel(medicine.form, medicine.quantity != 1)
+    val message = "Hello, I would like to refill $name. " +
+        "Please arrange ${medicine.quantity} $unit. Thank you."
+    val url = "https://wa.me/$digits?text=" +
+        java.net.URLEncoder.encode(message, "UTF-8")
+    val whatsapp = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+        setPackage("com.whatsapp")
+    }
+    val opened = runCatching { context.startActivity(whatsapp) }.isSuccess
+    if (!opened) {
+        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+    }
 }
 
 internal fun schedulePatternLabel(schedule: Schedule): String = when (schedule.type) {

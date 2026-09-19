@@ -1161,12 +1161,6 @@ private fun DoseRow(
     onSkip: (TodayDose) -> Unit
 ) {
     val completed = dose.status != DoseStatus.PENDING
-    val accent = when (dose.status) {
-        DoseStatus.TAKEN -> MaterialTheme.colorScheme.tertiary
-        DoseStatus.SKIPPED -> MaterialTheme.colorScheme.outline
-        DoseStatus.MISSED -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.primary
-    }
     val pill = listOf(dose.medicine.strength, dose.schedule.doseLabel)
         .filter { it.isNotBlank() }
         .joinToString(" \u00b7 ")
@@ -1180,14 +1174,6 @@ private fun DoseRow(
             .padding(horizontal = 4.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .width(4.dp)
-                .height(46.dp)
-                .clip(RoundedCornerShape(50))
-                .background(accent)
-        )
-        Spacer(Modifier.width(10.dp))
         MedAvatar(
             name = dose.medicine.name,
             photoPath = dose.medicine.photoPath,
@@ -1221,25 +1207,7 @@ private fun DoseRow(
             }
         }
         Spacer(Modifier.width(8.dp))
-        if (completed) {
-            RoundStatusIcon(status = dose.status)
-        } else {
-            DoseActionButton(
-                text = "Take",
-                icon = Icons.Rounded.CheckCircle,
-                container = MaterialTheme.colorScheme.primaryContainer,
-                content = MaterialTheme.colorScheme.onPrimaryContainer,
-                onClick = { onTake(dose) }
-            )
-            Spacer(Modifier.width(6.dp))
-            DoseActionButton(
-                text = "Skip",
-                icon = Icons.Rounded.Close,
-                container = MaterialTheme.colorScheme.surfaceContainerHigh,
-                content = MaterialTheme.colorScheme.onSurfaceVariant,
-                onClick = { onSkip(dose) }
-            )
-        }
+        RoundStatusIcon(status = dose.status)
     }
 }
 

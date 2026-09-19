@@ -95,8 +95,13 @@ fun HistoryContent(
     LaunchedEffect(rangeDays) {
         val full = vm.doseLogForRange(rangeDays * 2)
         val cutoff = System.currentTimeMillis() - rangeDays * 86_400_000L
-        previous = full.filter { it.scheduledAt < cutoff }
-        log = full.filter { it.scheduledAt >= cutoff }
+        // History is for doses already acted on - hide upcoming/pending and future.
+        val acted = full.filter {
+            it.status == DoseStatus.TAKEN || it.status == DoseStatus.MISSED ||
+                it.status == DoseStatus.SKIPPED
+        }
+        previous = acted.filter { it.scheduledAt < cutoff }
+        log = acted.filter { it.scheduledAt >= cutoff }
         logLoaded = true
     }
 
