@@ -9,7 +9,9 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +36,7 @@ import androidx.compose.material.icons.outlined.Medication
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.LocalPharmacy
@@ -107,6 +110,8 @@ fun MedContent(
 ) {
     val context = LocalContext.current
     var pendingDelete by remember { mutableStateOf<Medicine?>(null) }
+    var detailMedicine by remember { mutableStateOf<Medicine?>(null) }
+    var refillIndex by remember { mutableIntStateOf(0) }
 
     fun shareMedicine(medicine: Medicine, schedules: List<Schedule>) {
         val text = buildString {
@@ -173,15 +178,20 @@ fun MedContent(
                 }
                 if (lowMedicines.isNotEmpty() && !bannerDismissed) {
                     item(key = "low_supply") {
-                        val low = lowMedicines.first()
+                        val index = refillIndex.coerceIn(0, lowMedicines.lastIndex)
+                        val low = lowMedicines[index]
                         LowSupplyBanner(
                             medicine = low,
                             schedules = schedulesByMedicine[low.id].orEmpty(),
+                            moreCount = lowMedicines.size - 1,
                             onRefill = {
                                 val phone = settings.pharmacyPhone
                                 if (phone.isNotBlank()) refillMedicine = low else onEdit(low)
                             },
-                            onLater = { bannerDismissed = true }
+                            onLater = { bannerDismissed = true },
+                            onNext = {
+                                refillIndex = (index + 1) % lowMedicines.size
+                            }
                         )
                     }
                 }
@@ -212,15 +222,16 @@ fun MedContent(
                 } else {
                     items(filteredMedicines, key = { it.id }) { medicine ->
                         val schedules = schedulesByMedicine[medicine.id].orEmpty()
-                        MedicineCard(
-                            medicine = medicine,
-                            schedules = schedules,
-                            onEdit = { onEdit(medicine) },
-                            onDuplicate = { vm.duplicateMedicine(medicine, schedules) },
-                            onShare = { shareMedicine(medicine, schedules) },
-                            onDelete = { pendingDelete = medicine },
-                            modifier = Modifier.animateItem()
-                        )
+                MedicineCard(
+                    medicine = medicine,
+                    schedules = schedules,
+                    onOpen = { detailMedicine = medicine },
+                    onEdit = { onEdit(medicine) },
+                    onDuplicate = { vm.duplicateMedicine(medicine, schedules) },
+                    onShare = { shareMedicine(medicine, schedules) },
+                    onDelete = { pendingDelete = medicine },
+                    modifier = Modifier.animateItem()
+                )
                     }
                 }
                 item(key = "pharmacy") {
@@ -283,6 +294,217 @@ fun MedContent(
                 refillMedicine = null
             }
         )
+    }
+
+    val detailTarget = detailMedicine
+    if (detailTarget != null) {
+        MedicineDetailOverlay(
+            medicine = detailTarget,
+            schedules = schedulesByMedicine[detailTarget.id].orEmpty(),
+            onEdit = {
+                detailMedicine = null
+                onEdit(detailTarget)
+            },
+            onDismiss = { detailMedicine = null }
+        )
+    }
+}
+
+@Composable
+private fun MedicineDetailOverlay(
+    medicine: Medicine?,
+    schedules: List<Schedule>,
+    onEdit: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val shown = remember { mutableStateOf<Medicine?>(null) }
+    val shownSchedules = remember { mutableStateOf<List<Schedule>>(emptyList()) }
+    LaunchedEffect(medicine) {
+        if (medicine != null) {
+            shown.value = medicine
+            shownSchedules.value = schedules
+        }
+    }
+    val visible = medicine != null
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = motionTween(MedMotion.Fast),
+        label = "detailAlpha"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (visible) 1f else 0.94f,
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow),
+        label = "detailScale"
+    )
+    if (!visible && alpha <= 0.01f) return
+    val med = shown.value ?: return
+    val sched = shownSchedules.value
+    val doseLabel = sched.firstNotNullOfOrNull { s -> s.doseLabel.takeIf { it.isNotBlank() } }.orEmpty()
+    val sub = listOf(doseLabel, MedicineForm.label(med.form))
+        .filter { it.isNotBlank() }.joinToString(" \u00b7 ")
+    val daysSchedule = sched.firstOrNull { it.type == ScheduleType.WEEKDAYS }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f * alpha))
+                .clickable { onDismiss() }
+        )
+        Surface(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(20.dp)
+                .fillMaxWidth()
+                .fillMaxHeight(0.86f)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    this.alpha = alpha
+                },
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = MedElevation.sheet
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Medicine details",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            "Complete information \u2014 read without cutting off",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Surface(
+                        onClick = onDismiss,
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.onSurface
+                    ) {
+                        Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Rounded.Close,
+                                contentDescription = "Close",
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        MedIconSquare(
+                            label = med.name,
+                            seed = med.id,
+                            size = 56.dp,
+                            photoPath = med.photoPath
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                Text(
+                                    med.name,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                if (med.strength.isNotBlank()) {
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        med.strength,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                }
+                            }
+                            if (sub.isNotBlank()) {
+                                Text(
+                                    sub,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    DetailItem(
+                        Icons.Rounded.Medication, "Form", MedicineForm.label(med.form),
+                        Modifier.fillMaxWidth(), maxLines = 3
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    DetailItem(
+                        Icons.Rounded.Restaurant, "Intake",
+                        com.medremind.app.data.IntakeInstruction
+                            .label(med.intakeInstruction).ifBlank { "\u2014" },
+                        Modifier.fillMaxWidth(), maxLines = 3
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    DetailItem(
+                        Icons.Rounded.AccessTime, "Time", timesLabel(sched),
+                        Modifier.fillMaxWidth(), maxLines = 3
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    DetailItem(
+                        Icons.Rounded.HourglassEmpty, "Duration", durationLabel(sched),
+                        Modifier.fillMaxWidth(), maxLines = 3
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    DetailItem(
+                        Icons.Rounded.Repeat, "Frequency", frequencyLabel(sched),
+                        Modifier.fillMaxWidth(), maxLines = 3
+                    )
+                    if (daysSchedule != null) {
+                        Spacer(Modifier.height(10.dp))
+                        DaysPanel(
+                            daysMask = daysSchedule.daysMask,
+                            note = offDaysLabel(daysSchedule.daysMask)
+                        )
+                    }
+                    if (med.quantity > 0) {
+                        Spacer(Modifier.height(12.dp))
+                        StockPanel(medicine = med, schedules = sched)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Surface(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier.padding(vertical = 13.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "Close",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                    GradientPillButton(
+                        text = "Edit medicine",
+                        onClick = onEdit,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -405,6 +627,7 @@ private fun MedHeader(
 private fun MedicineCard(
     medicine: Medicine,
     schedules: List<Schedule>,
+    onOpen: () -> Unit,
     onEdit: () -> Unit,
     onDuplicate: () -> Unit,
     onShare: () -> Unit,
@@ -424,7 +647,7 @@ private fun MedicineCard(
     Surface(
         onClick = {
             haptics.tap()
-            onEdit()
+            onOpen()
         },
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
@@ -606,7 +829,8 @@ private fun DetailItem(
     icon: ImageVector,
     label: String,
     value: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    maxLines: Int = 1
 ) {
     val line = MaterialTheme.colorScheme.outlineVariant
     Row(
@@ -645,7 +869,7 @@ private fun DetailItem(
                 value,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.ExtraBold,
-                maxLines = 1,
+                maxLines = maxLines,
                 overflow = TextOverflow.Ellipsis
             )
         }
@@ -859,8 +1083,10 @@ private fun to12Hour(time: String): String {
 private fun LowSupplyBanner(
     medicine: Medicine,
     schedules: List<Schedule>,
+    moreCount: Int = 0,
     onRefill: () -> Unit,
-    onLater: () -> Unit
+    onLater: () -> Unit,
+    onNext: () -> Unit = {}
 ) {
     val daily = dailyDose(schedules)
     val daysLeft = if (daily > 0f) (medicine.quantity / daily).toInt() else 0
@@ -998,6 +1224,21 @@ private fun LowSupplyBanner(
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp)
+                        )
+                    }
+                }
+                if (moreCount > 0) {
+                    Spacer(Modifier.height(4.dp))
+                    TextButton(
+                        onClick = onNext,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    ) {
+                        Text(
+                            "$moreCount more medicine" + (if (moreCount == 1) "" else "s") +
+                                " need a refill \u00b7 Show next",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = rose,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
