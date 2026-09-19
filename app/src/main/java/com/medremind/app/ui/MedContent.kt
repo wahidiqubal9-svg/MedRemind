@@ -140,101 +140,111 @@ fun MedContent(
         matchesQuery && matchesFilter
     }
 
-    if (medicines.isEmpty()) {
-        Column(modifier = modifier.fillMaxSize()) {
-            MedHeader(count = 0, onOpenMe = onOpenMe, profilePhoto = profilePhoto)
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                MedEmptyState(
-                    icon = Icons.Outlined.Medication,
-                    title = "No medicines yet",
-                    message = "Add your first medicine to start tracking doses.",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 32.dp),
-                    action = {
-                        GradientPillButton(
-                            text = "Add medicine",
-                            icon = Icons.Rounded.Add,
-                            onClick = onAdd
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            MedHeader(
+                count = medicines.size,
+                onOpenMe = onOpenMe,
+                profilePhoto = profilePhoto
+            )
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentPadding = PaddingValues(
+                    start = 16.dp, end = 16.dp, top = 4.dp, bottom = 120.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                item(key = "search") {
+                    SearchField(
+                        value = query,
+                        onValueChange = { query = it },
+                        placeholder = "Search prescriptions or vitamins\u2026"
+                    )
+                }
+                item(key = "filters") {
+                    FilterChipRow(
+                        options = filterOptions,
+                        selectedIndex = filter,
+                        onSelect = { filter = it }
+                    )
+                }
+                if (lowMedicines.isNotEmpty() && !bannerDismissed) {
+                    item(key = "low_supply") {
+                        val low = lowMedicines.first()
+                        LowSupplyBanner(
+                            medicine = low,
+                            schedules = schedulesByMedicine[low.id].orEmpty(),
+                            onRefill = {
+                                val phone = settings.pharmacyPhone
+                                if (phone.isNotBlank()) refillMedicine = low else onEdit(low)
+                            },
+                            onLater = { bannerDismissed = true }
                         )
                     }
-                )
-            }
-        }
-        return
-    }
-
-    Box(modifier = modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 120.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            item(key = "cabinet_header") {
-                MedHeader(
-                    count = medicines.size,
-                    onOpenMe = onOpenMe,
-                    profilePhoto = profilePhoto
-                )
-            }
-            item(key = "search") {
-                SearchField(
-                    value = query,
-                    onValueChange = { query = it },
-                    placeholder = "Search prescriptions or vitamins\u2026"
-                )
-            }
-            item(key = "filters") {
-                FilterChipRow(
-                    options = filterOptions,
-                    selectedIndex = filter,
-                    onSelect = { filter = it }
-                )
-            }
-            if (lowMedicines.isNotEmpty() && !bannerDismissed) {
-                item(key = "low_supply") {
-                    val low = lowMedicines.first()
-                    LowSupplyBanner(
-                        medicine = low,
-                        schedules = schedulesByMedicine[low.id].orEmpty(),
-                        onRefill = {
+                }
+                if (medicines.isEmpty()) {
+                    item(key = "empty") {
+                        MedEmptyState(
+                            icon = Icons.Outlined.Medication,
+                            title = "No medicines yet",
+                            message = "Add your first medicine to start tracking doses.",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 24.dp),
+                            action = {
+                                GradientPillButton(
+                                    text = "Add medicine",
+                                    icon = Icons.Rounded.Add,
+                                    onClick = onAdd
+                                )
+                            }
+                        )
+                    }
+                } else if (filteredMedicines.isEmpty()) {
+                    item(key = "no_results") {
+                        MedEmptyState(
+                            icon = Icons.Outlined.Medication,
+                            title = "No matches",
+                            message = "No medicines match your search or filter.",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 24.dp)
+                        )
+                    }
+                } else {
+                    items(filteredMedicines, key = { it.id }) { medicine ->
+                        val schedules = schedulesByMedicine[medicine.id].orEmpty()
+                        MedicineCard(
+                            medicine = medicine,
+                            schedules = schedules,
+                            onEdit = { onEdit(medicine) },
+                            onDuplicate = { vm.duplicateMedicine(medicine, schedules) },
+                            onShare = { shareMedicine(medicine, schedules) },
+                            onDelete = { pendingDelete = medicine },
+                            modifier = Modifier.animateItem()
+                        )
+                    }
+                }
+                item(key = "pharmacy") {
+                    PharmacyCard(
+                        settings = settings,
+                        onEdit = { showPharmacyDialog = true },
+                        onCall = {
                             val phone = settings.pharmacyPhone
-                            if (phone.isNotBlank()) refillMedicine = low else onEdit(low)
-                        },
-                        onLater = { bannerDismissed = true }
+                            if (phone.isNotBlank()) {
+                                runCatching {
+                                    context.startActivity(
+                                        Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+                                    )
+                                }
+                            }
+                        }
                     )
                 }
             }
-            items(filteredMedicines, key = { it.id }) { medicine ->
-                val schedules = schedulesByMedicine[medicine.id].orEmpty()
-                MedicineCard(
-                    medicine = medicine,
-                    schedules = schedules,
-                    onEdit = { onEdit(medicine) },
-                    onDuplicate = { vm.duplicateMedicine(medicine, schedules) },
-                    onShare = { shareMedicine(medicine, schedules) },
-                    onDelete = { pendingDelete = medicine },
-                    modifier = Modifier.animateItem()
-                )
-            }
-            item(key = "pharmacy") {
-                PharmacyCard(
-                    settings = settings,
-                    onEdit = { showPharmacyDialog = true },
-                    onCall = {
-                        val phone = settings.pharmacyPhone
-                        if (phone.isNotBlank()) {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
-                                )
-                            }
-                        }
-                    }
-                )
-            }
         }
-
     }
 
     val toDelete = pendingDelete
@@ -355,7 +365,7 @@ private fun MedHeader(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(top = 8.dp),
+            .padding(start = 20.dp, end = 16.dp, top = 10.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
