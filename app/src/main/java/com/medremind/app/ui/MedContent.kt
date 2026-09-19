@@ -8,6 +8,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PriorityHigh
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Schedule
@@ -59,11 +61,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -93,6 +98,7 @@ fun MedContent(
     var filter by remember { mutableIntStateOf(0) }
     var showPharmacyDialog by remember { mutableStateOf(false) }
     var bannerDismissed by remember { mutableStateOf(false) }
+    var refillMedicine by remember { mutableStateOf<Medicine?>(null) }
     val filterOptions = listOf("All", "Daily", "Weekly", "Course")
 
     val lowMedicines = medicines.filter { it.quantity > 0 && it.quantity <= it.refillThreshold }
@@ -165,14 +171,9 @@ fun MedContent(
                     LowSupplyBanner(
                         medicine = low,
                         schedules = schedulesByMedicine[low.id].orEmpty(),
-                        pharmacyName = settings.pharmacyName,
                         onRefill = {
                             val phone = settings.pharmacyPhone
-                            if (phone.isNotBlank()) {
-                                openWhatsAppRefill(context, phone, low)
-                            } else {
-                                onEdit(low)
-                            }
+                            if (phone.isNotBlank()) refillMedicine = low else onEdit(low)
                         },
                         onLater = { bannerDismissed = true }
                     )
@@ -212,6 +213,93 @@ fun MedContent(
             onDismiss = { showPharmacyDialog = false }
         )
     }
+
+    val refillTarget = refillMedicine
+    if (refillTarget != null) {
+        RefillDaysDialog(
+            medicine = refillTarget,
+            suggestedDays = dailyDose(schedulesByMedicine[refillTarget.id].orEmpty())
+                .let { d ->
+                    if (d > 0f) (refillTarget.quantity / d).toInt().coerceIn(1, 365) else 30
+                },
+            onDismiss = { refillMedicine = null },
+            onConfirm = { days ->
+                openWhatsAppRefill(
+                    context = context,
+                    phone = settings.pharmacyPhone,
+                    medicine = refillTarget,
+                    schedules = schedulesByMedicine[refillTarget.id].orEmpty(),
+                    days = days
+                )
+                refillMedicine = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun RefillDaysDialog(
+    medicine: Medicine,
+    suggestedDays: Int,
+    onDismiss: () -> Unit,
+    onConfirm: (Int) -> Unit
+) {
+    var days by remember { mutableStateOf(suggestedDays.coerceIn(1, 365).toString()) }
+    val quick = listOf(7, 14, 30, 90)
+    val current = days.toIntOrNull()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Refill request") },
+        text = {
+            Column {
+                Text(
+                    "How many days of ${medicine.name} do you need?",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    quick.forEach { value ->
+                        val selected = current == value
+                        Surface(
+                            onClick = { days = value.toString() },
+                            shape = RoundedCornerShape(50),
+                            color = if (selected) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        ) {
+                            Text(
+                                "${value}d",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = days,
+                    onValueChange = { days = it.filter { c -> c.isDigit() }.take(3) },
+                    label = { Text("Days") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = current != null && current > 0,
+                onClick = { onConfirm((current ?: suggestedDays).coerceIn(1, 365)) }
+            ) {
+                Text("Send")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable
@@ -501,120 +589,145 @@ private fun StockGauge(medicine: Medicine, schedules: List<Schedule>) {
 private fun LowSupplyBanner(
     medicine: Medicine,
     schedules: List<Schedule>,
-    pharmacyName: String,
     onRefill: () -> Unit,
     onLater: () -> Unit
 ) {
     val daily = dailyDose(schedules)
     val daysLeft = if (daily > 0f) (medicine.quantity / daily).toInt() else 0
     val unit = unitLabel(medicine.form, medicine.quantity != 1)
+    val rose = Color(0xFFE8466B)
+    val ink = Color(0xFF101828)
+    val bodyColor = Color(0xFF7A4453)
     val body = androidx.compose.ui.text.buildAnnotatedString {
         withStyle(
-            androidx.compose.ui.text.SpanStyle(fontWeight = FontWeight.Bold)
+            androidx.compose.ui.text.SpanStyle(color = ink, fontWeight = FontWeight.Bold)
         ) { append(medicine.name) }
-        append(" has only ${medicine.quantity} $unit remaining.")
-        if (pharmacyName.isNotBlank()) {
-            append(" Tap to request a refill from $pharmacyName.")
-        } else {
-            append(" Tap to request a refill.")
-        }
+        append(" has only ")
+        withStyle(
+            androidx.compose.ui.text.SpanStyle(color = ink, fontWeight = FontWeight.Bold)
+        ) { append("${medicine.quantity} $unit") }
+        append(" remaining. Tap below to request a refill.")
     }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.error.copy(alpha = 0.25f)
-        ),
+        shape = RoundedCornerShape(22.dp),
+        color = Color.Transparent,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF6C9D5)),
         shadowElevation = MedElevation.card
     ) {
-        Row(modifier = Modifier.padding(14.dp)) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(
-                        MaterialTheme.colorScheme.errorContainer,
-                        RoundedCornerShape(10.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.PriorityHigh,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "LOW SUPPLY WARNING",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.error,
-                        contentColor = MaterialTheme.colorScheme.onError
+        Box(
+            modifier = Modifier.background(
+                Brush.linearGradient(listOf(Color(0xFFFFF4F7), Color(0xFFFDEAEF)))
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(Color(0xFFF0567A), rose)
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
                     ) {
+                        Icon(
+                            imageVector = Icons.Rounded.PriorityHigh,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "LOW SUPPLY WARNING",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = rose,
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 1.2.sp
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = rose,
+                                contentColor = Color.White
+                            ) {
+                                Text(
+                                    "$daysLeft day" + (if (daysLeft == 1) "" else "s") + " left",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(5.dp))
                         Text(
-                            "$daysLeft Day" + (if (daysLeft == 1) "" else "s") + " Left",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            text = body,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontSize = 13.5.sp,
+                                lineHeight = 21.sp
+                            ),
+                            color = bodyColor
                         )
                     }
                 }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = body,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Spacer(Modifier.height(14.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
                     Surface(
                         onClick = onRefill,
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.error,
-                        contentColor = MaterialTheme.colorScheme.onError
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color.Transparent,
+                        shadowElevation = MedElevation.card
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                            modifier = Modifier
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(Color(0xFFF0567A), rose)
+                                    )
+                                )
+                                .padding(horizontal = 18.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                Icons.Rounded.LocalPharmacy,
+                                imageVector = Icons.Rounded.Refresh,
                                 contentDescription = null,
-                                modifier = Modifier.size(18.dp)
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
                             )
-                            Spacer(Modifier.width(6.dp))
+                            Spacer(Modifier.width(7.dp))
                             Text(
                                 "Refill Now",
-                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                     }
+                    Spacer(Modifier.width(10.dp))
                     Surface(
                         onClick = onLater,
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color.White,
+                        contentColor = ink,
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
-                            MaterialTheme.colorScheme.outlineVariant
+                            Color(0xFFE7EAF2)
                         )
                     ) {
                         Text(
                             "Remind Later",
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp)
                         )
                     }
                 }
@@ -798,15 +911,21 @@ private fun unitLabel(form: String, plural: Boolean): String {
 private fun openWhatsAppRefill(
     context: android.content.Context,
     phone: String,
-    medicine: Medicine
+    medicine: Medicine,
+    schedules: List<Schedule>,
+    days: Int
 ) {
     val digits = phone.filter { it.isDigit() }
     if (digits.isBlank()) return
     val name = listOf(medicine.name, medicine.strength)
         .filter { it.isNotBlank() }.joinToString(" ")
-    val unit = unitLabel(medicine.form, medicine.quantity != 1)
-    val message = "Hello, I would like to refill $name. " +
-        "Please arrange ${medicine.quantity} $unit. Thank you."
+    val daily = dailyDose(schedules)
+    val qty = if (daily > 0f) kotlin.math.ceil(days * daily).toInt() else 0
+    val qtyText = if (qty > 0) {
+        " Please arrange about $qty ${unitLabel(medicine.form, qty != 1)}."
+    } else ""
+    val message = "Hello, I would like to refill $name for $days days." +
+        qtyText + " Thank you."
     val url = "https://wa.me/$digits?text=" +
         java.net.URLEncoder.encode(message, "UTF-8")
     val whatsapp = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
