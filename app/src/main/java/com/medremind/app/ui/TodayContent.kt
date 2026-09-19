@@ -113,7 +113,6 @@ fun TodayContent(
     var dosesLoaded by remember { mutableStateOf(false) }
     var reloadTick by remember { mutableIntStateOf(0) }
     var markedDates by remember { mutableStateOf<Set<LocalDate>>(emptySet()) }
-    var weekStats by remember { mutableStateOf<List<Pair<Int, Int>>>(emptyList()) }
     val scope = rememberCoroutineScope()
     val haptics = rememberMedHaptics()
     val prnMeds by vm.prnMedicines.collectAsState()
@@ -121,13 +120,6 @@ fun TodayContent(
     LaunchedEffect(selectedDate, medicines, reloadTick) {
         doses = vm.dosesOn(selectedDate)
         dosesLoaded = true
-        val today = LocalDate.now()
-        weekStats = (6 downTo 0).map { back ->
-            val day = vm.dosesOn(today.minusDays(back.toLong()))
-            val due = day.count { it.status != DoseStatus.PENDING }
-            val taken = day.count { it.status == DoseStatus.TAKEN }
-            due to taken
-        }
     }
 
     LaunchedEffect(medicines) {
@@ -349,8 +341,7 @@ fun TodayContent(
                     SummaryCard(
                         taken = doses.count { it.status == DoseStatus.TAKEN },
                         total = doses.size,
-                        missed = doses.count { it.status == DoseStatus.MISSED },
-                        weekStats = weekStats
+                        missed = doses.count { it.status == DoseStatus.MISSED }
                     )
                 }
             }
@@ -510,8 +501,7 @@ private fun CalendarHandle(expanded: Boolean, onToggle: () -> Unit) {
 private fun SummaryCard(
     taken: Int,
     total: Int,
-    missed: Int,
-    weekStats: List<Pair<Int, Int>>
+    missed: Int
 ) {
     val targetPct = if (total == 0) 0 else taken * 100 / total
     val pct by animateIntAsState(
@@ -524,13 +514,11 @@ private fun SummaryCard(
         animationSpec = motionTween(MedMotion.Slow, easing = MedMotion.Emphasized),
         label = "summaryTaken"
     )
-    val perfect = weekStats.count { it.first > 0 && it.second == it.first }
     val encouragement = when {
         targetPct >= 100 -> "All done \u2014 great job!"
         targetPct >= 50 -> "You're doing great today!"
         else -> "Let's get back on track."
     }
-    val today = LocalDate.now()
 
     MedCard(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -609,68 +597,6 @@ private fun SummaryCard(
                 }
             }
         }
-
-        Spacer(Modifier.height(14.dp))
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Spacer(Modifier.height(12.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Week streak",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                "$perfect day" + if (perfect == 1) "" else "s" + " perfect",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(Modifier.weight(1f))
-            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                weekStats.forEachIndexed { index, (due, dayTaken) ->
-                    val date = today.minusDays((weekStats.lastIndex - index).toLong())
-                    WeekNode(
-                        letter = date.dayOfWeek.name.take(1),
-                        due = due,
-                        taken = dayTaken,
-                        isToday = index == weekStats.lastIndex
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun WeekNode(letter: String, due: Int, taken: Int, isToday: Boolean) {
-    val complete = due > 0 && taken == due
-    val partial = due > 0 && taken in 1 until due
-    val bg = when {
-        isToday -> MaterialTheme.colorScheme.primary
-        complete -> MaterialTheme.colorScheme.primaryContainer
-        partial -> MaterialTheme.colorScheme.tertiaryContainer
-        else -> MaterialTheme.colorScheme.surfaceContainerHigh
-    }
-    val fg = when {
-        isToday -> MaterialTheme.colorScheme.onPrimary
-        complete -> MaterialTheme.colorScheme.onPrimaryContainer
-        partial -> MaterialTheme.colorScheme.onTertiaryContainer
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    Box(
-        modifier = Modifier
-            .size(22.dp)
-            .clip(CircleShape)
-            .background(bg),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = letter,
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-            color = fg,
-            fontWeight = FontWeight.Bold
-        )
     }
 }
 
