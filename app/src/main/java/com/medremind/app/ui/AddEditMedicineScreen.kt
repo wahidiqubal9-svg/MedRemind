@@ -542,6 +542,14 @@ private fun DetailsStep(
     )
     Spacer(Modifier.height(18.dp))
 
+    FieldLabel("Form")
+    FilterChipRow(
+        options = MedicineForm.all.map { MedicineForm.label(it) },
+        selectedIndex = MedicineForm.all.indexOf(form).coerceAtLeast(0),
+        onSelect = { onForm(MedicineForm.all[it]) }
+    )
+
+    Spacer(Modifier.height(16.dp))
     FieldLabel("Medicine name")
     OutlinedTextField(
         value = name,
@@ -550,14 +558,6 @@ private fun DetailsStep(
         leadingIcon = { Icon(Icons.Rounded.Medication, contentDescription = null) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth()
-    )
-
-    Spacer(Modifier.height(16.dp))
-    FieldLabel("Form")
-    FilterChipRow(
-        options = MedicineForm.all.map { MedicineForm.label(it) },
-        selectedIndex = MedicineForm.all.indexOf(form).coerceAtLeast(0),
-        onSelect = { onForm(MedicineForm.all[it]) }
     )
 
     Spacer(Modifier.height(16.dp))

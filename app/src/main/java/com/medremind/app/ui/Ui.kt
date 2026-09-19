@@ -1040,27 +1040,34 @@ fun FilterChipRow(
         val haptics = rememberMedHaptics()
         options.forEachIndexed { index, label ->
             val selected = index == selectedIndex
-            Surface(
-                onClick = {
-                    haptics.tap()
-                    onSelect(index)
-                },
-                shape = RoundedCornerShape(50),
-                color = if (selected) Color.Transparent else MaterialTheme.colorScheme.surface,
-                contentColor = if (selected) MaterialTheme.colorScheme.onPrimary
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-                border = if (selected) null else androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.outlineVariant
-                ),
-                modifier = if (selected) {
-                    Modifier.background(MedGradients.heroHorizontal(), RoundedCornerShape(50))
-                } else Modifier
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .then(
+                        if (selected) {
+                            Modifier.background(MedGradients.heroHorizontal())
+                        } else {
+                            Modifier
+                                .background(MaterialTheme.colorScheme.surface)
+                                .border(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.outlineVariant,
+                                    RoundedCornerShape(50)
+                                )
+                        }
+                    )
+                    .clickable {
+                        haptics.tap()
+                        onSelect(index)
+                    },
+                contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
+                    color = if (selected) MaterialTheme.colorScheme.onPrimary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 15.dp, vertical = 9.dp)
                 )
             }
