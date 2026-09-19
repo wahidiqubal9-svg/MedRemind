@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Medication
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
@@ -186,21 +187,16 @@ fun MedContent(
                 }
                 if (medicines.isEmpty()) {
                     item(key = "empty") {
-                        MedEmptyState(
-                            icon = Icons.Outlined.Medication,
-                            title = "No medicines yet",
-                            message = "Add your first medicine to start tracking doses.",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 24.dp),
-                            action = {
-                                GradientPillButton(
-                                    text = "Add medicine",
-                                    icon = Icons.Rounded.Add,
-                                    onClick = onAdd
-                                )
-                            }
-                        )
+                        MedCard(modifier = Modifier.fillMaxWidth()) {
+                            MedEmptyState(
+                                icon = Icons.Rounded.CalendarMonth,
+                                title = "No doses scheduled",
+                                message = "Nothing is scheduled for this day. Add a medicine to get started.",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 28.dp)
+                            )
+                        }
                     }
                 } else if (filteredMedicines.isEmpty()) {
                     item(key = "no_results") {

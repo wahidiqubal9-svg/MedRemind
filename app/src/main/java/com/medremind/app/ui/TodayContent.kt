@@ -362,14 +362,7 @@ fun TodayContent(
                             message = "Nothing is scheduled for this day. Add a medicine to get started.",
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 28.dp),
-                            action = {
-                                GradientPillButton(
-                                    text = "Add medicine",
-                                    icon = Icons.Rounded.Add,
-                                    onClick = onAdd
-                                )
-                            }
+                                .padding(vertical = 28.dp)
                         )
                     }
                 }
