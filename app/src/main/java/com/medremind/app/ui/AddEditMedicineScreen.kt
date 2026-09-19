@@ -184,6 +184,10 @@ fun AddEditMedicineScreen(
     }
     var prescriber by rememberSaveable { mutableStateOf(initial?.prescriber ?: "") }
     var rxNumber by rememberSaveable { mutableStateOf(initial?.rxNumber ?: "") }
+    var batchNumber by rememberSaveable { mutableStateOf(initial?.batchNumber ?: "") }
+    var expiryText by rememberSaveable {
+        mutableStateOf(initial?.expiryDate?.let { formatExpiry(it) } ?: "")
+    }
     var packSize by rememberSaveable {
         mutableStateOf((initial?.packSize ?: 0).takeIf { it > 0 }?.toString() ?: "")
     }
@@ -266,6 +270,8 @@ fun AddEditMedicineScreen(
                 rxNumber = ""
                 packSize = ""
                 refillsLeft = "0"
+                batchNumber = ""
+                expiryText = ""
                 timesCount = 2
                 isCustomCount = false
                 asNeeded = false
@@ -357,7 +363,11 @@ fun AddEditMedicineScreen(
                         prescriber = prescriber,
                         onPrescriber = { prescriber = it },
                         rxNumber = rxNumber,
-                        onRxNumber = { rxNumber = it }
+                        onRxNumber = { rxNumber = it },
+                        batchNumber = batchNumber,
+                        onBatchNumber = { batchNumber = it },
+                        expiryText = expiryText,
+                        onExpiryText = { expiryText = it }
                     )
                     1 -> ScheduleStep(
                         asNeeded = asNeeded,
@@ -482,7 +492,9 @@ fun AddEditMedicineScreen(
                                     prescriber = prescriber.trim(),
                                     rxNumber = rxNumber.trim(),
                                     refillsLeft = refillsLeft.toIntOrNull() ?: 0,
-                                    packSize = packSize.toIntOrNull() ?: 0
+                                    packSize = packSize.toIntOrNull() ?: 0,
+                                    batchNumber = batchNumber.trim(),
+                                    expiryDate = LabelScanner.parseExpiry(expiryText)
                                 )
                                 vm.saveMedicine(medicine, listOf(schedule)) { saved = true }
                             }
@@ -565,7 +577,11 @@ private fun DetailsStep(
     prescriber: String,
     onPrescriber: (String) -> Unit,
     rxNumber: String,
-    onRxNumber: (String) -> Unit
+    onRxNumber: (String) -> Unit,
+    batchNumber: String,
+    onBatchNumber: (String) -> Unit,
+    expiryText: String,
+    onExpiryText: (String) -> Unit
 ) {
     Text(
         "Add medicine",
@@ -632,6 +648,25 @@ private fun DetailsStep(
             modifier = Modifier.fillMaxWidth()
         )
     }
+
+    Spacer(Modifier.height(16.dp))
+    FieldLabel("Batch number", hint = "(optional)")
+    OutlinedTextField(
+        value = batchNumber,
+        onValueChange = onBatchNumber,
+        placeholder = { Text("e.g. B240912") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
+    Spacer(Modifier.height(12.dp))
+    FieldLabel("Expiry", hint = "(MM/YY)")
+    OutlinedTextField(
+        value = expiryText,
+        onValueChange = onExpiryText,
+        placeholder = { Text("e.g. 08/27") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
 
     Spacer(Modifier.height(16.dp))
     FieldLabel("Dose", hint = "(amount per intake)")
@@ -1681,6 +1716,13 @@ private fun ReviewRow(icon: androidx.compose.ui.graphics.vector.ImageVector, lab
             Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         }
     }
+}
+
+private fun formatExpiry(millis: Long): String {
+    val cal = java.util.Calendar.getInstance().apply { timeInMillis = millis }
+    val month = cal.get(java.util.Calendar.MONTH) + 1
+    val year = cal.get(java.util.Calendar.YEAR) % 100
+    return String.format(java.util.Locale.getDefault(), "%02d/%02d", month, year)
 }
 
 private fun splitAmountUnit(value: String, defaultUnit: String): Pair<String, String> {

@@ -66,5 +66,9 @@ data class Medicine(
     val refillsLeft: Int = 0,
     /** Total units in a full pack; 0 means unknown. Powers the stock gauge. */
     val packSize: Int = 0,
-    val autoRefillDate: Long? = null
+    val autoRefillDate: Long? = null,
+    /** Printed batch/lot number. */
+    val batchNumber: String = "",
+    /** Printed expiry date, as epoch millis. */
+    val expiryDate: Long? = null
 )

@@ -49,6 +49,8 @@ object BackupManager {
                         put("refillsLeft", m.refillsLeft)
                         put("packSize", m.packSize)
                         put("autoRefillDate", m.autoRefillDate ?: JSONObject.NULL)
+                        put("batchNumber", m.batchNumber)
+                        put("expiryDate", m.expiryDate ?: JSONObject.NULL)
                         put("photoName", m.photoPath?.let { File(it).name })
                     })
                 }
@@ -166,7 +168,9 @@ object BackupManager {
                     rxNumber = o.optString("rxNumber", ""),
                     refillsLeft = o.optInt("refillsLeft", 0),
                     packSize = o.optInt("packSize", 0),
-                    autoRefillDate = if (o.isNull("autoRefillDate")) null else o.optLong("autoRefillDate")
+                    autoRefillDate = if (o.isNull("autoRefillDate")) null else o.optLong("autoRefillDate"),
+                    batchNumber = o.optString("batchNumber", ""),
+                    expiryDate = if (o.isNull("expiryDate")) null else o.optLong("expiryDate")
                 )
             )
         }

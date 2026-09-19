@@ -12,6 +12,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +43,7 @@ import androidx.compose.material.icons.rounded.LocalPharmacy
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Schedule
@@ -60,6 +63,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,9 +75,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import com.medremind.app.data.PhotoStorage
 import com.medremind.app.data.DoseStatus
+import java.io.File
+import kotlinx.coroutines.launch
 import com.medremind.app.data.Medicine
 import com.medremind.app.data.MedicineCategory
 import com.medremind.app.data.MedicineForm
@@ -94,6 +102,7 @@ fun MedContent(
     onAdd: () -> Unit,
     onOpenMe: () -> Unit,
     onScanBarcode: (String) -> Unit,
+    onScanLabel: (ScannedLabel) -> Unit,
     profilePhoto: String? = null
 ) {
     val context = LocalContext.current
@@ -121,6 +130,31 @@ fun MedContent(
             PackageManager.PERMISSION_GRANTED
         if (granted) scanLauncher.launch(scanOptions())
         else permissionLauncher.launch(Manifest.permission.CAMERA)
+    }
+
+    var pendingLabelFile by remember { mutableStateOf<File?>(null) }
+    val scope = rememberCoroutineScope()
+    val labelLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { ok ->
+        val file = pendingLabelFile
+        if (ok && file != null) {
+            scope.launch {
+                val uri = FileProvider.getUriForFile(
+                    context,
+                    context.packageName + ".fileprovider",
+                    file
+                )
+                val text = LabelScanner.recognize(context, uri)
+                onScanLabel(LabelScanner.parse(text))
+            }
+        }
+    }
+    fun startLabelScan() {
+        val file = PhotoStorage.newPhotoFile(context)
+        pendingLabelFile = file
+        val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+        labelLauncher.launch(uri)
     }
 
     val lowMedicines = medicines.filter { it.quantity > 0 && it.quantity <= it.refillThreshold }
@@ -210,7 +244,10 @@ fun MedContent(
                 }
             }
             item(key = "quick_actions") {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     QuickActionCard(
                         icon = Icons.Rounded.Add,
                         title = "Add new",
@@ -218,16 +255,25 @@ fun MedContent(
                         container = MaterialTheme.colorScheme.primaryContainer,
                         content = MaterialTheme.colorScheme.onPrimaryContainer,
                         onClick = onAdd,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.width(168.dp)
                     )
                     QuickActionCard(
                         icon = Icons.Rounded.CameraAlt,
                         title = "Scan barcode",
-                        subtitle = "Instant import",
+                        subtitle = "Prefill Rx number",
                         container = MaterialTheme.colorScheme.secondaryContainer,
                         content = MaterialTheme.colorScheme.onSecondaryContainer,
                         onClick = { startScan() },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.width(168.dp)
+                    )
+                    QuickActionCard(
+                        icon = Icons.Rounded.PhotoCamera,
+                        title = "Scan label",
+                        subtitle = "OCR pack details",
+                        container = MaterialTheme.colorScheme.tertiaryContainer,
+                        content = MaterialTheme.colorScheme.onTertiaryContainer,
+                        onClick = { startLabelScan() },
+                        modifier = Modifier.width(168.dp)
                     )
                 }
             }
