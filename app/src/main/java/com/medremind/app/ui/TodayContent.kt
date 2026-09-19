@@ -3,6 +3,7 @@ package com.medremind.app.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -35,12 +36,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DoneAll
+import androidx.compose.material.icons.rounded.NightsStay
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.ThumbUp
+import androidx.compose.material.icons.rounded.WbSunny
+import androidx.compose.material.icons.rounded.WbTwilight
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -76,6 +85,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.medremind.app.data.DoseStatus
 import com.medremind.app.data.Medicine
 import kotlinx.coroutines.launch
@@ -93,6 +103,7 @@ fun TodayContent(
     onAdd: () -> Unit,
     onOpenMe: () -> Unit,
     profilePhoto: String? = null,
+    greetingName: String? = null,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -102,6 +113,7 @@ fun TodayContent(
     var dosesLoaded by remember { mutableStateOf(false) }
     var reloadTick by remember { mutableIntStateOf(0) }
     var markedDates by remember { mutableStateOf<Set<LocalDate>>(emptySet()) }
+    var weekStats by remember { mutableStateOf<List<Pair<Int, Int>>>(emptyList()) }
     val scope = rememberCoroutineScope()
     val haptics = rememberMedHaptics()
     val prnMeds by vm.prnMedicines.collectAsState()
@@ -109,6 +121,13 @@ fun TodayContent(
     LaunchedEffect(selectedDate, medicines, reloadTick) {
         doses = vm.dosesOn(selectedDate)
         dosesLoaded = true
+        val today = LocalDate.now()
+        weekStats = (6 downTo 0).map { back ->
+            val day = vm.dosesOn(today.minusDays(back.toLong()))
+            val due = day.count { it.status != DoseStatus.PENDING }
+            val taken = day.count { it.status == DoseStatus.TAKEN }
+            due to taken
+        }
     }
 
     LaunchedEffect(medicines) {
@@ -221,7 +240,8 @@ fun TodayContent(
             expanded = expanded,
             onToggleCalendar = { expanded = !expanded },
             onOpenMe = onOpenMe,
-            profilePhoto = profilePhoto
+            profilePhoto = profilePhoto,
+            greetingName = greetingName
         )
 
         CalendarHandle(
@@ -253,7 +273,7 @@ fun TodayContent(
                 // Kept composed (only the height animates) so the selected date / pager
                 // state survives collapsing the calendar.
                 val stripHeight by animateDpAsState(
-                    targetValue = if (expanded) 0.dp else 78.dp,
+                    targetValue = if (expanded) 0.dp else 100.dp,
                     animationSpec = tween(320, easing = FastOutSlowInEasing),
                     label = "stripHeight"
                 )
@@ -262,15 +282,27 @@ fun TodayContent(
                         .fillMaxWidth()
                         .height(stripHeight)
                         .clipToBounds()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
                 ) {
-                    WeekStrip(
-                        selectedDate = selectedDate,
-                        markedDates = markedDates,
-                        onSelect = {
-                            selectedDate = it
-                            month = YearMonth.from(it)
-                        }
-                    )
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        shape = RoundedCornerShape(22.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant
+                        ),
+                        shadowElevation = MedElevation.card
+                    ) {
+                        WeekStrip(
+                            selectedDate = selectedDate,
+                            markedDates = markedDates,
+                            onSelect = {
+                                selectedDate = it
+                                month = YearMonth.from(it)
+                            }
+                        )
+                    }
                 }
 
                 AnimatedVisibility(
@@ -309,12 +341,24 @@ fun TodayContent(
                     TodaySkeleton()
                 }
             } else {
+            val nextDose = doses
+                .filter { it.status == DoseStatus.PENDING }
+                .minByOrNull { it.timeMillis }
             if (doses.isNotEmpty()) {
                 item(key = "summary") {
                     SummaryCard(
                         taken = doses.count { it.status == DoseStatus.TAKEN },
                         total = doses.size,
-                        missed = doses.count { it.status == DoseStatus.MISSED }
+                        missed = doses.count { it.status == DoseStatus.MISSED },
+                        weekStats = weekStats
+                    )
+                }
+            }
+            if (nextDose != null) {
+                item(key = "next_dose") {
+                    NextDoseBanner(
+                        dose = nextDose,
+                        onTake = { record(nextDose, DoseStatus.TAKEN) }
                     )
                 }
             }
@@ -463,7 +507,12 @@ private fun CalendarHandle(expanded: Boolean, onToggle: () -> Unit) {
 }
 
 @Composable
-private fun SummaryCard(taken: Int, total: Int, missed: Int) {
+private fun SummaryCard(
+    taken: Int,
+    total: Int,
+    missed: Int,
+    weekStats: List<Pair<Int, Int>>
+) {
     val targetPct = if (total == 0) 0 else taken * 100 / total
     val pct by animateIntAsState(
         targetValue = targetPct,
@@ -475,62 +524,270 @@ private fun SummaryCard(taken: Int, total: Int, missed: Int) {
         animationSpec = motionTween(MedMotion.Slow, easing = MedMotion.Emphasized),
         label = "summaryTaken"
     )
-    MedHeroCard(modifier = Modifier.fillMaxWidth()) {
+    val perfect = weekStats.count { it.first > 0 && it.second == it.first }
+    val encouragement = when {
+        targetPct >= 100 -> "All done \u2014 great job!"
+        targetPct >= 50 -> "You're doing great today!"
+        else -> "Let's get back on track."
+    }
+    val today = LocalDate.now()
+
+    MedCard(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "Daily progress",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
-                )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "$takenAnim of $total doses taken",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Rounded.AutoAwesome,
+                            contentDescription = null,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            "DAILY ADHERENCE",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
                 Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SummaryChip(Color(0xFF7EF0B2), "$takenAnim Taken")
-                    SummaryChip(Color(0xFFFFB3C4), "$missed Missed")
+                Text(
+                    "$takenAnim of $total doses",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "taken today \u00b7 ${pct}% complete",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Rounded.ThumbUp,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        encouragement,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
             Spacer(Modifier.width(12.dp))
-            ProgressRing(percent = pct, modifier = Modifier.size(80.dp)) {
-                Text(
-                    "$pct%",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    fontWeight = FontWeight.Bold
-                )
+            ProgressRing(
+                percent = pct,
+                modifier = Modifier.size(96.dp),
+                trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                progressColor = MaterialTheme.colorScheme.primary
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "$pct%",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        "TAKEN",
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Spacer(Modifier.height(12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Week streak",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                "$perfect day" + if (perfect == 1) "" else "s" + " perfect",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.weight(1f))
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                weekStats.forEachIndexed { index, (due, dayTaken) ->
+                    val date = today.minusDays((weekStats.lastIndex - index).toLong())
+                    WeekNode(
+                        letter = date.dayOfWeek.name.take(1),
+                        due = due,
+                        taken = dayTaken,
+                        isToday = index == weekStats.lastIndex
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun SummaryChip(dot: Color, text: String) {
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = Color.White.copy(alpha = 0.18f),
-        contentColor = Color.White
+private fun WeekNode(letter: String, due: Int, taken: Int, isToday: Boolean) {
+    val complete = due > 0 && taken == due
+    val partial = due > 0 && taken in 1 until due
+    val bg = when {
+        isToday -> MaterialTheme.colorScheme.primary
+        complete -> MaterialTheme.colorScheme.primaryContainer
+        partial -> MaterialTheme.colorScheme.tertiaryContainer
+        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+    val fg = when {
+        isToday -> MaterialTheme.colorScheme.onPrimary
+        complete -> MaterialTheme.colorScheme.onPrimaryContainer
+        partial -> MaterialTheme.colorScheme.onTertiaryContainer
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Box(
+        modifier = Modifier
+            .size(22.dp)
+            .clip(CircleShape)
+            .background(bg),
+        contentAlignment = Alignment.Center
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(7.dp)
-                    .clip(CircleShape)
-                    .background(dot)
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold
-            )
+        Text(
+            text = letter,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+            color = fg,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun NextDoseBanner(dose: TodayDose, onTake: () -> Unit) {
+    val haptics = rememberMedHaptics()
+    val minutes = ((dose.timeMillis - System.currentTimeMillis()) / 60_000L).toInt()
+    val label = when {
+        minutes > 1 -> "UP NEXT IN $minutes MINS"
+        minutes == 1 -> "UP NEXT IN 1 MIN"
+        minutes == 0 -> "DUE NOW"
+        else -> "OVERDUE"
+    }
+    val timeText = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(dose.timeMillis))
+    val intake = com.medremind.app.data.IntakeInstruction.label(dose.medicine.intakeInstruction)
+    val subtitle = listOf(timeText, intake).filter { it.isNotBlank() }.joinToString(" \u00b7 ")
+
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "nextPulse")
+    val dotAlpha by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.25f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = motionTween(MedMotion.Slow, easing = MedMotion.Decelerate),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+        ),
+        label = "nextPulseAlpha"
+    )
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        color = Color.Transparent,
+        shadowElevation = MedElevation.raised
+    ) {
+        Box(modifier = Modifier.background(MedGradients.heroHorizontal())) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(15.dp))
+                        .background(Color.White.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Schedule,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF7EF0B2).copy(alpha = dotAlpha))
+                        )
+                    }
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        text = listOf(dose.medicine.name, dose.medicine.strength)
+                            .filter { it.isNotBlank() }.joinToString(" "),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1
+                    )
+                    if (subtitle.isNotBlank()) {
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f),
+                            maxLines = 1
+                        )
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
+                Surface(
+                    onClick = {
+                        haptics.confirm()
+                        onTake()
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    contentColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            "Take",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -542,24 +799,41 @@ private fun timeOfDayColor(hour: Int): Color = when {
     else -> Color(0xFF6D5BD0)
 }
 
+private fun timeOfDayIcon(hour: Int): ImageVector = when {
+    hour in 5..11 -> Icons.Rounded.WbSunny
+    hour in 12..16 -> Icons.Rounded.WbTwilight
+    hour in 17..20 -> Icons.Rounded.NightsStay
+    else -> Icons.Rounded.Bedtime
+}
+
+private fun segmentLabel(hour: Int): String = when {
+    hour in 5..11 -> "Morning"
+    hour in 12..16 -> "Afternoon"
+    hour in 17..20 -> "Evening"
+    else -> "Night"
+}
+
 @Composable
 private fun TodayHeader(
     selectedDate: LocalDate,
     expanded: Boolean,
     onToggleCalendar: () -> Unit,
     onOpenMe: () -> Unit,
-    profilePhoto: String? = null
+    profilePhoto: String? = null,
+    greetingName: String? = null
 ) {
     val isToday = selectedDate == LocalDate.now()
-    val title = if (isToday) {
-        "Today"
-    } else {
-        val sameYear = selectedDate.year == LocalDate.now().year
-        SimpleDateFormat(
-            if (sameYear) "MMMM d" else "MMMM d, yyyy",
-            Locale.getDefault()
-        ).format(dateToMillis(selectedDate))
+    val greeting = when (java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)) {
+        in 5..11 -> "Good morning"
+        in 12..16 -> "Good afternoon"
+        in 17..20 -> "Good evening"
+        else -> "Good night"
     }
+    val title = if (greetingName.isNullOrBlank()) greeting else "$greeting, $greetingName"
+    val dateLabel = SimpleDateFormat(
+        if (selectedDate.year == LocalDate.now().year) "EEEE, MMM d" else "EEEE, MMM d, yyyy",
+        Locale.getDefault()
+    ).format(dateToMillis(selectedDate)) + if (isToday) " \u00b7 Today" else ""
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -567,12 +841,20 @@ private fun TodayHeader(
             .padding(start = 20.dp, end = 16.dp, top = 10.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f)
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = dateLabel,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         SquareIconButton(
             icon = Icons.Rounded.CalendarMonth,
             contentDescription = if (expanded) "Hide calendar" else "Full calendar",
@@ -623,79 +905,79 @@ private fun WeekStrip(
         state = pagerState,
         modifier = Modifier
             .fillMaxWidth()
-            .height(78.dp)
+            .height(100.dp)
     ) { page ->
         val start = todayWeekStart.plusDays(((page - center) * 7).toLong())
         Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                for (i in 0 until 7) {
-                    val date = start.plusDays(i.toLong())
-                    val isSelected = date == selectedDate
-                    val isToday = date == today
-                    Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            for (i in 0 until 7) {
+                val date = start.plusDays(i.toLong())
+                val isSelected = date == selectedDate
+                val isToday = date == today
+                val active = isSelected || isToday
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable { onSelect(date) }
+                        .padding(vertical = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = weekdayLetter(date),
+                        style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.5.sp),
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                        color = if (active) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(16.dp))
-                            .clickable { onSelect(date) }
-                            .padding(vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(
+                                when {
+                                    isToday -> MaterialTheme.colorScheme.primary
+                                    isSelected -> MaterialTheme.colorScheme.primaryContainer
+                                    else -> Color.Transparent
+                                }
+                            ),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = weekdayLetter(date),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isSelected) MaterialTheme.colorScheme.onSurface
-                            else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.onSurface
-                                    else Color.Transparent
-                                )
-                                .then(
-                                    if (isToday && !isSelected) {
-                                        Modifier.border(
-                                            1.5.dp,
-                                            MaterialTheme.colorScheme.primary,
-                                            CircleShape
-                                        )
-                                    } else Modifier
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = date.dayOfMonth.toString(),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (isSelected || isToday) FontWeight.SemiBold
-                                else FontWeight.Normal,
-                                color = when {
-                                    isSelected -> MaterialTheme.colorScheme.surface
-                                    isToday -> MaterialTheme.colorScheme.primary
-                                    else -> MaterialTheme.colorScheme.onSurface
-                                }
-                            )
-                        }
-                        Spacer(Modifier.height(4.dp))
-                        Box(
-                            modifier = Modifier
-                                .size(4.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (date in markedDates) MaterialTheme.colorScheme.primary
-                                    else Color.Transparent
-                                )
+                            text = date.dayOfMonth.toString(),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Medium,
+                            color = when {
+                                isToday -> MaterialTheme.colorScheme.onPrimary
+                                isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+                                else -> MaterialTheme.colorScheme.onSurface
+                            }
                         )
                     }
+                    Spacer(Modifier.height(5.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(5.dp)
+                            .clip(CircleShape)
+                            .background(
+                                when {
+                                    date in markedDates && isToday ->
+                                        MaterialTheme.colorScheme.onPrimary
+                                    date in markedDates -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.surfaceContainerHighest
+                                }
+                            )
+                    )
                 }
             }
         }
     }
+}
 
 
 @Composable
@@ -817,9 +1099,12 @@ private fun TimeGroupCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 2.dp,
-        shadowElevation = 2.dp
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant
+        ),
+        shadowElevation = MedElevation.card
     ) {
         Column {
             val hour = remember(doses) {
@@ -827,6 +1112,7 @@ private fun TimeGroupCard(
                     .get(java.util.Calendar.HOUR_OF_DAY)
             }
             val allDone = doses.all { it.status != DoseStatus.PENDING }
+            val anyDone = doses.any { it.status != DoseStatus.PENDING }
             val accentColor = timeOfDayColor(hour)
             Row(
                 modifier = Modifier
@@ -842,7 +1128,7 @@ private fun TimeGroupCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Schedule,
+                        imageVector = timeOfDayIcon(hour),
                         contentDescription = null,
                         tint = accentColor,
                         modifier = Modifier.size(19.dp)
@@ -851,8 +1137,8 @@ private fun TimeGroupCard(
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = time,
-                        style = MaterialTheme.typography.titleLarge,
+                        text = "${segmentLabel(hour)} \u00b7 $time",
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
@@ -861,9 +1147,7 @@ private fun TimeGroupCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                if (!allDone) {
-                    StatusChip(status = DoseStatus.PENDING, label = "Upcoming")
-                }
+                SegmentStatusChip(allDone = allDone, anyDone = anyDone)
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -873,7 +1157,7 @@ private fun TimeGroupCard(
                     DoseRow(dose = dose, onTake = onTake, onSkip = onSkip)
                     if (index != doses.lastIndex) {
                         HorizontalDivider(
-                            modifier = Modifier.padding(start = 66.dp),
+                            modifier = Modifier.padding(start = 74.dp),
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
                         )
                     }
@@ -885,43 +1169,134 @@ private fun TimeGroupCard(
 }
 
 @Composable
+private fun SegmentStatusChip(allDone: Boolean, anyDone: Boolean) {
+    val label: String
+    val container: Color
+    val content: Color
+    when {
+        allDone -> {
+            label = "All completed"
+            container = MaterialTheme.colorScheme.tertiaryContainer
+            content = MaterialTheme.colorScheme.onTertiaryContainer
+        }
+        anyDone -> {
+            label = "In progress"
+            container = MaterialTheme.colorScheme.primaryContainer
+            content = MaterialTheme.colorScheme.onPrimaryContainer
+        }
+        else -> {
+            label = "Upcoming"
+            container = MaterialTheme.colorScheme.surfaceContainerHigh
+            content = MaterialTheme.colorScheme.onSurfaceVariant
+        }
+    }
+    Surface(shape = RoundedCornerShape(50), color = container, contentColor = content) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(content)
+            )
+            Spacer(Modifier.width(5.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun StrengthPill(text: String) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+        )
+    }
+}
+
+@Composable
 private fun DoseRow(
     dose: TodayDose,
     onTake: (TodayDose) -> Unit,
     onSkip: (TodayDose) -> Unit
 ) {
     val completed = dose.status != DoseStatus.PENDING
+    val accent = when (dose.status) {
+        DoseStatus.TAKEN -> MaterialTheme.colorScheme.tertiary
+        DoseStatus.SKIPPED -> MaterialTheme.colorScheme.outline
+        DoseStatus.MISSED -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.primary
+    }
+    val pill = listOf(dose.medicine.strength, dose.schedule.doseLabel)
+        .filter { it.isNotBlank() }
+        .joinToString(" \u00b7 ")
+    val instruction = com.medremind.app.data.IntakeInstruction
+        .label(dose.medicine.intakeInstruction)
+        .ifBlank { schedulePatternLabel(dose.schedule) }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 6.dp, vertical = 10.dp),
+            .padding(horizontal = 4.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        Box(
+            modifier = Modifier
+                .width(4.dp)
+                .height(46.dp)
+                .clip(RoundedCornerShape(50))
+                .background(accent)
+        )
+        Spacer(Modifier.width(10.dp))
         MedAvatar(
             name = dose.medicine.name,
             photoPath = dose.medicine.photoPath,
-            size = 46.dp,
+            size = 44.dp,
             accent = medicineAccent(dose.medicine.id)
         )
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = dose.medicine.name,
-                style = MaterialTheme.typography.titleMedium,
-                textDecoration = if (completed) TextDecoration.LineThrough else null,
-                color = if (completed) MaterialTheme.colorScheme.onSurfaceVariant
-                else MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = doseSubtitle(dose),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = dose.medicine.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    textDecoration = if (completed) TextDecoration.LineThrough else null,
+                    color = if (completed) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (pill.isNotBlank()) {
+                    Spacer(Modifier.width(6.dp))
+                    StrengthPill(pill)
+                }
+            }
+            if (instruction.isNotBlank()) {
+                Text(
+                    text = instruction,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
         }
         Spacer(Modifier.width(8.dp))
         if (completed) {
-            StatusChip(status = dose.status)
+            RoundStatusIcon(status = dose.status)
         } else {
             DoseActionButton(
                 text = "Take",
@@ -939,6 +1314,26 @@ private fun DoseRow(
                 onClick = { onSkip(dose) }
             )
         }
+    }
+}
+
+@Composable
+private fun RoundStatusIcon(status: String) {
+    val tint = statusTint(status)
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(tint.copy(alpha = 0.14f))
+            .border(1.dp, tint.copy(alpha = 0.4f), CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = statusIcon(status),
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(19.dp)
+        )
     }
 }
 

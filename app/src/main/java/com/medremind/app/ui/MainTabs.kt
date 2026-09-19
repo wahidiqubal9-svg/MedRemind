@@ -151,6 +151,7 @@ fun MainTabs(
                     onAdd = onAdd,
                     onOpenMe = onOpenMe,
                     profilePhoto = settings.profilePhoto,
+                    greetingName = settings.profileName,
                     snackbarHostState = snackbarHostState
                 )
                 1 -> MedContent(
