@@ -1,6 +1,11 @@
 package com.medremind.app.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Medication
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Medication
@@ -32,7 +38,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -108,8 +117,12 @@ fun MedContent(
         return
     }
 
+    var menuMedicine by remember { mutableStateOf<Medicine?>(null) }
+    var pendingDelete by remember { mutableStateOf<Medicine?>(null) }
+
+    Box(modifier = modifier.fillMaxSize()) {
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
@@ -142,9 +155,183 @@ fun MedContent(
                 medicine = medicine,
                 schedules = schedulesByMedicine[medicine.id].orEmpty(),
                 onClick = { onEdit(medicine) },
-                onEdit = { onEdit(medicine) },
-                onDelete = { onDelete(medicine) },
+                onOpenMenu = { menuMedicine = medicine },
                 modifier = Modifier.animateItem()
+            )
+        }
+    }
+
+    MedicineActionOverlay(
+        medicine = menuMedicine,
+        subtitle = menuMedicine?.let {
+            doseLine(it, schedulesByMedicine[it.id].orEmpty())
+        } ?: "",
+        onEdit = {
+            val med = menuMedicine
+            menuMedicine = null
+            if (med != null) onEdit(med)
+        },
+        onDelete = {
+            val med = menuMedicine
+            menuMedicine = null
+            if (med != null) pendingDelete = med
+        },
+        onDismiss = { menuMedicine = null }
+    )
+    }
+
+    val toDelete = pendingDelete
+    if (toDelete != null) {
+        MedConfirmDialog(
+            title = "Delete medicine?",
+            message = "\"${toDelete.name}\" and all of its schedules will be permanently removed. This cannot be undone.",
+            onConfirm = {
+                pendingDelete = null
+                onDelete(toDelete)
+            },
+            onDismiss = { pendingDelete = null }
+        )
+    }
+}
+
+@Composable
+private fun MedicineActionOverlay(
+    medicine: Medicine?,
+    subtitle: String,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val shown = remember { mutableStateOf<Medicine?>(null) }
+    val shownSubtitle = remember { mutableStateOf("") }
+    LaunchedEffect(medicine, subtitle) {
+        if (medicine != null) {
+            shown.value = medicine
+            shownSubtitle.value = subtitle
+        }
+    }
+
+    val visible = medicine != null
+    val scale by animateFloatAsState(
+        targetValue = if (visible) 1f else 0.86f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+        label = "menuScale"
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = motionTween(MedMotion.Fast),
+        label = "menuAlpha"
+    )
+    if (!visible && alpha <= 0.01f) return
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.45f * alpha))
+                .clickable { onDismiss() }
+        )
+        val med = shown.value
+        if (med != null) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(28.dp)
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        this.alpha = alpha
+                    },
+                shape = MaterialTheme.shapes.extraLarge,
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = MedElevation.sheet
+            ) {
+                Column(modifier = Modifier.padding(22.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        MedIconSquare(
+                            label = med.name,
+                            seed = med.id,
+                            size = 56.dp,
+                            photoPath = med.photoPath
+                        )
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                med.name,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                            Text(
+                                shownSubtitle.value.ifBlank { "\u2014" },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(18.dp))
+                    MenuActionRow(
+                        icon = Icons.Rounded.Edit,
+                        label = "Edit medicine",
+                        onClick = onEdit
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    MenuActionRow(
+                        icon = Icons.Rounded.DeleteOutline,
+                        label = "Delete medicine",
+                        destructive = true,
+                        onClick = onDelete
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MenuActionRow(
+    icon: ImageVector,
+    label: String,
+    destructive: Boolean = false,
+    onClick: () -> Unit
+) {
+    val haptics = rememberMedHaptics()
+    Surface(
+        onClick = {
+            if (destructive) haptics.reject() else haptics.tap()
+            onClick()
+        },
+        shape = RoundedCornerShape(18.dp),
+        color = if (destructive) MaterialTheme.colorScheme.errorContainer
+        else MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = if (destructive) MaterialTheme.colorScheme.onErrorContainer
+        else MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(14.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                Icons.Rounded.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
             )
         }
     }
@@ -155,16 +342,17 @@ private fun MedicineCard(
     medicine: Medicine,
     schedules: List<Schedule>,
     onClick: () -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
+    onOpenMenu: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val accent = medicineAccent(medicine.id)
-    var actionsExpanded by remember { mutableStateOf(false) }
-    var showDelete by remember { mutableStateOf(false) }
+    val haptics = rememberMedHaptics()
 
     Surface(
-        onClick = onClick,
+        onClick = {
+            haptics.tap()
+            onClick()
+        },
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surface,
@@ -195,18 +383,23 @@ private fun MedicineCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                InlineMedicineActions(
-                    expanded = actionsExpanded,
-                    onToggle = { actionsExpanded = !actionsExpanded },
-                    onEdit = {
-                        actionsExpanded = false
-                        onEdit()
+                Surface(
+                    onClick = {
+                        haptics.tap()
+                        onOpenMenu()
                     },
-                    onDelete = {
-                        actionsExpanded = false
-                        showDelete = true
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                ) {
+                    Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.MoreVert,
+                            contentDescription = "More options",
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
-                )
+                }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -254,18 +447,6 @@ private fun MedicineCard(
             }
         }
     }
-
-    if (showDelete) {
-        MedConfirmDialog(
-            title = "Delete medicine?",
-            message = "\"${medicine.name}\" and all of its schedules will be permanently removed. This cannot be undone.",
-            onConfirm = {
-                showDelete = false
-                onDelete()
-            },
-            onDismiss = { showDelete = false }
-        )
-    }
 }
 
 @Composable
@@ -291,66 +472,6 @@ private fun TagPill(
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold
             )
-        }
-    }
-}
-
-@Composable
-private fun InlineMedicineActions(
-    expanded: Boolean,
-    onToggle: () -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        AnimatedVisibility(visible = expanded) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    onClick = onEdit,
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    contentColor = MaterialTheme.colorScheme.onSurface
-                ) {
-                    Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Rounded.Edit,
-                            contentDescription = "Edit",
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-                Spacer(Modifier.width(8.dp))
-                Surface(
-                    onClick = onDelete,
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer
-                ) {
-                    Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Rounded.DeleteOutline,
-                            contentDescription = "Delete",
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-                Spacer(Modifier.width(8.dp))
-            }
-        }
-
-        Surface(
-            onClick = onToggle,
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            contentColor = MaterialTheme.colorScheme.onSurface
-        ) {
-            Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Rounded.MoreVert,
-                    contentDescription = "More options",
-                    modifier = Modifier.size(20.dp)
-                )
-            }
         }
     }
 }

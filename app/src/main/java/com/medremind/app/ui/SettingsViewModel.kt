@@ -182,3 +182,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 }
 
 const val MAX_DISEASES = 10
+
+val commonDiseases = listOf(
+    "Diabetes", "High blood pressure", "High cholesterol", "Asthma", "COPD",
+    "Heart disease", "Stroke", "Thyroid disorder", "Arthritis", "Osteoporosis",
+    "Depression", "Anxiety", "Epilepsy", "Migraine", "Kidney disease",
+    "Liver disease", "Anemia", "Sleep apnea", "Obesity", "Acid reflux (GERD)",
+    "Peptic ulcer", "Irritable bowel syndrome", "Crohn's disease",
+    "Ulcerative colitis", "Celiac disease", "Psoriasis", "Eczema", "Glaucoma",
+    "Cataract", "Cancer", "Tuberculosis", "HIV/AIDS", "Dementia", "Parkinson's disease",
+    "Pregnancy", "Allergy", "Osteoarthritis"
+)

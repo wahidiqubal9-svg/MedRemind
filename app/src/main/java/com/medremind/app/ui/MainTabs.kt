@@ -87,17 +87,6 @@ private val navSpecs = listOf(
     NavSpec("Health", R.drawable.ic_nav_health)
 )
 
-private val commonDiseases = listOf(
-    "Diabetes", "High blood pressure", "High cholesterol", "Asthma", "COPD",
-    "Heart disease", "Stroke", "Thyroid disorder", "Arthritis", "Osteoporosis",
-    "Depression", "Anxiety", "Epilepsy", "Migraine", "Kidney disease",
-    "Liver disease", "Anemia", "Asthma (exercise-induced)", "Sleep apnea", "Obesity",
-    "Acid reflux (GERD)", "Peptic ulcer", "Irritable bowel syndrome", "Crohn's disease",
-    "Ulcerative colitis", "Celiac disease", "Psoriasis", "Eczema", "Glaucoma",
-    "Cataract", "Cancer", "Tuberculosis", "HIV/AIDS", "Dementia", "Parkinson's disease",
-    "Pregnancy", "Allergy", "Osteoarthritis"
-)
-
 @Composable
 fun MainTabs(
     tab: Int,
@@ -300,9 +289,6 @@ private fun HealthScreen(
     vm: MedicineViewModel,
     onOpenMe: () -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val selected = settings.profileDiseases
-    val atMax = selected.size >= MAX_DISEASES
     val metrics by vm.metrics.collectAsState()
     var showAddMetric by remember { mutableStateOf(false) }
 
@@ -321,97 +307,6 @@ private fun HealthScreen(
                 onClick = onOpenMe,
                 photoPath = settings.profilePhoto
             )
-        }
-
-        MedCard(modifier = Modifier.fillMaxWidth()) {
-            Text("Your conditions", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Add the conditions you have (up to $MAX_DISEASES).",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(12.dp))
-
-            Box {
-                OutlinedButton(
-                    onClick = { expanded = true },
-                    enabled = !atMax,
-                    shape = RoundedCornerShape(50)
-                ) {
-                    Icon(
-                        Icons.Rounded.Add,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Add disease")
-                }
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
-                ) {
-                    commonDiseases.forEach { disease ->
-                        val already = selected.contains(disease)
-                        DropdownMenuItem(
-                            text = { Text(disease) },
-                            enabled = !already,
-                            onClick = {
-                                settings.addDisease(disease)
-                                expanded = false
-                            }
-                        )
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            if (selected.isEmpty()) {
-                Text(
-                    "No conditions added yet.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    selected.forEach { disease ->
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(start = 16.dp, end = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = disease,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                IconButton(onClick = { settings.removeDisease(disease) }) {
-                                    Icon(
-                                        Icons.Rounded.Close,
-                                        contentDescription = "Remove $disease",
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (atMax) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Maximum of $MAX_DISEASES conditions reached.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
         }
 
         MedCard(modifier = Modifier.fillMaxWidth()) {
@@ -445,6 +340,64 @@ private fun HealthScreen(
                     }
                 }
             }
+        }
+
+        val bpReadings = metrics.filter { it.type == MetricType.BP }.sortedBy { it.recordedAt }
+        if (bpReadings.isNotEmpty()) {
+            MetricChartCard(
+                title = "Blood pressure",
+                currentText = "${bpReadings.last().value.toInt()}/${bpReadings.last().value2.toInt()} mmHg",
+                series = listOf(
+                    ChartSeries(
+                        values = bpReadings.map { it.value },
+                        color = MaterialTheme.colorScheme.primary,
+                        label = "Systolic",
+                        low = 90f,
+                        high = 130f
+                    ),
+                    ChartSeries(
+                        values = bpReadings.map { it.value2 },
+                        color = MaterialTheme.colorScheme.tertiary,
+                        label = "Diastolic",
+                        low = 60f,
+                        high = 85f
+                    )
+                )
+            )
+        }
+
+        val glucoseReadings = metrics.filter { it.type == MetricType.GLUCOSE }
+            .sortedBy { it.recordedAt }
+        if (glucoseReadings.isNotEmpty()) {
+            MetricChartCard(
+                title = "Blood sugar",
+                currentText = "${glucoseReadings.last().value.toInt()} mg/dL",
+                series = listOf(
+                    ChartSeries(
+                        values = glucoseReadings.map { it.value },
+                        color = MaterialTheme.colorScheme.tertiary,
+                        label = "Glucose",
+                        low = 70f,
+                        high = 140f
+                    )
+                )
+            )
+        }
+
+        val weightReadings = metrics.filter { it.type == MetricType.WEIGHT }
+            .sortedBy { it.recordedAt }
+        if (weightReadings.isNotEmpty()) {
+            MetricChartCard(
+                title = "Weight",
+                currentText = formatMetric(weightReadings.last()) ,
+                series = listOf(
+                    ChartSeries(
+                        values = weightReadings.map { it.value },
+                        color = MaterialTheme.colorScheme.secondary,
+                        label = "Weight"
+                    )
+                )
+            )
         }
     }
 

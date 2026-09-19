@@ -27,10 +27,15 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -392,27 +397,77 @@ private fun ProfileForm(
             number = true
         )
 
-        if (settings.profileDiseases.isNotEmpty()) {
-            Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(16.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "Conditions (managed in the Health tab)",
+                text = "Conditions",
                 style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "${settings.profileDiseases.size}/$MAX_DISEASES",
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+        Spacer(Modifier.height(8.dp))
+        var showDiseaseMenu by remember { mutableStateOf(false) }
+        Box {
+            OutlinedButton(
+                onClick = { showDiseaseMenu = true },
+                enabled = settings.profileDiseases.size < MAX_DISEASES,
+                shape = RoundedCornerShape(50)
+            ) {
+                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Add condition")
+            }
+            DropdownMenu(
+                expanded = showDiseaseMenu,
+                onDismissRequest = { showDiseaseMenu = false }
+            ) {
+                commonDiseases.forEach { disease ->
+                    val already = settings.profileDiseases.contains(disease)
+                    DropdownMenuItem(
+                        text = { Text(disease) },
+                        enabled = !already,
+                        onClick = {
+                            settings.addDisease(disease)
+                            showDiseaseMenu = false
+                        }
+                    )
+                }
+            }
+        }
+        if (settings.profileDiseases.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 settings.profileDiseases.forEach { disease ->
                     Surface(
                         shape = RoundedCornerShape(50),
                         color = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            text = disease,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        )
+                        Row(
+                            modifier = Modifier.padding(start = 16.dp, end = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = disease,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(onClick = { settings.removeDisease(disease) }) {
+                                Icon(
+                                    Icons.Rounded.Close,
+                                    contentDescription = "Remove $disease",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }

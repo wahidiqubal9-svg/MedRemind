@@ -20,11 +20,13 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -85,6 +87,23 @@ fun HistoryContent(
     val due = taken + missed + skipped
     val percent = if (due == 0) 0 else taken * 100 / due
 
+    fun shareReport(mime: String, chooserTitle: String, build: () -> File) {
+        scope.launch {
+            val file = withContext(Dispatchers.IO) { build() }
+            val uri = FileProvider.getUriForFile(
+                context,
+                context.packageName + ".fileprovider",
+                file
+            )
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = mime
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(intent, chooserTitle))
+        }
+    }
+
     val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
     val grouped = remember(log) {
         val map = linkedMapOf<String, MutableList<DoseLogEntry>>()
@@ -101,32 +120,6 @@ fun HistoryContent(
     ) {
         item(key = "progress_header") {
             ScreenHeader("Progress") {
-                IconButton(
-                    onClick = {
-                        if (log.isNotEmpty()) scope.launch {
-                            val file = withContext(Dispatchers.IO) {
-                                ReportExporter.exportCsv(context, log)
-                            }
-                            val uri = FileProvider.getUriForFile(
-                                context,
-                                context.packageName + ".fileprovider",
-                                file
-                            )
-                            val share = Intent(Intent.ACTION_SEND).apply {
-                                type = "text/csv"
-                                putExtra(Intent.EXTRA_STREAM, uri)
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-                            context.startActivity(Intent.createChooser(share, "Share report"))
-                        }
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Share,
-                        contentDescription = "Export report",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
                 SquareIconButton(
                     icon = Icons.Rounded.Person,
                     contentDescription = "Me",
@@ -184,6 +177,22 @@ fun HistoryContent(
                     tint = statusTint(DoseStatus.SKIPPED)
                 )
             }
+        }
+
+        item(key = "export") {
+            ExportCard(
+                enabled = log.isNotEmpty(),
+                onCsv = {
+                    shareReport("text/csv", "Share CSV report") {
+                        ReportExporter.exportCsv(context, log)
+                    }
+                },
+                onPdf = {
+                    shareReport("application/pdf", "Share PDF report") {
+                        ReportExporter.exportPdf(context, log, rangeDays)
+                    }
+                }
+            )
         }
 
         if (log.isEmpty()) {
@@ -353,6 +362,72 @@ private fun DoseLogRow(
                 )
             }
             StatusChip(status = entry.status)
+        }
+    }
+}
+
+@Composable
+private fun ExportCard(
+    enabled: Boolean,
+    onCsv: () -> Unit,
+    onPdf: () -> Unit
+) {
+    MedCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MedGradients.heroHorizontal()),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.FileDownload,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Export data", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Share your adherence report as CSV or PDF.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedButton(
+                onClick = onCsv,
+                enabled = enabled,
+                shape = RoundedCornerShape(50),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    Icons.Rounded.Description,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text("CSV")
+            }
+            OutlinedButton(
+                onClick = onPdf,
+                enabled = enabled,
+                shape = RoundedCornerShape(50),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    Icons.Rounded.PictureAsPdf,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text("PDF")
+            }
         }
     }
 }
