@@ -145,8 +145,8 @@ fun MedContent(
                     context.packageName + ".fileprovider",
                     file
                 )
-                val text = LabelScanner.recognize(context, uri)
-                onScanLabel(LabelScanner.parse(text))
+                val ocr = LabelScanner.recognize(context, uri)
+                onScanLabel(LabelScanner.parse(ocr))
             }
         }
     }
@@ -244,38 +244,15 @@ fun MedContent(
                 }
             }
             item(key = "quick_actions") {
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    QuickActionCard(
-                        icon = Icons.Rounded.Add,
-                        title = "Add new",
-                        subtitle = "Prescription / OTC",
-                        container = MaterialTheme.colorScheme.primaryContainer,
-                        content = MaterialTheme.colorScheme.onPrimaryContainer,
-                        onClick = onAdd,
-                        modifier = Modifier.width(168.dp)
-                    )
-                    QuickActionCard(
-                        icon = Icons.Rounded.CameraAlt,
-                        title = "Scan barcode",
-                        subtitle = "Prefill Rx number",
-                        container = MaterialTheme.colorScheme.secondaryContainer,
-                        content = MaterialTheme.colorScheme.onSecondaryContainer,
-                        onClick = { startScan() },
-                        modifier = Modifier.width(168.dp)
-                    )
-                    QuickActionCard(
-                        icon = Icons.Rounded.PhotoCamera,
-                        title = "Scan label",
-                        subtitle = "OCR pack details",
-                        container = MaterialTheme.colorScheme.tertiaryContainer,
-                        content = MaterialTheme.colorScheme.onTertiaryContainer,
-                        onClick = { startLabelScan() },
-                        modifier = Modifier.width(168.dp)
-                    )
-                }
+                QuickActionCard(
+                    icon = Icons.Rounded.PhotoCamera,
+                    title = "Scan label",
+                    subtitle = "Read name, dose, batch & expiry with the camera",
+                    container = MaterialTheme.colorScheme.tertiaryContainer,
+                    content = MaterialTheme.colorScheme.onTertiaryContainer,
+                    onClick = { startLabelScan() },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
             items(filteredMedicines, key = { it.id }) { medicine ->
                 MedicineCard(

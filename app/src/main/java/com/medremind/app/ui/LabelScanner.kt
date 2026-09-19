@@ -10,6 +10,10 @@ import java.util.Calendar
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
 
+data class OcrLine(val text: String, val top: Int, val height: Int)
+
+data class OcrResult(val text: String = "", val lines: List<OcrLine> = emptyList())
+
 data class ScannedLabel(
     val name: String = "",
     val strength: String = "",
@@ -27,30 +31,49 @@ data class ScannedLabel(
  */
 object LabelScanner {
 
-    suspend fun recognize(context: Context, uri: Uri): String =
+    private val strengthRegex =
+        Regex("(\\d+(?:\\.\\d+)?)\\s*(MG|MCG|G|ML|IU|%)", RegexOption.IGNORE_CASE)
+
+    suspend fun recognize(context: Context, uri: Uri): OcrResult =
         suspendCancellableCoroutine { cont ->
             val image = runCatching { InputImage.fromFilePath(context, uri) }.getOrNull()
             if (image == null) {
-                cont.resume("")
+                cont.resume(OcrResult())
                 return@suspendCancellableCoroutine
             }
             val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
             recognizer.process(image)
                 .addOnSuccessListener { result ->
                     recognizer.close()
-                    cont.resume(result.text)
+                    val lines = mutableListOf<OcrLine>()
+                    result.textBlocks.forEach { block ->
+                        block.lines.forEach { line ->
+                            val box = line.boundingBox
+                            lines.add(
+                                OcrLine(
+                                    text = line.text.trim(),
+                                    top = box?.top ?: 0,
+                                    height = box?.height() ?: 0
+                                )
+                            )
+                        }
+                    }
+                    cont.resume(OcrResult(result.text, lines))
                 }
                 .addOnFailureListener {
                     recognizer.close()
-                    cont.resume("")
+                    cont.resume(OcrResult())
                 }
         }
 
-    fun parse(text: String): ScannedLabel {
-        val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
-        if (lines.isEmpty()) return ScannedLabel(rawText = text)
+    fun parse(result: OcrResult): ScannedLabel {
+        val lines = if (result.lines.isNotEmpty()) {
+            result.lines.map { it.text }.filter { it.isNotEmpty() }
+        } else {
+            result.text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        }
+        if (lines.isEmpty()) return ScannedLabel(rawText = result.text)
 
-        val strengthRegex = Regex("(\\d+(?:\\.\\d+)?)\\s*(MG|MCG|G|ML|IU|%)", RegexOption.IGNORE_CASE)
         val strengthMatch = lines.asSequence().mapNotNull { strengthRegex.find(it) }.firstOrNull()
         val strength = strengthMatch?.let {
             "${it.groupValues[1]} ${it.groupValues[2].lowercase()}"
@@ -92,18 +115,7 @@ object LabelScanner {
             .firstOrNull()
         val expiry = parseExpiry(expiryRaw)
 
-        val keywords = listOf(
-            "BATCH", "LOT", "EXP", "MFG", "MADE", "STORE", "KEEP", "DOSAGE",
-            "DIRECTIONS", "WARNING", "PRESCRIPTION", "SCHEDULE", "ADDRESS",
-            "PHONE", "MRP", "PACK", "TABLET", "CAPSULE", "NET", "CONTENT"
-        )
-        val name = lines.filter { line ->
-            val alphabetic = line.count { it.isLetter() || it.isWhitespace() }
-            alphabetic >= line.length * 0.7 &&
-                line.any { it.isLetter() } &&
-                line.length in 3..40 &&
-                keywords.none { line.uppercase().contains(it) }
-        }.maxByOrNull { it.length } ?: ""
+        val name = extractName(result)
 
         return ScannedLabel(
             name = name,
@@ -112,8 +124,52 @@ object LabelScanner {
             packSize = packSize,
             batchNumber = batch,
             expiryDate = expiry,
-            rawText = text
+            rawText = result.text
         )
+    }
+
+    private val nameKeywords = listOf(
+        "BATCH", "LOT ", "LOT#", "EXP", "MFG", "MADE", "STORE", "KEEP", "DOSAGE",
+        "DIRECTIONS", "WARNING", "PRESCRIPTION", "SCHEDULE", "ADDRESS", "PHONE",
+        "MRP", "PACK", "TABLET", "CAPSULE", "SOFTGEL", "SYRUP", "INJECTION",
+        "MEDICINE", "GENERIC", "NET ", "CONTENT", "COMPOSITION", "STORAGE",
+        "DOSE", "STRIP", "BLISTER", "PHARMA", "LABS", "LABORATOR", "LTD", "PVT",
+        "LIMITED", "MANUFACTUR", "MARKET", "IMPORT", "EXPORT", "USP", "IP ",
+        "TAKE", "ONCE", "DAILY", "BEFORE", "AFTER", "FOOD", "MEAL", "WATER",
+        "TABLETS", "CAPSULES", "MG ", " ML", "MCG", "MMHG"
+    )
+
+    private fun extractName(result: OcrResult): String {
+        val candidates = if (result.lines.isNotEmpty()) {
+            result.lines
+        } else {
+            result.text.lines().mapIndexed { index, s ->
+                OcrLine(s.trim(), top = index, height = 1)
+            }
+        }.filter { it.text.isNotEmpty() }
+
+        val scored = candidates.filter { line ->
+            val t = line.text.trim()
+            val letters = t.count { it.isLetter() }
+            val digits = t.count { it.isDigit() }
+            val upper = t.uppercase()
+            letters >= 3 &&
+                t.length in 3..42 &&
+                digits <= letters &&
+                !t.contains('@') &&
+                !upper.contains("WWW") &&
+                nameKeywords.none { kw -> upper.contains(kw.trim()) }
+        }
+
+        val best = scored.maxWithOrNull(
+            compareBy({ it.height }, { -it.top })
+        )?.text?.trim() ?: scored.firstOrNull()?.text?.trim() ?: ""
+
+        return best
+            .replace(strengthRegex, "")
+            .trim()
+            .trim('-', ':', '|', ',', '*')
+            .trim()
     }
 
     fun parseExpiry(raw: String?): Long? {
