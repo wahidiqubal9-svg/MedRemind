@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -46,8 +47,12 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Medication
+import androidx.compose.material.icons.rounded.NoMeals
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PhotoLibrary
+import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material.icons.rounded.Restaurant
+import androidx.compose.material.icons.rounded.RestaurantMenu
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
@@ -78,6 +83,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -88,6 +94,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
+import com.medremind.app.data.IntakeInstruction
 import com.medremind.app.data.Medicine
 import com.medremind.app.data.PhotoStorage
 import com.medremind.app.data.Schedule
@@ -166,6 +173,7 @@ fun AddEditMedicineScreen(
     var refillBelow by rememberSaveable {
         mutableStateOf((initial?.refillThreshold ?: 0).takeIf { it > 0 }?.toString() ?: "")
     }
+    var intake by rememberSaveable { mutableStateOf(initial?.intakeInstruction ?: "") }
 
     var timesCount by remember { mutableIntStateOf(2) }
     var isCustomCount by remember { mutableStateOf(false) }
@@ -235,6 +243,7 @@ fun AddEditMedicineScreen(
                 trackRefill = false
                 stockAmount = ""
                 refillBelow = ""
+                intake = ""
                 timesCount = 2
                 isCustomCount = false
                 asNeeded = false
@@ -318,13 +327,7 @@ fun AddEditMedicineScreen(
                         qtyUnit = qtyUnit,
                         photoPath = photoPath,
                         onPhotoClick = { showPhotoSheet = true },
-                        onOpenUnit = { target -> unitTarget = target },
-                        trackRefill = trackRefill,
-                        onTrackRefill = { trackRefill = it },
-                        stockAmount = stockAmount,
-                        onStockAmount = { stockAmount = it },
-                        refillBelow = refillBelow,
-                        onRefillBelow = { refillBelow = it }
+                        onOpenUnit = { target -> unitTarget = target }
                     )
                     1 -> ScheduleStep(
                         asNeeded = asNeeded,
@@ -359,7 +362,15 @@ fun AddEditMedicineScreen(
                         daysLabel = if (asNeeded) "As needed"
                         else if (specificDaysOnly) daysLabel(daysMask) else "Every day",
                         durationLabel = if (asNeeded) "Ongoing"
-                        else if (durationDays == 0) "Continue" else "$durationDays days"
+                        else if (durationDays == 0) "Continue" else "$durationDays days",
+                        intake = intake,
+                        onIntake = { intake = it },
+                        trackRefill = trackRefill,
+                        onTrackRefill = { trackRefill = it },
+                        stockAmount = stockAmount,
+                        onStockAmount = { stockAmount = it },
+                        refillBelow = refillBelow,
+                        onRefillBelow = { refillBelow = it }
                     )
                         }
                     }
@@ -430,7 +441,8 @@ fun AddEditMedicineScreen(
                                     quantity = if (trackRefill) (stockAmount.toIntOrNull() ?: 0) else 0,
                                     refillThreshold = if (trackRefill) {
                                         refillBelow.toIntOrNull() ?: 0
-                                    } else 0
+                                    } else 0,
+                                    intakeInstruction = intake
                                 )
                                 vm.saveMedicine(medicine, listOf(schedule)) { saved = true }
                             }
@@ -505,13 +517,7 @@ private fun DetailsStep(
     qtyUnit: String,
     photoPath: String?,
     onPhotoClick: () -> Unit,
-    onOpenUnit: (Int) -> Unit,
-    trackRefill: Boolean,
-    onTrackRefill: (Boolean) -> Unit,
-    stockAmount: String,
-    onStockAmount: (String) -> Unit,
-    refillBelow: String,
-    onRefillBelow: (String) -> Unit
+    onOpenUnit: (Int) -> Unit
 ) {
     Text(
         "Add medicine",
@@ -580,58 +586,84 @@ private fun DetailsStep(
     Spacer(Modifier.height(16.dp))
     FieldLabel("How many at each time?")
     Row(verticalAlignment = Alignment.CenterVertically) {
-        OutlinedTextField(
+        QuantityStepper(
             value = qtyAmount,
-            onValueChange = { onQtyAmount(it.filter { c -> c.isDigit() || c == '.' }) },
-            placeholder = { Text("1") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            onValueChange = onQtyAmount,
             modifier = Modifier.weight(1f)
         )
         Spacer(Modifier.width(10.dp))
         UnitButton(value = qtyUnit, onClick = { onOpenUnit(1) })
     }
+}
 
-    Spacer(Modifier.height(20.dp))
+@Composable
+private fun QuantityStepper(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptics = rememberMedHaptics()
+    val current = value.toIntOrNull() ?: 1
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outline
+        )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Track refills", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Count pills and remind me when supply is low.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            StepperButton(
+                icon = Icons.Rounded.Remove,
+                enabled = current > 1,
+                onClick = {
+                    haptics.tick()
+                    onValueChange((current - 1).coerceAtLeast(1).toString())
                 }
-                Switch(checked = trackRefill, onCheckedChange = onTrackRefill)
-            }
-            if (trackRefill) {
-                Spacer(Modifier.height(14.dp))
-                FieldLabel("Pills remaining")
-                OutlinedTextField(
-                    value = stockAmount,
-                    onValueChange = { onStockAmount(it.filter { c -> c.isDigit() }.take(6)) },
-                    placeholder = { Text("30") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(12.dp))
-                FieldLabel("Remind me when below")
-                OutlinedTextField(
-                    value = refillBelow,
-                    onValueChange = { onRefillBelow(it.filter { c -> c.isDigit() }.take(6)) },
-                    placeholder = { Text("5") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+            )
+            Text(
+                text = current.toString(),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.weight(1f)
+            )
+            StepperButton(
+                icon = Icons.Rounded.Add,
+                enabled = current < 30,
+                onClick = {
+                    haptics.tick()
+                    onValueChange((current + 1).coerceAtMost(30).toString())
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun StepperButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        shape = CircleShape,
+        color = if (enabled) MaterialTheme.colorScheme.primaryContainer
+        else MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = if (enabled) MaterialTheme.colorScheme.onPrimaryContainer
+        else MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.size(44.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -973,7 +1005,15 @@ private fun ReviewStep(
     onEdit: () -> Unit,
     timeLabel: String,
     daysLabel: String,
-    durationLabel: String
+    durationLabel: String,
+    intake: String,
+    onIntake: (String) -> Unit,
+    trackRefill: Boolean,
+    onTrackRefill: (Boolean) -> Unit,
+    stockAmount: String,
+    onStockAmount: (String) -> Unit,
+    refillBelow: String,
+    onRefillBelow: (String) -> Unit
 ) {
     Text(
         "Check the details",
@@ -1029,6 +1069,67 @@ private fun ReviewStep(
         ReviewRow(Icons.Rounded.Schedule, "Duration", durationLabel)
     }
 
+    Spacer(Modifier.height(16.dp))
+    Text("Intake instructions", style = MaterialTheme.typography.titleMedium)
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "How should this medicine be taken?",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    Spacer(Modifier.height(10.dp))
+    val intakeOptions = listOf(
+        Triple(IntakeInstruction.BEFORE_MEAL, "Before meal", Icons.Rounded.Schedule),
+        Triple(IntakeInstruction.WITH_MEAL, "With food", Icons.Rounded.Restaurant),
+        Triple(IntakeInstruction.AFTER_MEAL, "After meal", Icons.Rounded.RestaurantMenu),
+        Triple(IntakeInstruction.EMPTY_STOMACH, "Empty stomach", Icons.Rounded.NoMeals)
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        intakeOptions.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                row.forEach { (value, label, icon) ->
+                    IntakeOptionCard(
+                        label = label,
+                        icon = icon,
+                        selected = intake == value,
+                        onClick = { onIntake(if (intake == value) "" else value) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+
+    Spacer(Modifier.height(16.dp))
+    MedCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Inventory & refill", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Count pills and get a low-supply reminder.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = trackRefill,
+                onCheckedChange = { checked ->
+                    onTrackRefill(checked)
+                    if (checked && stockAmount.isBlank()) onStockAmount("30")
+                    if (checked && refillBelow.isBlank()) onRefillBelow("5")
+                }
+            )
+        }
+        if (trackRefill) {
+            Spacer(Modifier.height(14.dp))
+            FieldLabel("Pills remaining")
+            QuantityStepper(value = stockAmount, onValueChange = onStockAmount)
+            Spacer(Modifier.height(12.dp))
+            FieldLabel("Remind me when below")
+            QuantityStepper(value = refillBelow, onValueChange = onRefillBelow)
+        }
+    }
+
     Spacer(Modifier.height(14.dp))
     OutlinedButton(
         onClick = onEdit,
@@ -1038,6 +1139,107 @@ private fun ReviewStep(
         Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
         Text("Edit details")
+    }
+}
+
+@Composable
+private fun IntakeOptionCard(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptics = rememberMedHaptics()
+    val bg by androidx.compose.animation.animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer
+        else MaterialTheme.colorScheme.surface,
+        label = "intakeBg"
+    )
+    Surface(
+        onClick = {
+            haptics.tap()
+            onClick()
+        },
+        modifier = modifier,
+        shape = RoundedCornerShape(22.dp),
+        color = bg,
+        border = androidx.compose.foundation.BorderStroke(
+            if (selected) 1.6.dp else 1.dp,
+            if (selected) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.outlineVariant
+        ),
+        shadowElevation = if (selected) MedElevation.card else 0.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 14.dp, horizontal = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            MealMascot(icon = icon, selected = selected)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+private fun MealMascot(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    selected: Boolean
+) {
+    val accent = if (selected) MaterialTheme.colorScheme.primary
+    else MaterialTheme.colorScheme.onSurfaceVariant
+    val face = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+    else MaterialTheme.colorScheme.onSurface
+    Box(modifier = Modifier.size(60.dp), contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.size(56.dp)) {
+            val w = size.width
+            val h = size.height
+            // Capsule body.
+            drawRoundRect(
+                color = accent,
+                topLeft = Offset(w * 0.08f, h * 0.26f),
+                size = androidx.compose.ui.geometry.Size(w * 0.84f, h * 0.44f),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(h * 0.22f, h * 0.22f)
+            )
+            // Eyes.
+            drawCircle(face, radius = w * 0.045f, center = Offset(w * 0.36f, h * 0.46f))
+            drawCircle(face, radius = w * 0.045f, center = Offset(w * 0.64f, h * 0.46f))
+            // Smile.
+            drawArc(
+                color = face,
+                startAngle = 20f,
+                sweepAngle = 140f,
+                useCenter = false,
+                topLeft = Offset(w * 0.40f, h * 0.40f),
+                size = androidx.compose.ui.geometry.Size(w * 0.20f, h * 0.16f),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = w * 0.03f,
+                    cap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+            )
+        }
+        Surface(
+            shape = CircleShape,
+            color = if (selected) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = if (selected) MaterialTheme.colorScheme.onPrimary
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .size(24.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(13.dp))
+            }
+        }
     }
 }
 

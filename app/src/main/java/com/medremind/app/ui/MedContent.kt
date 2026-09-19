@@ -478,7 +478,8 @@ private fun TagPill(
 
 private fun doseLine(medicine: Medicine, schedules: List<Schedule>): String {
     val doseLabel = schedules.firstNotNullOfOrNull { s -> s.doseLabel.takeIf { it.isNotBlank() } }
-    return listOf(medicine.strength, doseLabel)
+    val intake = com.medremind.app.data.IntakeInstruction.label(medicine.intakeInstruction)
+    return listOf(medicine.strength, doseLabel, intake)
         .filterNotNull()
         .filter { it.isNotBlank() }
         .joinToString(" \u00b7 ")

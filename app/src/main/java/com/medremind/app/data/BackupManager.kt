@@ -41,6 +41,7 @@ object BackupManager {
                         put("createdAt", m.createdAt)
                         put("quantity", m.quantity)
                         put("refillThreshold", m.refillThreshold)
+                        put("intakeInstruction", m.intakeInstruction)
                         put("photoName", m.photoPath?.let { File(it).name })
                     })
                 }
@@ -150,7 +151,8 @@ object BackupManager {
                     photoPath = photoName?.let { photoPaths[it] },
                     createdAt = o.optLong("createdAt", System.currentTimeMillis()),
                     quantity = o.optInt("quantity", 0),
-                    refillThreshold = o.optInt("refillThreshold", 0)
+                    refillThreshold = o.optInt("refillThreshold", 0),
+                    intakeInstruction = o.optString("intakeInstruction", "")
                 )
             )
         }

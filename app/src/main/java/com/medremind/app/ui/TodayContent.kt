@@ -980,7 +980,10 @@ private fun doseSubtitle(dose: TodayDose): String {
         ?: dose.medicine.strength.takeIf { it.isNotBlank() }
         ?: "1 dose"
     val pattern = schedulePatternLabel(dose.schedule)
-    return "$doseText  |  $pattern"
+    val intake = com.medremind.app.data.IntakeInstruction.label(dose.medicine.intakeInstruction)
+    return listOf(doseText, pattern, intake)
+        .filter { it.isNotBlank() }
+        .joinToString("  |  ")
 }
 
 private fun weekdayLetter(date: LocalDate): String =
