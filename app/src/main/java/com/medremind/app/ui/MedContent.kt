@@ -1,19 +1,13 @@
 package com.medremind.app.ui
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -35,7 +30,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Medication
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
@@ -43,12 +37,10 @@ import androidx.compose.material.icons.rounded.LocalPharmacy
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Warning
-import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -63,7 +55,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,16 +65,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
-import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
-import com.medremind.app.data.PhotoStorage
 import com.medremind.app.data.DoseStatus
-import java.io.File
-import kotlinx.coroutines.launch
 import com.medremind.app.data.Medicine
-import com.medremind.app.data.MedicineCategory
 import com.medremind.app.data.MedicineForm
 import com.medremind.app.data.Schedule
 import com.medremind.app.data.ScheduleType
@@ -101,8 +84,6 @@ fun MedContent(
     onDelete: (Medicine) -> Unit,
     onAdd: () -> Unit,
     onOpenMe: () -> Unit,
-    onScanBarcode: (String) -> Unit,
-    onScanLabel: (ScannedLabel) -> Unit,
     profilePhoto: String? = null
 ) {
     val context = LocalContext.current
@@ -111,51 +92,6 @@ fun MedContent(
     var showPharmacyDialog by remember { mutableStateOf(false) }
     var bannerDismissed by remember { mutableStateOf(false) }
     val filterOptions = listOf("All", "Daily", "Weekly", "Course")
-
-    fun scanOptions() = ScanOptions().apply {
-        setDesiredBarcodeFormats(ScanOptions.ALL_CODE_TYPES)
-        setPrompt("Point at a medicine barcode")
-        setBeepEnabled(false)
-        setOrientationLocked(false)
-    }
-
-    val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
-        result.contents?.let { onScanBarcode(it) }
-    }
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted -> if (granted) scanLauncher.launch(scanOptions()) }
-    fun startScan() {
-        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-            PackageManager.PERMISSION_GRANTED
-        if (granted) scanLauncher.launch(scanOptions())
-        else permissionLauncher.launch(Manifest.permission.CAMERA)
-    }
-
-    var pendingLabelFile by remember { mutableStateOf<File?>(null) }
-    val scope = rememberCoroutineScope()
-    val labelLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.TakePicture()
-    ) { ok ->
-        val file = pendingLabelFile
-        if (ok && file != null) {
-            scope.launch {
-                val uri = FileProvider.getUriForFile(
-                    context,
-                    context.packageName + ".fileprovider",
-                    file
-                )
-                val ocr = LabelScanner.recognize(context, uri)
-                onScanLabel(LabelScanner.parse(ocr))
-            }
-        }
-    }
-    fun startLabelScan() {
-        val file = PhotoStorage.newPhotoFile(context)
-        pendingLabelFile = file
-        val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
-        labelLauncher.launch(uri)
-    }
 
     val lowMedicines = medicines.filter { it.quantity > 0 && it.quantity <= it.refillThreshold }
     val filteredMedicines = medicines.filter { medicine ->
@@ -243,17 +179,6 @@ fun MedContent(
                     )
                 }
             }
-            item(key = "quick_actions") {
-                QuickActionCard(
-                    icon = Icons.Rounded.PhotoCamera,
-                    title = "Scan label",
-                    subtitle = "Read name, dose, batch & expiry with the camera",
-                    container = MaterialTheme.colorScheme.tertiaryContainer,
-                    content = MaterialTheme.colorScheme.onTertiaryContainer,
-                    onClick = { startLabelScan() },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
             items(filteredMedicines, key = { it.id }) { medicine ->
                 MedicineCard(
                     medicine = medicine,
@@ -299,6 +224,7 @@ private fun MedHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .statusBarsPadding()
             .padding(top = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -348,16 +274,7 @@ private fun MedicineCard(
 ) {
     val haptics = rememberMedHaptics()
     val low = medicine.quantity > 0 && medicine.quantity <= medicine.refillThreshold
-    val accent = when {
-        low -> MaterialTheme.colorScheme.error
-        medicine.category == MedicineCategory.SUPPLEMENT -> MaterialTheme.colorScheme.tertiary
-        medicine.category == MedicineCategory.OTC -> MaterialTheme.colorScheme.secondary
-        else -> MaterialTheme.colorScheme.primary
-    }
-    val icon = when (medicine.category) {
-        MedicineCategory.SUPPLEMENT -> Icons.Rounded.WbSunny
-        else -> Icons.Rounded.Medication
-    }
+    val accent = if (low) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     val pattern = schedules.firstOrNull()?.let { schedulePatternLabel(it) }.orEmpty()
     val intake = com.medremind.app.data.IntakeInstruction.label(medicine.intakeInstruction)
     val supplyStatus = when {
@@ -390,43 +307,28 @@ private fun MedicineCard(
             )
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = if (low) MaterialTheme.colorScheme.errorContainer
-                        else MaterialTheme.colorScheme.surfaceContainerHigh,
-                        contentColor = if (low) MaterialTheme.colorScheme.onErrorContainer
-                        else MaterialTheme.colorScheme.onSurfaceVariant
-                    ) {
-                        Text(
-                            text = if (low) "Refill due" else MedicineCategory.label(medicine.category),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
-                        )
-                    }
-                    if (medicine.rxNumber.isNotBlank()) {
-                        Spacer(Modifier.width(6.dp))
+                    if (low) {
                         Surface(
                             shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
                         ) {
                             Text(
-                                text = "Rx #${medicine.rxNumber}",
+                                "Refill due",
                                 style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
                             )
                         }
                     }
                     if (!low && medicine.refillsLeft > 0) {
-                        Spacer(Modifier.width(6.dp))
                         Surface(
                             shape = RoundedCornerShape(50),
                             color = MaterialTheme.colorScheme.primaryContainer,
                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                         ) {
                             Text(
-                                text = "${medicine.refillsLeft} refills left",
+                                "${medicine.refillsLeft} refills left",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
@@ -444,13 +346,6 @@ private fun MedicineCard(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.ExtraBold
                         )
-                        if (medicine.prescriber.isNotBlank()) {
-                            Text(
-                                text = "Prescribed by ${medicine.prescriber}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
                     }
                     Spacer(Modifier.width(10.dp))
                     Box(
@@ -463,7 +358,7 @@ private fun MedicineCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = icon,
+                            imageVector = Icons.Rounded.Medication,
                             contentDescription = null,
                             tint = accent,
                             modifier = Modifier.size(22.dp)
@@ -862,66 +757,6 @@ private fun PharmacyDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
-}
-
-@Composable
-private fun QuickActionCard(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    container: Color,
-    content: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val haptics = rememberMedHaptics()
-    Surface(
-        onClick = {
-            haptics.tap()
-            onClick()
-        },
-        modifier = modifier,
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant
-        ),
-        shadowElevation = MedElevation.card
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .background(container, RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = content,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Spacer(Modifier.width(10.dp))
-            Column {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
-            }
-        }
-    }
 }
 
 /** Estimated units consumed per day across all enabled schedules. */

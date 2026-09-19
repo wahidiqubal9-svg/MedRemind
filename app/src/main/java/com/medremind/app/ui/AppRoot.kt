@@ -184,25 +184,6 @@ fun AppRoot(
                         vm.deleteMedicine(medicine) {}
                     }
                 },
-                onScanBarcode = { code ->
-                    guarded {
-                        editing = Medicine(name = "", rxNumber = code)
-                        showEditor = true
-                    }
-                },
-                onScanLabel = { label ->
-                    guarded {
-                        editing = Medicine(
-                            name = label.name,
-                            strength = label.strength,
-                            form = label.form,
-                            packSize = label.packSize,
-                            batchNumber = label.batchNumber,
-                            expiryDate = label.expiryDate
-                        )
-                        showEditor = true
-                    }
-                },
                 onOpenSettings = { showSettings = true },
                 onOpenMe = { showMe = true }
             )

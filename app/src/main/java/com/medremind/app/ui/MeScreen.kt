@@ -209,6 +209,28 @@ private fun ProfileCard(
                         )
                     }
                 }
+                if (settings.profileDiseases.isNotEmpty()) {
+                    Spacer(Modifier.height(16.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp)
+                    ) {
+                        Text(
+                            "CONDITIONS",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            settings.profileDiseases.joinToString(" \u00b7 "),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
                 Spacer(Modifier.height(18.dp))
                 Surface(
                     onClick = onEdit,

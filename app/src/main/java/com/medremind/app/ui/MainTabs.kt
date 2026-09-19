@@ -97,8 +97,6 @@ fun MainTabs(
     onAdd: () -> Unit,
     onEdit: (Medicine) -> Unit,
     onDelete: (Medicine) -> Unit,
-    onScanBarcode: (String) -> Unit,
-    onScanLabel: (ScannedLabel) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenMe: () -> Unit
 ) {
@@ -165,8 +163,6 @@ fun MainTabs(
                     onDelete = onDelete,
                     onAdd = onAdd,
                     onOpenMe = onOpenMe,
-                    onScanBarcode = onScanBarcode,
-                    onScanLabel = onScanLabel,
                     profilePhoto = settings.profilePhoto
                 )
                 2 -> HistoryContent(

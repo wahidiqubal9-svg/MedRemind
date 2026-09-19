@@ -96,7 +96,6 @@ import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.medremind.app.data.IntakeInstruction
 import com.medremind.app.data.Medicine
-import com.medremind.app.data.MedicineCategory
 import com.medremind.app.data.MedicineForm
 import com.medremind.app.data.PhotoStorage
 import com.medremind.app.data.Schedule
@@ -176,17 +175,8 @@ fun AddEditMedicineScreen(
         mutableStateOf((initial?.refillThreshold ?: 0).takeIf { it > 0 }?.toString() ?: "")
     }
     var intake by rememberSaveable { mutableStateOf(initial?.intakeInstruction ?: "") }
-    var category by rememberSaveable {
-        mutableStateOf(initial?.category ?: com.medremind.app.data.MedicineCategory.PRESCRIPTION)
-    }
     var form by rememberSaveable {
         mutableStateOf(initial?.form ?: com.medremind.app.data.MedicineForm.TABLET)
-    }
-    var prescriber by rememberSaveable { mutableStateOf(initial?.prescriber ?: "") }
-    var rxNumber by rememberSaveable { mutableStateOf(initial?.rxNumber ?: "") }
-    var batchNumber by rememberSaveable { mutableStateOf(initial?.batchNumber ?: "") }
-    var expiryText by rememberSaveable {
-        mutableStateOf(initial?.expiryDate?.let { formatExpiry(it) } ?: "")
     }
     var packSize by rememberSaveable {
         mutableStateOf((initial?.packSize ?: 0).takeIf { it > 0 }?.toString() ?: "")
@@ -264,14 +254,9 @@ fun AddEditMedicineScreen(
                 stockAmount = ""
                 refillBelow = ""
                 intake = ""
-                category = MedicineCategory.PRESCRIPTION
                 form = MedicineForm.TABLET
-                prescriber = ""
-                rxNumber = ""
                 packSize = ""
                 refillsLeft = "0"
-                batchNumber = ""
-                expiryText = ""
                 timesCount = 2
                 isCustomCount = false
                 asNeeded = false
@@ -311,7 +296,7 @@ fun AddEditMedicineScreen(
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ) {
                     Text(
-                        text = "Step ${step + 1} of 3 · ${listOf("Details", "Schedule", "Review")[step]}",
+                        text = "Step ${step + 1} of 4 · ${listOf("Details", "Schedule", "Intake", "Review")[step]}",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
@@ -321,6 +306,7 @@ fun AddEditMedicineScreen(
 
             Stepper(
                 step = step,
+                total = 4,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
             )
 
@@ -356,18 +342,8 @@ fun AddEditMedicineScreen(
                         photoPath = photoPath,
                         onPhotoClick = { showPhotoSheet = true },
                         onOpenUnit = { target -> unitTarget = target },
-                        category = category,
-                        onCategory = { category = it },
                         form = form,
-                        onForm = { form = it },
-                        prescriber = prescriber,
-                        onPrescriber = { prescriber = it },
-                        rxNumber = rxNumber,
-                        onRxNumber = { rxNumber = it },
-                        batchNumber = batchNumber,
-                        onBatchNumber = { batchNumber = it },
-                        expiryText = expiryText,
-                        onExpiryText = { expiryText = it }
+                        onForm = { form = it }
                     )
                     1 -> ScheduleStep(
                         asNeeded = asNeeded,
@@ -391,18 +367,7 @@ fun AddEditMedicineScreen(
                         durationDays = durationDays,
                         onDuration = { durationDays = it }
                     )
-                    else -> ReviewStep(
-                        name = name.ifBlank { "Medicine" },
-                        strength = "$doseAmount $doseUnit".trim(),
-                        doseLabel = "$qtyAmount $qtyUnit".trim(),
-                        photoPath = photoPath,
-                        onEdit = { step = 0 },
-                        timeLabel = if (asNeeded) "Take when needed"
-                        else times.joinToString(" · ") { formatTimeLabel(it) },
-                        daysLabel = if (asNeeded) "As needed"
-                        else if (specificDaysOnly) daysLabel(daysMask) else "Every day",
-                        durationLabel = if (asNeeded) "Ongoing"
-                        else if (durationDays == 0) "Continue" else "$durationDays days",
+                    2 -> IntakeInventoryStep(
                         intake = intake,
                         onIntake = { intake = it },
                         trackRefill = trackRefill,
@@ -415,6 +380,24 @@ fun AddEditMedicineScreen(
                         onPackSize = { packSize = it },
                         refillsLeft = refillsLeft,
                         onRefillsLeft = { refillsLeft = it }
+                    )
+                    else -> ReviewStep(
+                        name = name.ifBlank { "Medicine" },
+                        strength = "$doseAmount $doseUnit".trim(),
+                        doseLabel = "$qtyAmount $qtyUnit".trim(),
+                        photoPath = photoPath,
+                        onEdit = { step = 0 },
+                        formLabel = MedicineForm.label(form),
+                        timeLabel = if (asNeeded) "Take when needed"
+                        else times.joinToString(" · ") { formatTimeLabel(it) },
+                        daysLabel = if (asNeeded) "As needed"
+                        else if (specificDaysOnly) daysLabel(daysMask) else "Every day",
+                        durationLabel = if (asNeeded) "Ongoing"
+                        else if (durationDays == 0) "Continue" else "$durationDays days",
+                        intakeLabel = com.medremind.app.data.IntakeInstruction.label(intake),
+                        inventoryLabel = buildInventoryLabel(
+                            trackRefill, stockAmount, packSize, refillBelow, refillsLeft
+                        )
                     )
                         }
                     }
@@ -431,7 +414,7 @@ fun AddEditMedicineScreen(
                         .navigationBarsPadding()
                         .padding(horizontal = 20.dp, vertical = 14.dp)
                 ) {
-                    if (step == 2 && initial != null && initial.id != 0L) {
+                    if (step == 3 && initial != null && initial.id != 0L) {
                         OutlinedButton(
                             onClick = { vm.deleteMedicine(initial) { onDone() } },
                             shape = RoundedCornerShape(50),
@@ -452,13 +435,13 @@ fun AddEditMedicineScreen(
                     }
                     GradientPillButton(
                         text = when (step) {
-                            0 -> "Continue"
-                            1 -> "Review"
+                            0, 1 -> "Continue"
+                            2 -> "Review"
                             else -> "Save medicine"
                         },
-                        icon = if (step == 2) Icons.Rounded.Check else Icons.Rounded.ChevronRight,
+                        icon = if (step == 3) Icons.Rounded.Check else Icons.Rounded.ChevronRight,
                         onClick = {
-                            if (step < 2) {
+                            if (step < 3) {
                                 step++
                             } else {
                                 val base = initial ?: Medicine(name = "")
@@ -487,14 +470,9 @@ fun AddEditMedicineScreen(
                                         refillBelow.toIntOrNull() ?: 0
                                     } else 0,
                                     intakeInstruction = intake,
-                                    category = category,
                                     form = form,
-                                    prescriber = prescriber.trim(),
-                                    rxNumber = rxNumber.trim(),
                                     refillsLeft = refillsLeft.toIntOrNull() ?: 0,
-                                    packSize = packSize.toIntOrNull() ?: 0,
-                                    batchNumber = batchNumber.trim(),
-                                    expiryDate = LabelScanner.parseExpiry(expiryText)
+                                    packSize = packSize.toIntOrNull() ?: 0
                                 )
                                 vm.saveMedicine(medicine, listOf(schedule)) { saved = true }
                             }
@@ -570,18 +548,8 @@ private fun DetailsStep(
     photoPath: String?,
     onPhotoClick: () -> Unit,
     onOpenUnit: (Int) -> Unit,
-    category: String,
-    onCategory: (String) -> Unit,
     form: String,
-    onForm: (String) -> Unit,
-    prescriber: String,
-    onPrescriber: (String) -> Unit,
-    rxNumber: String,
-    onRxNumber: (String) -> Unit,
-    batchNumber: String,
-    onBatchNumber: (String) -> Unit,
-    expiryText: String,
-    onExpiryText: (String) -> Unit
+    onForm: (String) -> Unit
 ) {
     Text(
         "Add medicine",
@@ -607,65 +575,11 @@ private fun DetailsStep(
     )
 
     Spacer(Modifier.height(16.dp))
-    FieldLabel("Type")
-    val categoryValues = listOf(
-        MedicineCategory.PRESCRIPTION,
-        MedicineCategory.SUPPLEMENT,
-        MedicineCategory.OTC
-    )
-    MedSegmentedButtons(
-        options = listOf("Prescription", "Supplement", "OTC"),
-        selectedIndex = categoryValues.indexOf(category).coerceAtLeast(0),
-        onSelect = { onCategory(categoryValues[it]) },
-        modifier = Modifier.fillMaxWidth()
-    )
-
-    Spacer(Modifier.height(16.dp))
     FieldLabel("Form")
     FilterChipRow(
         options = MedicineForm.all.map { MedicineForm.label(it) },
         selectedIndex = MedicineForm.all.indexOf(form).coerceAtLeast(0),
         onSelect = { onForm(MedicineForm.all[it]) }
-    )
-
-    if (category == MedicineCategory.PRESCRIPTION) {
-        Spacer(Modifier.height(16.dp))
-        FieldLabel("Prescribed by", hint = "(optional)")
-        OutlinedTextField(
-            value = prescriber,
-            onValueChange = onPrescriber,
-            placeholder = { Text("e.g. Dr. Chen") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(Modifier.height(12.dp))
-        FieldLabel("Rx number", hint = "(optional)")
-        OutlinedTextField(
-            value = rxNumber,
-            onValueChange = onRxNumber,
-            placeholder = { Text("e.g. 649210") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-    }
-
-    Spacer(Modifier.height(16.dp))
-    FieldLabel("Batch number", hint = "(optional)")
-    OutlinedTextField(
-        value = batchNumber,
-        onValueChange = onBatchNumber,
-        placeholder = { Text("e.g. B240912") },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth()
-    )
-    Spacer(Modifier.height(12.dp))
-    FieldLabel("Expiry", hint = "(MM/YY)")
-    OutlinedTextField(
-        value = expiryText,
-        onValueChange = onExpiryText,
-        placeholder = { Text("e.g. 08/27") },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth()
     )
 
     Spacer(Modifier.height(16.dp))
@@ -1123,15 +1037,7 @@ private fun TimePickerDialog(
 }
 
 @Composable
-private fun ReviewStep(
-    name: String,
-    strength: String,
-    doseLabel: String,
-    photoPath: String?,
-    onEdit: () -> Unit,
-    timeLabel: String,
-    daysLabel: String,
-    durationLabel: String,
+private fun IntakeInventoryStep(
     intake: String,
     onIntake: (String) -> Unit,
     trackRefill: Boolean,
@@ -1146,64 +1052,22 @@ private fun ReviewStep(
     onRefillsLeft: (String) -> Unit
 ) {
     Text(
-        "Check the details",
+        "Intake & inventory",
         style = MaterialTheme.typography.headlineMedium,
         fontWeight = FontWeight.Bold
     )
     Spacer(Modifier.height(4.dp))
     Text(
-        "Make sure everything looks right before saving.",
+        "How should it be taken, and how much do you have?",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
     Spacer(Modifier.height(18.dp))
 
-    MedCard(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (photoPath != null) {
-                AsyncImage(
-                    model = File(photoPath),
-                    contentDescription = name,
-                    modifier = Modifier
-                        .size(52.dp)
-                        .clip(RoundedCornerShape(14.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.primaryContainer) {
-                    Box(modifier = Modifier.size(52.dp), contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Rounded.Medication,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.width(14.dp))
-            Column {
-                Text(name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                Text(
-                    listOf(strength, doseLabel).filter { it.isNotBlank() }.joinToString(" · "),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-        ReviewRow(Icons.Rounded.Schedule, "Time", timeLabel)
-        Spacer(Modifier.height(10.dp))
-        ReviewRow(Icons.Rounded.Schedule, "Days", daysLabel)
-        Spacer(Modifier.height(10.dp))
-        ReviewRow(Icons.Rounded.Schedule, "Duration", durationLabel)
-    }
-
-    Spacer(Modifier.height(16.dp))
     Text("Intake instructions", style = MaterialTheme.typography.titleMedium)
     Spacer(Modifier.height(4.dp))
     Text(
-        "How should this medicine be taken?",
+        "Optional \u2014 tap to choose.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -1263,6 +1127,90 @@ private fun ReviewStep(
             Spacer(Modifier.height(12.dp))
             FieldLabel("Refills left")
             QuantityStepper(value = refillsLeft, onValueChange = onRefillsLeft)
+        }
+    }
+}
+
+@Composable
+private fun ReviewStep(
+    name: String,
+    strength: String,
+    doseLabel: String,
+    photoPath: String?,
+    onEdit: () -> Unit,
+    formLabel: String,
+    timeLabel: String,
+    daysLabel: String,
+    durationLabel: String,
+    intakeLabel: String,
+    inventoryLabel: String
+) {
+    Text(
+        "Check the details",
+        style = MaterialTheme.typography.headlineMedium,
+        fontWeight = FontWeight.Bold
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        "Make sure everything looks right before saving.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    Spacer(Modifier.height(18.dp))
+
+    MedCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (photoPath != null) {
+                AsyncImage(
+                    model = File(photoPath),
+                    contentDescription = name,
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(RoundedCornerShape(14.dp)),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Box(modifier = Modifier.size(52.dp), contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Rounded.Medication,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.width(14.dp))
+            Column {
+                Text(name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text(
+                    listOf(strength, doseLabel).filter { it.isNotBlank() }.joinToString(" \u00b7 "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+        if (formLabel.isNotBlank()) {
+            ReviewRow(Icons.Rounded.Medication, "Form", formLabel)
+            Spacer(Modifier.height(10.dp))
+        }
+        ReviewRow(Icons.Rounded.Schedule, "Time", timeLabel)
+        Spacer(Modifier.height(10.dp))
+        ReviewRow(Icons.Rounded.Schedule, "Days", daysLabel)
+        Spacer(Modifier.height(10.dp))
+        ReviewRow(Icons.Rounded.Schedule, "Duration", durationLabel)
+        if (intakeLabel.isNotBlank()) {
+            Spacer(Modifier.height(10.dp))
+            ReviewRow(Icons.Rounded.Restaurant, "Intake", intakeLabel)
+        }
+        if (inventoryLabel.isNotBlank()) {
+            Spacer(Modifier.height(10.dp))
+            ReviewRow(Icons.Rounded.Medication, "Inventory", inventoryLabel)
         }
     }
 
@@ -1718,11 +1666,20 @@ private fun ReviewRow(icon: androidx.compose.ui.graphics.vector.ImageVector, lab
     }
 }
 
-private fun formatExpiry(millis: Long): String {
-    val cal = java.util.Calendar.getInstance().apply { timeInMillis = millis }
-    val month = cal.get(java.util.Calendar.MONTH) + 1
-    val year = cal.get(java.util.Calendar.YEAR) % 100
-    return String.format(java.util.Locale.getDefault(), "%02d/%02d", month, year)
+private fun buildInventoryLabel(
+    trackRefill: Boolean,
+    stockAmount: String,
+    packSize: String,
+    refillBelow: String,
+    refillsLeft: String
+): String {
+    if (!trackRefill) return ""
+    val parts = mutableListOf<String>()
+    stockAmount.toIntOrNull()?.let { parts.add("$it in stock") }
+    packSize.toIntOrNull()?.takeIf { it > 0 }?.let { parts.add("pack of $it") }
+    refillBelow.toIntOrNull()?.takeIf { it > 0 }?.let { parts.add("remind below $it") }
+    refillsLeft.toIntOrNull()?.takeIf { it > 0 }?.let { parts.add("$it refills left") }
+    return parts.joinToString(" \u00b7 ")
 }
 
 private fun splitAmountUnit(value: String, defaultUnit: String): Pair<String, String> {
