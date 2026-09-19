@@ -421,7 +421,7 @@ fun AddEditMedicineScreen(
                         .navigationBarsPadding()
                         .padding(horizontal = 20.dp, vertical = 14.dp)
                 ) {
-                    if (step == 2 && initial != null) {
+                    if (step == 2 && initial != null && initial.id != 0L) {
                         OutlinedButton(
                             onClick = { vm.deleteMedicine(initial) { onDone() } },
                             shape = RoundedCornerShape(50),

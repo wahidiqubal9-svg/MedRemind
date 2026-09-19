@@ -1,7 +1,11 @@
 package com.medremind.app.ui
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -29,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Medication
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
@@ -65,6 +70,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import com.medremind.app.data.DoseStatus
 import com.medremind.app.data.Medicine
 import com.medremind.app.data.MedicineCategory
@@ -85,34 +93,44 @@ fun MedContent(
     onDelete: (Medicine) -> Unit,
     onAdd: () -> Unit,
     onOpenMe: () -> Unit,
+    onScanBarcode: (String) -> Unit,
     profilePhoto: String? = null
 ) {
     val context = LocalContext.current
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableIntStateOf(0) }
-    var menuMedicine by remember { mutableStateOf<Medicine?>(null) }
-    var pendingDelete by remember { mutableStateOf<Medicine?>(null) }
     var showPharmacyDialog by remember { mutableStateOf(false) }
     var bannerDismissed by remember { mutableStateOf(false) }
+    val filterOptions = listOf("All", "Daily", "Weekly", "Course")
 
-    val prescriptionCount = medicines.count { it.category == MedicineCategory.PRESCRIPTION }
-    val supplementCount = medicines.count {
-        it.category == MedicineCategory.SUPPLEMENT || it.category == MedicineCategory.OTC
+    fun scanOptions() = ScanOptions().apply {
+        setDesiredBarcodeFormats(ScanOptions.ALL_CODE_TYPES)
+        setPrompt("Point at a medicine barcode")
+        setBeepEnabled(false)
+        setOrientationLocked(false)
     }
+
+    val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
+        result.contents?.let { onScanBarcode(it) }
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) scanLauncher.launch(scanOptions()) }
+    fun startScan() {
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+        if (granted) scanLauncher.launch(scanOptions())
+        else permissionLauncher.launch(Manifest.permission.CAMERA)
+    }
+
     val lowMedicines = medicines.filter { it.quantity > 0 && it.quantity <= it.refillThreshold }
-    val filterOptions = listOf(
-        "All (${medicines.size})",
-        "Prescriptions ($prescriptionCount)",
-        "Supplements ($supplementCount)",
-        "Needs refill (${lowMedicines.size})"
-    )
     val filteredMedicines = medicines.filter { medicine ->
         val matchesQuery = query.isBlank() || medicine.name.contains(query, ignoreCase = true)
+        val schedules = schedulesByMedicine[medicine.id].orEmpty()
         val matchesFilter = when (filter) {
-            1 -> medicine.category == MedicineCategory.PRESCRIPTION
-            2 -> medicine.category == MedicineCategory.SUPPLEMENT ||
-                medicine.category == MedicineCategory.OTC
-            3 -> medicine.quantity > 0 && medicine.quantity <= medicine.refillThreshold
+            1 -> schedules.any { it.type == ScheduleType.DAILY }
+            2 -> schedules.any { it.type == ScheduleType.WEEKDAYS }
+            3 -> schedules.any { it.type == ScheduleType.COURSE }
             else -> true
         }
         matchesQuery && matchesFilter
@@ -191,12 +209,33 @@ fun MedContent(
                     )
                 }
             }
+            item(key = "quick_actions") {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    QuickActionCard(
+                        icon = Icons.Rounded.Add,
+                        title = "Add new",
+                        subtitle = "Prescription / OTC",
+                        container = MaterialTheme.colorScheme.primaryContainer,
+                        content = MaterialTheme.colorScheme.onPrimaryContainer,
+                        onClick = onAdd,
+                        modifier = Modifier.weight(1f)
+                    )
+                    QuickActionCard(
+                        icon = Icons.Rounded.CameraAlt,
+                        title = "Scan barcode",
+                        subtitle = "Instant import",
+                        container = MaterialTheme.colorScheme.secondaryContainer,
+                        content = MaterialTheme.colorScheme.onSecondaryContainer,
+                        onClick = { startScan() },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
             items(filteredMedicines, key = { it.id }) { medicine ->
                 MedicineCard(
                     medicine = medicine,
                     schedules = schedulesByMedicine[medicine.id].orEmpty(),
                     onClick = { onEdit(medicine) },
-                    onOpenMenu = { menuMedicine = medicine },
                     modifier = Modifier.animateItem()
                 )
             }
@@ -218,36 +257,6 @@ fun MedContent(
             }
         }
 
-        MedicineActionOverlay(
-            medicine = menuMedicine,
-            subtitle = menuMedicine?.let {
-                doseLine(it, schedulesByMedicine[it.id].orEmpty())
-            } ?: "",
-            onEdit = {
-                val med = menuMedicine
-                menuMedicine = null
-                if (med != null) onEdit(med)
-            },
-            onDelete = {
-                val med = menuMedicine
-                menuMedicine = null
-                if (med != null) pendingDelete = med
-            },
-            onDismiss = { menuMedicine = null }
-        )
-    }
-
-    val toDelete = pendingDelete
-    if (toDelete != null) {
-        MedConfirmDialog(
-            title = "Delete medicine?",
-            message = "\"${toDelete.name}\" and all of its schedules will be permanently removed. This cannot be undone.",
-            onConfirm = {
-                pendingDelete = null
-                onDelete(toDelete)
-            },
-            onDismiss = { pendingDelete = null }
-        )
     }
 
     if (showPharmacyDialog) {
@@ -312,7 +321,6 @@ private fun MedicineCard(
     medicine: Medicine,
     schedules: List<Schedule>,
     onClick: () -> Unit,
-    onOpenMenu: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val haptics = rememberMedHaptics()
@@ -329,6 +337,12 @@ private fun MedicineCard(
     }
     val pattern = schedules.firstOrNull()?.let { schedulePatternLabel(it) }.orEmpty()
     val intake = com.medremind.app.data.IntakeInstruction.label(medicine.intakeInstruction)
+    val supplyStatus = when {
+        low -> "Needs refill"
+        medicine.quantity > 0 -> "Well-stocked"
+        schedules.isEmpty() -> "No schedule"
+        else -> pattern.ifBlank { "Scheduled" }
+    }
 
     Surface(
         onClick = {
@@ -396,24 +410,6 @@ private fun MedicineCard(
                             )
                         }
                     }
-                    Spacer(Modifier.weight(1f))
-                    Surface(
-                        onClick = {
-                            haptics.tap()
-                            onOpenMenu()
-                        },
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        contentColor = MaterialTheme.colorScheme.onSurface
-                    ) {
-                        Box(modifier = Modifier.size(34.dp), contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Rounded.MoreVert,
-                                contentDescription = "More options",
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
                 }
 
                 Spacer(Modifier.height(10.dp))
@@ -467,6 +463,32 @@ private fun MedicineCard(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
                     Spacer(Modifier.height(10.dp))
                     StockGauge(medicine = medicine, schedules = schedules)
+                }
+
+                Spacer(Modifier.height(14.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = supplyStatus,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Surface(
+                        onClick = {
+                            haptics.tap()
+                            onClick()
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        contentColor = MaterialTheme.colorScheme.onSurface
+                    ) {
+                        Text(
+                            "Edit dose",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                        )
+                    }
                 }
             }
         }
@@ -651,7 +673,7 @@ private fun LowSupplyBanner(
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
-                                "Refill",
+                                "Refill Now",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -668,7 +690,7 @@ private fun LowSupplyBanner(
                         )
                     ) {
                         Text(
-                            "Later",
+                            "Remind Later",
                             style = MaterialTheme.typography.labelMedium,
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
                         )
@@ -820,155 +842,63 @@ private fun PharmacyDialog(
 }
 
 @Composable
-private fun MedicineActionOverlay(
-    medicine: Medicine?,
-    subtitle: String,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    val shown = remember { mutableStateOf<Medicine?>(null) }
-    val shownSubtitle = remember { mutableStateOf("") }
-    LaunchedEffect(medicine, subtitle) {
-        if (medicine != null) {
-            shown.value = medicine
-            shownSubtitle.value = subtitle
-        }
-    }
-
-    val visible = medicine != null
-    val scale by animateFloatAsState(
-        targetValue = if (visible) 1f else 0.86f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
-        label = "menuScale"
-    )
-    val alpha by animateFloatAsState(
-        targetValue = if (visible) 1f else 0f,
-        animationSpec = motionTween(MedMotion.Fast),
-        label = "menuAlpha"
-    )
-    if (!visible && alpha <= 0.01f) return
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.45f * alpha))
-                .clickable { onDismiss() }
-        )
-        val med = shown.value
-        if (med != null) {
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(28.dp)
-                    .fillMaxWidth()
-                    .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                        this.alpha = alpha
-                    },
-                shape = MaterialTheme.shapes.extraLarge,
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = MedElevation.sheet
-            ) {
-                Column(modifier = Modifier.padding(22.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        MedIconSquare(
-                            label = med.name,
-                            seed = med.id,
-                            size = 56.dp,
-                            photoPath = med.photoPath
-                        )
-                        Spacer(Modifier.width(14.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                med.name,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                            Text(
-                                shownSubtitle.value.ifBlank { "\u2014" },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    Spacer(Modifier.height(18.dp))
-                    MenuActionRow(
-                        icon = Icons.Rounded.Edit,
-                        label = "Edit medicine",
-                        onClick = onEdit
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    MenuActionRow(
-                        icon = Icons.Rounded.DeleteOutline,
-                        label = "Delete medicine",
-                        destructive = true,
-                        onClick = onDelete
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    TextButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Cancel")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun MenuActionRow(
+private fun QuickActionCard(
     icon: ImageVector,
-    label: String,
-    destructive: Boolean = false,
-    onClick: () -> Unit
+    title: String,
+    subtitle: String,
+    container: Color,
+    content: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val haptics = rememberMedHaptics()
     Surface(
         onClick = {
-            if (destructive) haptics.reject() else haptics.tap()
+            haptics.tap()
             onClick()
         },
-        shape = RoundedCornerShape(18.dp),
-        color = if (destructive) MaterialTheme.colorScheme.errorContainer
-        else MaterialTheme.colorScheme.surfaceContainerHigh,
-        contentColor = if (destructive) MaterialTheme.colorScheme.onErrorContainer
-        else MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier,
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant
+        ),
+        shadowElevation = MedElevation.card
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(14.dp))
-            Text(
-                label,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f)
-            )
-            Icon(
-                Icons.Rounded.ChevronRight,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .background(container, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = content,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
         }
     }
-}
-
-private fun doseLine(medicine: Medicine, schedules: List<Schedule>): String {
-    val doseLabel = schedules.firstNotNullOfOrNull { s -> s.doseLabel.takeIf { it.isNotBlank() } }
-    val intake = com.medremind.app.data.IntakeInstruction.label(medicine.intakeInstruction)
-    return listOf(medicine.strength, doseLabel, intake)
-        .filterNotNull()
-        .filter { it.isNotBlank() }
-        .joinToString(" \u00b7 ")
 }
 
 /** Estimated units consumed per day across all enabled schedules. */

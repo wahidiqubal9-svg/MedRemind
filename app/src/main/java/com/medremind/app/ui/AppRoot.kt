@@ -184,6 +184,12 @@ fun AppRoot(
                         vm.deleteMedicine(medicine) {}
                     }
                 },
+                onScanBarcode = { code ->
+                    guarded {
+                        editing = Medicine(name = "", rxNumber = code)
+                        showEditor = true
+                    }
+                },
                 onOpenSettings = { showSettings = true },
                 onOpenMe = { showMe = true }
             )
