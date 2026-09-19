@@ -167,7 +167,6 @@ fun AddEditMedicineScreen(
     var showPhotoSheet by remember { mutableStateOf(false) }
     var unitTarget by remember { mutableStateOf<Int?>(null) }
 
-    var trackRefill by rememberSaveable { mutableStateOf((initial?.quantity ?: 0) > 0) }
     var stockAmount by rememberSaveable {
         mutableStateOf((initial?.quantity ?: 0).takeIf { it > 0 }?.toString() ?: "")
     }
@@ -177,12 +176,6 @@ fun AddEditMedicineScreen(
     var intake by rememberSaveable { mutableStateOf(initial?.intakeInstruction ?: "") }
     var form by rememberSaveable {
         mutableStateOf(initial?.form ?: com.medremind.app.data.MedicineForm.TABLET)
-    }
-    var packSize by rememberSaveable {
-        mutableStateOf((initial?.packSize ?: 0).takeIf { it > 0 }?.toString() ?: "")
-    }
-    var refillsLeft by rememberSaveable {
-        mutableStateOf((initial?.refillsLeft ?: 0).toString())
     }
 
     var timesCount by remember { mutableIntStateOf(2) }
@@ -250,13 +243,10 @@ fun AddEditMedicineScreen(
                 qtyAmount = "1"
                 qtyUnit = "tablet"
                 photoPath = null
-                trackRefill = false
                 stockAmount = ""
                 refillBelow = ""
                 intake = ""
                 form = MedicineForm.TABLET
-                packSize = ""
-                refillsLeft = "0"
                 timesCount = 2
                 isCustomCount = false
                 asNeeded = false
@@ -370,16 +360,10 @@ fun AddEditMedicineScreen(
                     2 -> IntakeInventoryStep(
                         intake = intake,
                         onIntake = { intake = it },
-                        trackRefill = trackRefill,
-                        onTrackRefill = { trackRefill = it },
                         stockAmount = stockAmount,
                         onStockAmount = { stockAmount = it },
                         refillBelow = refillBelow,
-                        onRefillBelow = { refillBelow = it },
-                        packSize = packSize,
-                        onPackSize = { packSize = it },
-                        refillsLeft = refillsLeft,
-                        onRefillsLeft = { refillsLeft = it }
+                        onRefillBelow = { refillBelow = it }
                     )
                     else -> ReviewStep(
                         name = name.ifBlank { "Medicine" },
@@ -395,9 +379,7 @@ fun AddEditMedicineScreen(
                         durationLabel = if (asNeeded) "Ongoing"
                         else if (durationDays == 0) "Continue" else "$durationDays days",
                         intakeLabel = com.medremind.app.data.IntakeInstruction.label(intake),
-                        inventoryLabel = buildInventoryLabel(
-                            trackRefill, stockAmount, packSize, refillBelow, refillsLeft
-                        )
+                        inventoryLabel = buildInventoryLabel(stockAmount, refillBelow)
                     )
                         }
                     }
@@ -465,14 +447,10 @@ fun AddEditMedicineScreen(
                                     name = name.trim(),
                                     strength = "$doseAmount $doseUnit".trim(),
                                     photoPath = photoPath,
-                                    quantity = if (trackRefill) (stockAmount.toIntOrNull() ?: 0) else 0,
-                                    refillThreshold = if (trackRefill) {
-                                        refillBelow.toIntOrNull() ?: 0
-                                    } else 0,
+                                    quantity = stockAmount.toIntOrNull() ?: 0,
+                                    refillThreshold = refillBelow.toIntOrNull() ?: 0,
                                     intakeInstruction = intake,
-                                    form = form,
-                                    refillsLeft = refillsLeft.toIntOrNull() ?: 0,
-                                    packSize = packSize.toIntOrNull() ?: 0
+                                    form = form
                                 )
                                 vm.saveMedicine(medicine, listOf(schedule)) { saved = true }
                             }
@@ -1040,16 +1018,10 @@ private fun TimePickerDialog(
 private fun IntakeInventoryStep(
     intake: String,
     onIntake: (String) -> Unit,
-    trackRefill: Boolean,
-    onTrackRefill: (Boolean) -> Unit,
     stockAmount: String,
     onStockAmount: (String) -> Unit,
     refillBelow: String,
-    onRefillBelow: (String) -> Unit,
-    packSize: String,
-    onPackSize: (String) -> Unit,
-    refillsLeft: String,
-    onRefillsLeft: (String) -> Unit
+    onRefillBelow: (String) -> Unit
 ) {
     Text(
         "Intake & inventory",
@@ -1096,38 +1068,18 @@ private fun IntakeInventoryStep(
 
     Spacer(Modifier.height(16.dp))
     MedCard(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Inventory & refill", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Count pills and get a low-supply reminder.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
-                checked = trackRefill,
-                onCheckedChange = { checked ->
-                    onTrackRefill(checked)
-                    if (checked && stockAmount.isBlank()) onStockAmount("30")
-                    if (checked && refillBelow.isBlank()) onRefillBelow("5")
-                }
-            )
-        }
-        if (trackRefill) {
-            Spacer(Modifier.height(14.dp))
-            FieldLabel("Pills remaining")
-            QuantityStepper(value = stockAmount, onValueChange = onStockAmount)
-            Spacer(Modifier.height(12.dp))
-            FieldLabel("Remind me when below")
-            QuantityStepper(value = refillBelow, onValueChange = onRefillBelow)
-            Spacer(Modifier.height(12.dp))
-            FieldLabel("Pack size", hint = "(total per pack)")
-            QuantityStepper(value = packSize, onValueChange = onPackSize)
-            Spacer(Modifier.height(12.dp))
-            FieldLabel("Refills left")
-            QuantityStepper(value = refillsLeft, onValueChange = onRefillsLeft)
-        }
+        Text("Inventory & refill", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Optional \u2014 count pills and get a low-supply reminder.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(14.dp))
+        FieldLabel("Pills remaining")
+        QuantityStepper(value = stockAmount, onValueChange = onStockAmount)
+        Spacer(Modifier.height(12.dp))
+        FieldLabel("Remind me when below")
+        QuantityStepper(value = refillBelow, onValueChange = onRefillBelow)
     }
 }
 
@@ -1666,19 +1618,10 @@ private fun ReviewRow(icon: androidx.compose.ui.graphics.vector.ImageVector, lab
     }
 }
 
-private fun buildInventoryLabel(
-    trackRefill: Boolean,
-    stockAmount: String,
-    packSize: String,
-    refillBelow: String,
-    refillsLeft: String
-): String {
-    if (!trackRefill) return ""
+private fun buildInventoryLabel(stockAmount: String, refillBelow: String): String {
     val parts = mutableListOf<String>()
-    stockAmount.toIntOrNull()?.let { parts.add("$it in stock") }
-    packSize.toIntOrNull()?.takeIf { it > 0 }?.let { parts.add("pack of $it") }
+    stockAmount.toIntOrNull()?.takeIf { it > 0 }?.let { parts.add("$it in stock") }
     refillBelow.toIntOrNull()?.takeIf { it > 0 }?.let { parts.add("remind below $it") }
-    refillsLeft.toIntOrNull()?.takeIf { it > 0 }?.let { parts.add("$it refills left") }
     return parts.joinToString(" \u00b7 ")
 }
 
