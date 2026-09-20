@@ -1117,6 +1117,12 @@ private fun ScheduleSheet(
                                     }
                                 }
                             }
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "Starts on the day you set it (today).",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                             Spacer(Modifier.height(12.dp))
                             if (repeatCycle) {
                                 PatternCalendar(
@@ -1385,8 +1391,6 @@ private fun SchedulePattern.toSchedule(
     endDate: Long?,
     doseLabel: String
 ): Schedule {
-    val anchor = selectedDates.minOrNull()?.let { epochDayToMillis(it) }
-        ?: System.currentTimeMillis()
     val customIsCycle = type == PatternType.CUSTOM && repeatCycle
     val customIsDates = type == PatternType.CUSTOM && !repeatCycle
     val typeName = when {
@@ -1408,11 +1412,8 @@ private fun SchedulePattern.toSchedule(
         } else "",
         cycleOnDays = if (customIsCycle) cycleOnDays else 0,
         cycleOffDays = if (customIsCycle) cycleOffDays else 0,
-        startDate = when {
-            type == PatternType.EVERY_N -> anchor
-            customIsCycle -> System.currentTimeMillis()
-            else -> 0L
-        },
+        // Every schedule starts from the day it is set.
+        startDate = System.currentTimeMillis(),
         doseLabel = doseLabel,
         endDate = if (type == PatternType.PRN) null else endDate,
         enabled = true
