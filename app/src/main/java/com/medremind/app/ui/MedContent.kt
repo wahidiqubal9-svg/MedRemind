@@ -1048,6 +1048,11 @@ private fun frequencyLabel(schedules: List<Schedule>): String {
         ScheduleType.DAILY -> "Every day"
         ScheduleType.WEEKDAYS -> "${Integer.bitCount(s.daysMask)} days / week"
         ScheduleType.INTERVAL -> "Every ${s.intervalHours} h"
+        ScheduleType.EVERY_N_DAYS -> "Every ${s.intervalDays.coerceAtLeast(2)} days"
+        ScheduleType.SELECTED_DATES -> {
+            val count = s.selectedDates.split(',').count { it.trim().isNotEmpty() }
+            "$count date" + (if (count == 1) "" else "s")
+        }
         ScheduleType.AS_NEEDED -> "As needed"
         ScheduleType.COURSE -> "Course"
         else -> "Every day"
@@ -1399,10 +1404,18 @@ private fun dailyDose(schedules: List<Schedule>): Float {
         }
         val perTake = s.doseLabel.trim().split(Regex("\\s+"))
             .firstOrNull()?.toFloatOrNull()?.coerceAtLeast(0.5f) ?: 1f
-        val weekdayFactor = if (s.type == ScheduleType.WEEKDAYS) {
-            Integer.bitCount(s.daysMask) / 7f
-        } else 1f
-        total += times * perTake * weekdayFactor
+        val factor = when (s.type) {
+            ScheduleType.WEEKDAYS -> Integer.bitCount(s.daysMask) / 7f
+            ScheduleType.EVERY_N_DAYS -> 1f / s.intervalDays.coerceAtLeast(2)
+            ScheduleType.SELECTED_DATES -> {
+                val today = java.time.LocalDate.now().toEpochDay()
+                val recent = s.selectedDates.split(',').mapNotNull { it.trim().toLongOrNull() }
+                    .count { it in (today - 29)..today }
+                recent / 30f
+            }
+            else -> 1f
+        }
+        total += times * perTake * factor
     }
     return total
 }
@@ -1457,6 +1470,11 @@ internal fun schedulePatternLabel(schedule: Schedule): String = when (schedule.t
         if (days.isEmpty()) "No days" else days.joinToString(", ")
     }
     ScheduleType.INTERVAL -> "Every ${schedule.intervalHours} h"
+    ScheduleType.EVERY_N_DAYS -> "Every ${schedule.intervalDays.coerceAtLeast(2)} days"
+    ScheduleType.SELECTED_DATES -> {
+        val count = schedule.selectedDates.split(',').count { it.trim().isNotEmpty() }
+        "$count selected date" + (if (count == 1) "" else "s")
+    }
     ScheduleType.AS_NEEDED -> "As needed"
     ScheduleType.COURSE -> {
         if (schedule.endDate != null) {

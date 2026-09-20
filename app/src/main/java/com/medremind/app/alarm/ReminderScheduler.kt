@@ -58,6 +58,45 @@ object ReminderScheduler {
         val times = parseTimes(schedule.times).sorted()
         if (times.isEmpty()) return null
 
+        if (schedule.type == ScheduleType.SELECTED_DATES) {
+            val epochs = parseEpochDays(schedule.selectedDates)
+            if (epochs.isEmpty()) return null
+            var day = from.toLocalDate()
+            var i = 0
+            while (i < 800) {
+                if (endDate != null && day.isAfter(endDate)) return null
+                if (day.toEpochDay() in epochs) {
+                    for (t in times) {
+                        val ms = toMillis(day, t)
+                        if (ms > fromMillis) return ms
+                    }
+                }
+                day = day.plusDays(1)
+                i++
+            }
+            return null
+        }
+
+        if (schedule.type == ScheduleType.EVERY_N_DAYS) {
+            val gap = schedule.intervalDays.coerceAtLeast(2)
+            val anchor = if (schedule.startDate > 0) dateOf(schedule.startDate) else from.toLocalDate()
+            var day = from.toLocalDate()
+            var i = 0
+            while (i < gap + 2) {
+                if (endDate != null && day.isAfter(endDate)) return null
+                val diff = day.toEpochDay() - anchor.toEpochDay()
+                if (diff >= 0 && diff % gap == 0L) {
+                    for (t in times) {
+                        val ms = toMillis(day, t)
+                        if (ms > fromMillis) return ms
+                    }
+                }
+                day = day.plusDays(1)
+                i++
+            }
+            return null
+        }
+
         var day = from.toLocalDate()
         var i = 0
         while (i < 8) {
@@ -113,9 +152,27 @@ object ReminderScheduler {
                 if ((schedule.daysMask and bit) == 0) emptyList()
                 else parseTimes(schedule.times).map { toMillis(date, it) }
             }
+            ScheduleType.SELECTED_DATES -> {
+                if (date.toEpochDay() !in parseEpochDays(schedule.selectedDates)) emptyList()
+                else parseTimes(schedule.times).map { toMillis(date, it) }
+            }
+            ScheduleType.EVERY_N_DAYS -> {
+                val gap = schedule.intervalDays.coerceAtLeast(2)
+                val anchor = if (schedule.startDate > 0) dateOf(schedule.startDate) else null
+                if (anchor == null) {
+                    emptyList()
+                } else {
+                    val diff = date.toEpochDay() - anchor.toEpochDay()
+                    if (diff < 0 || diff % gap != 0L) emptyList()
+                    else parseTimes(schedule.times).map { toMillis(date, it) }
+                }
+            }
             else -> parseTimes(schedule.times).map { toMillis(date, it) }
         }
     }
+
+    private fun parseEpochDays(value: String): Set<Long> =
+        value.split(',').mapNotNull { it.trim().toLongOrNull() }.toSet()
 
     private fun showAppIntent(context: Context): PendingIntent =
         PendingIntent.getActivity(

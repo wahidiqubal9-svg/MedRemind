@@ -11,6 +11,12 @@ object ScheduleType {
     const val INTERVAL = "INTERVAL"
     const val COURSE = "COURSE"
     const val AS_NEEDED = "AS_NEEDED"
+
+    /** Every N days (e.g. alternate day = 2). */
+    const val EVERY_N_DAYS = "EVERY_N_DAYS"
+
+    /** Only the specific calendar dates in [Schedule.selectedDates]. */
+    const val SELECTED_DATES = "SELECTED_DATES"
 }
 
 @Entity(
@@ -35,5 +41,9 @@ data class Schedule(
     val startDate: Long = 0L,
     val endDate: Long? = null,
     val doseLabel: String = "",
-    val enabled: Boolean = true
+    val enabled: Boolean = true,
+    /** For EVERY_N_DAYS: the gap in days. */
+    val intervalDays: Int = 0,
+    /** For SELECTED_DATES: comma-separated epoch days. */
+    val selectedDates: String = ""
 )

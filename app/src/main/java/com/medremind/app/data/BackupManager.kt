@@ -68,6 +68,8 @@ object BackupManager {
                         put("endDate", s.endDate ?: JSONObject.NULL)
                         put("doseLabel", s.doseLabel)
                         put("enabled", s.enabled)
+                        put("intervalDays", s.intervalDays)
+                        put("selectedDates", s.selectedDates)
                     })
                 }
             })
@@ -190,7 +192,9 @@ object BackupManager {
                     startDate = o.optLong("startDate", 0),
                     endDate = if (o.isNull("endDate")) null else o.optLong("endDate"),
                     doseLabel = o.optString("doseLabel"),
-                    enabled = o.optBoolean("enabled", true)
+                    enabled = o.optBoolean("enabled", true),
+                    intervalDays = o.optInt("intervalDays", 0),
+                    selectedDates = o.optString("selectedDates", "")
                 )
             )
         }

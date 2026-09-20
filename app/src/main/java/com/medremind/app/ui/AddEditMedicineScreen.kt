@@ -16,6 +16,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +43,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
@@ -102,11 +104,14 @@ import com.medremind.app.data.Schedule
 import com.medremind.app.data.ScheduleType
 import java.io.File
 import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.ZoneId
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-private val doseUnits = listOf("mg", "g", "ml", "IU")
+private val doseUnits = listOf("mg", "g", "ml", "IU", "mg/ml")
 private val qtyUnits = listOf("tablet", "capsule", "drop", "ml", "puff")
 private val dayLabels = listOf("M", "T", "W", "T", "F", "S", "S")
 private val dayNamesFull = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
@@ -181,8 +186,11 @@ fun AddEditMedicineScreen(
     var timesCount by remember { mutableIntStateOf(2) }
     var isCustomCount by remember { mutableStateOf(false) }
     var asNeeded by rememberSaveable { mutableStateOf(false) }
-    var specificDaysOnly by remember { mutableStateOf(false) }
-    var daysMask by remember { mutableIntStateOf(0b0011111) }
+    var frequencyMode by remember { mutableIntStateOf(0) }
+    var daysMask by remember { mutableIntStateOf(0) }
+    var intervalDays by remember { mutableIntStateOf(2) }
+    var selectedDates by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var calendarMonth by remember { mutableStateOf(YearMonth.now()) }
     var durationDays by remember { mutableIntStateOf(0) }
     var times by remember { mutableStateOf(listOf("08:00", "20:00")) }
     var editingTimeIndex by remember { mutableStateOf<Int?>(null) }
@@ -202,10 +210,17 @@ fun AddEditMedicineScreen(
                 timesCount = times.size.coerceIn(1, 10)
                 isCustomCount = timesCount > 4
                 asNeeded = first.type == ScheduleType.AS_NEEDED
-                specificDaysOnly = first.type == ScheduleType.WEEKDAYS
-                daysMask = if (first.type == ScheduleType.WEEKDAYS) first.daysMask.let {
-                    if (it == 0) 0b0011111 else it
-                } else 0b0011111
+                frequencyMode = when (first.type) {
+                    ScheduleType.WEEKDAYS -> 1
+                    ScheduleType.EVERY_N_DAYS -> 2
+                    ScheduleType.SELECTED_DATES -> 3
+                    else -> 0
+                }
+                daysMask = if (first.type == ScheduleType.WEEKDAYS) first.daysMask else 0
+                intervalDays = first.intervalDays.takeIf { it > 0 } ?: 2
+                selectedDates = first.selectedDates.split(',')
+                    .mapNotNull { it.trim().toLongOrNull() }
+                    .toSet()
                 durationDays = first.endDate?.let { end ->
                     val days = ((end - System.currentTimeMillis()) / 86_400_000L).toInt()
                     days.coerceAtLeast(1)
@@ -250,8 +265,10 @@ fun AddEditMedicineScreen(
                 timesCount = 2
                 isCustomCount = false
                 asNeeded = false
-                specificDaysOnly = false
-                daysMask = 0b0011111
+                frequencyMode = 0
+                daysMask = 0
+                intervalDays = 2
+                selectedDates = emptySet()
                 durationDays = 0
                 times = listOf("08:00", "20:00")
                 step = 0
@@ -345,13 +362,23 @@ fun AddEditMedicineScreen(
                             timesCount = count
                             times = suggestedTimes(count)
                         },
-                        specificDaysOnly = specificDaysOnly,
-                        onSelectDayType = { specific ->
-                            specificDaysOnly = specific
-                            if (specific && daysMask == 0) daysMask = 0b0011111
-                        },
+                        frequencyMode = frequencyMode,
+                        onFrequencyMode = { frequencyMode = it },
                         daysMask = daysMask,
                         onToggleDay = { index -> daysMask = daysMask xor (1 shl index) },
+                        intervalDays = intervalDays,
+                        onIntervalDays = { intervalDays = it },
+                        selectedDates = selectedDates,
+                        onToggleDate = { epochDay ->
+                            selectedDates = if (epochDay in selectedDates) {
+                                selectedDates - epochDay
+                            } else {
+                                selectedDates + epochDay
+                            }
+                        },
+                        onClearDates = { selectedDates = emptySet() },
+                        calendarMonth = calendarMonth,
+                        onCalendarMonth = { calendarMonth = it },
                         times = times,
                         onEditTime = { index -> editingTimeIndex = index },
                         durationDays = durationDays,
@@ -374,8 +401,15 @@ fun AddEditMedicineScreen(
                         formLabel = MedicineForm.label(form),
                         timeLabel = if (asNeeded) "Take when needed"
                         else times.joinToString(" · ") { formatTimeLabel(it) },
-                        daysLabel = if (asNeeded) "As needed"
-                        else if (specificDaysOnly) daysLabel(daysMask) else "Every day",
+                        daysLabel = when {
+                            asNeeded -> "As needed"
+                            frequencyMode == 1 -> daysLabel(daysMask)
+                            frequencyMode == 2 -> "Every $intervalDays days"
+                            frequencyMode == 3 ->
+                                "${selectedDates.size} selected date" +
+                                    (if (selectedDates.size == 1) "" else "s")
+                            else -> "Every day"
+                        },
                         durationLabel = if (asNeeded) "Ongoing"
                         else if (durationDays == 0) "Continue" else "$durationDays days",
                         intakeLabel = com.medremind.app.data.IntakeInstruction.label(intake),
@@ -427,16 +461,26 @@ fun AddEditMedicineScreen(
                                 step++
                             } else {
                                 val base = initial ?: Medicine(name = "")
+                                val anchorMillis = selectedDates.minOrNull()
+                                    ?.let { epochDayToMillis(it) }
+                                    ?: System.currentTimeMillis()
                                 val schedule = Schedule(
                                     id = initial?.let { 0L } ?: 0L,
                                     medicineId = base.id,
                                     type = when {
                                         asNeeded -> ScheduleType.AS_NEEDED
-                                        specificDaysOnly -> ScheduleType.WEEKDAYS
+                                        frequencyMode == 1 -> ScheduleType.WEEKDAYS
+                                        frequencyMode == 2 -> ScheduleType.EVERY_N_DAYS
+                                        frequencyMode == 3 -> ScheduleType.SELECTED_DATES
                                         else -> ScheduleType.DAILY
                                     },
                                     times = if (asNeeded) "" else times.joinToString(","),
-                                    daysMask = if (specificDaysOnly && !asNeeded) daysMask else 0,
+                                    daysMask = if (frequencyMode == 1 && !asNeeded) daysMask else 0,
+                                    intervalDays = if (frequencyMode == 2 && !asNeeded) intervalDays else 0,
+                                    selectedDates = if (frequencyMode == 3 && !asNeeded) {
+                                        selectedDates.sorted().joinToString(",")
+                                    } else "",
+                                    startDate = if (frequencyMode == 2 && !asNeeded) anchorMillis else 0L,
                                     doseLabel = "$qtyAmount $qtyUnit".trim(),
                                     endDate = if (!asNeeded && durationDays > 0) {
                                         System.currentTimeMillis() + durationDays * 86_400_000L
@@ -455,7 +499,14 @@ fun AddEditMedicineScreen(
                                 vm.saveMedicine(medicine, listOf(schedule)) { saved = true }
                             }
                         },
-                        enabled = step != 0 || name.isNotBlank(),
+                        enabled = when (step) {
+                            0 -> name.isNotBlank()
+                            1 -> asNeeded || !(
+                                (frequencyMode == 1 && daysMask == 0) ||
+                                    (frequencyMode == 3 && selectedDates.isEmpty())
+                                )
+                            else -> true
+                        },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -565,13 +616,28 @@ private fun DetailsStep(
     Row(verticalAlignment = Alignment.CenterVertically) {
         OutlinedTextField(
             value = doseAmount,
-            onValueChange = { onDoseAmount(it.filter { c -> c.isDigit() || c == '.' }) },
+            onValueChange = { onDoseAmount(it.filter { c -> c.isDigit() || c == '.' || c == '/' }) },
             placeholder = { Text("500") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.weight(1f)
         )
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(8.dp))
+        Surface(
+            onClick = { onDoseAmount(doseAmount + "/") },
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurface
+        ) {
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 14.dp, vertical = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("/", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+        }
+        Spacer(Modifier.width(8.dp))
         UnitButton(value = doseUnit, onClick = { onOpenUnit(0) })
     }
 
@@ -693,10 +759,17 @@ private fun ScheduleStep(
     timesCount: Int,
     isCustomCount: Boolean,
     onSelectCount: (Int, Boolean) -> Unit,
-    specificDaysOnly: Boolean,
-    onSelectDayType: (Boolean) -> Unit,
+    frequencyMode: Int,
+    onFrequencyMode: (Int) -> Unit,
     daysMask: Int,
     onToggleDay: (Int) -> Unit,
+    intervalDays: Int,
+    onIntervalDays: (Int) -> Unit,
+    selectedDates: Set<Long>,
+    onToggleDate: (Long) -> Unit,
+    onClearDates: () -> Unit,
+    calendarMonth: YearMonth,
+    onCalendarMonth: (YearMonth) -> Unit,
     times: List<String>,
     onEditTime: (Int) -> Unit,
     durationDays: Int,
@@ -704,6 +777,8 @@ private fun ScheduleStep(
 ) {
     var customCountText by remember { mutableStateOf(if (isCustomCount) timesCount.toString() else "5") }
     var customDurationText by remember { mutableStateOf(if (durationDays > 0) durationDays.toString() else "14") }
+    var intervalText by remember { mutableStateOf(intervalDays.toString()) }
+    LaunchedEffect(intervalDays) { intervalText = intervalDays.toString() }
     val durationIsCustom = durationDays > 0 && durationDays != 7 && durationDays != 30
 
     Text(
@@ -783,15 +858,15 @@ private fun ScheduleStep(
     }
 
     Spacer(Modifier.height(20.dp))
-    FieldLabel("2. Which days?")
+    FieldLabel("2. How often?")
     MedSegmentedButtons(
-        options = listOf("Every day", "Specific days"),
-        selectedIndex = if (specificDaysOnly) 1 else 0,
-        onSelect = { onSelectDayType(it == 1) },
+        options = listOf("Every day", "Weekly", "Every N days", "Dates"),
+        selectedIndex = frequencyMode,
+        onSelect = onFrequencyMode,
         modifier = Modifier.fillMaxWidth()
     )
-    AnimatedVisibility(visible = specificDaysOnly) {
-        Column {
+    when (frequencyMode) {
+        1 -> {
             Spacer(Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -819,6 +894,71 @@ private fun ScheduleStep(
                 color = if (daysMask == 0) MaterialTheme.colorScheme.error
                 else MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+        2 -> {
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Take this medicine every",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.width(10.dp))
+                OutlinedTextField(
+                    value = intervalText,
+                    onValueChange = { value ->
+                        val filtered = value.filter { it.isDigit() }.take(3)
+                        intervalText = filtered
+                        filtered.toIntOrNull()?.let {
+                            if (it >= 2) onIntervalDays(it.coerceAtMost(90))
+                        }
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.width(88.dp)
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    "days",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = if (intervalDays == 2) "Every 2 days \u2014 alternate days"
+                else "Every $intervalDays days",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        3 -> {
+            Spacer(Modifier.height(12.dp))
+            ScheduleCalendar(
+                month = calendarMonth,
+                selected = selectedDates,
+                onToggle = onToggleDate,
+                onPrev = { onCalendarMonth(calendarMonth.minusMonths(1)) },
+                onNext = { onCalendarMonth(calendarMonth.plusMonths(1)) }
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = if (selectedDates.isEmpty()) {
+                        "Tap dates on the calendar."
+                    } else {
+                        "${selectedDates.size} date" +
+                            (if (selectedDates.size == 1) "" else "s") + " selected"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (selectedDates.isEmpty()) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                if (selectedDates.isNotEmpty()) {
+                    TextButton(onClick = onClearDates) { Text("Clear") }
+                }
+            }
         }
     }
 
@@ -1618,6 +1758,109 @@ private fun ReviewRow(icon: androidx.compose.ui.graphics.vector.ImageVector, lab
     }
 }
 
+@Composable
+private fun ScheduleCalendar(
+    month: YearMonth,
+    selected: Set<Long>,
+    onToggle: (Long) -> Unit,
+    onPrev: () -> Unit,
+    onNext: () -> Unit
+) {
+    val today = LocalDate.now()
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onPrev) {
+                Icon(Icons.Rounded.ChevronLeft, contentDescription = "Previous month")
+            }
+            Text(
+                text = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
+                    .format(Date(monthStartMillis(month))),
+                style = MaterialTheme.typography.titleSmall,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = onNext) {
+                Icon(Icons.Rounded.ChevronRight, contentDescription = "Next month")
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth()) {
+            listOf("S", "M", "T", "W", "T", "F", "S").forEach { label ->
+                Text(
+                    text = label,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        val leading = month.atDay(1).dayOfWeek.value % 7
+        val totalCells = leading + month.lengthOfMonth()
+        val rows = (totalCells + 6) / 7
+        for (row in 0 until rows) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                for (col in 0 until 7) {
+                    val dayNumber = row * 7 + col - leading + 1
+                    if (dayNumber in 1..month.lengthOfMonth()) {
+                        val date = month.atDay(dayNumber)
+                        val epochDay = date.toEpochDay()
+                        val isSelected = epochDay in selected
+                        val isToday = date == today
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(42.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (isSelected) MaterialTheme.colorScheme.primary
+                                        else Color.Transparent
+                                    )
+                                    .then(
+                                        if (isToday && !isSelected) {
+                                            Modifier.border(
+                                                1.5.dp,
+                                                MaterialTheme.colorScheme.primary,
+                                                CircleShape
+                                            )
+                                        } else Modifier
+                                    )
+                                    .clickable { onToggle(epochDay) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = dayNumber.toString(),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (isSelected || isToday) FontWeight.SemiBold
+                                    else FontWeight.Normal,
+                                    color = when {
+                                        isSelected -> MaterialTheme.colorScheme.onPrimary
+                                        isToday -> MaterialTheme.colorScheme.primary
+                                        else -> MaterialTheme.colorScheme.onSurface
+                                    }
+                                )
+                            }
+                        }
+                    } else {
+                        Spacer(Modifier.weight(1f).height(42.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun monthStartMillis(month: YearMonth): Long =
+    month.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+private fun epochDayToMillis(epochDay: Long): Long =
+    LocalDate.ofEpochDay(epochDay).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
 private fun buildInventoryLabel(stockAmount: String, refillBelow: String): String {
     val parts = mutableListOf<String>()
     stockAmount.toIntOrNull()?.takeIf { it > 0 }?.let { parts.add("$it in stock") }
@@ -1628,7 +1871,7 @@ private fun buildInventoryLabel(stockAmount: String, refillBelow: String): Strin
 private fun splitAmountUnit(value: String, defaultUnit: String): Pair<String, String> {
     val trimmed = value.trim()
     if (trimmed.isEmpty()) return "" to defaultUnit
-    val match = Regex("^([0-9.]+)\\s*(.*)$").find(trimmed)
+    val match = Regex("^([0-9./]+)\\s*(.*)$").find(trimmed)
     return if (match != null) {
         val amount = match.groupValues[1]
         val unit = match.groupValues[2].ifBlank { defaultUnit }
