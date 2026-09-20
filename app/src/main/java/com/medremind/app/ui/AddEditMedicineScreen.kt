@@ -811,9 +811,15 @@ private fun ScheduleSheet(
     var repeatCycle by remember { mutableStateOf(true) }
     var durationDays by remember { mutableIntStateOf(0) }
     var customDurationText by remember { mutableStateOf("14") }
+    var durationStep by remember { mutableStateOf(false) }
     var dates by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var month by remember { mutableStateOf(YearMonth.now()) }
     val valid = picked?.let { patternValid(it, daysMask, dates, repeatCycle) } ?: false
+    val view = when {
+        picked == null -> 0
+        durationStep -> 100
+        else -> 1
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -822,9 +828,9 @@ private fun ScheduleSheet(
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         AnimatedContent(
-            targetState = picked,
+            targetState = view,
             transitionSpec = {
-                val forward = targetState != null
+                val forward = targetState > initialState
                 val enter = slideInHorizontally(motionTween(MedMotion.Medium)) { w ->
                     if (forward) w else -w
                 } + fadeIn(motionTween(MedMotion.Medium))
@@ -842,7 +848,8 @@ private fun ScheduleSheet(
                     .padding(horizontal = 20.dp)
                     .padding(bottom = 28.dp)
             ) {
-                if (current == null) {
+                val type = picked ?: PatternType.DAILY
+                if (current == 0) {
                     Text(
                         "Add schedule",
                         style = MaterialTheme.typography.titleMedium,
@@ -855,9 +862,126 @@ private fun ScheduleSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(12.dp))
-                    listOf(0, 1, 2, 3, 4).forEach { type ->
-                        SheetTypeRow(type = type, onClick = { picked = type })
+                    listOf(0, 1, 2, 3, 4).forEach { option ->
+                        SheetTypeRow(type = option, onClick = { picked = option })
                     }
+                } else if (current == 100) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            onClick = { durationStep = false },
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        ) {
+                            Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Rounded.ChevronLeft,
+                                    contentDescription = "Back",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "For how long?",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                patternTitle(type),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(18.dp))
+
+                    val durationIsCustom =
+                        durationDays > 0 && durationDays != 7 && durationDays != 30
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(0 to "Keep taking", 7 to "7 days", 30 to "30 days", -1 to "Custom")
+                            .forEach { (days, label) ->
+                                val selected =
+                                    if (days == -1) durationIsCustom else durationDays == days
+                                DurationChip(
+                                    label = label,
+                                    selected = selected,
+                                    onClick = {
+                                        if (days == -1) {
+                                            durationDays = customDurationText.toIntOrNull()
+                                                ?.coerceIn(1, 365) ?: 14
+                                        } else {
+                                            durationDays = days
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                    }
+                    if (durationIsCustom) {
+                        Spacer(Modifier.height(10.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "For",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            OutlinedTextField(
+                                value = customDurationText,
+                                onValueChange = { value ->
+                                    val filtered = value.filter { it.isDigit() }.take(3)
+                                    customDurationText = filtered
+                                    val n = filtered.toIntOrNull()
+                                    if (n != null && n in 1..365) durationDays = n
+                                },
+                                singleLine = true,
+                                modifier = Modifier.width(96.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "days",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    val durationMessage = durationError(
+                        type, durationDays, cycleOn, cycleOff, intervalDays, repeatCycle
+                    )
+                    if (durationMessage != null) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            durationMessage,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    Spacer(Modifier.height(22.dp))
+                    GradientPillButton(
+                        text = "Save schedule",
+                        icon = Icons.Rounded.Check,
+                        onClick = {
+                            onSave(
+                                SchedulePattern(
+                                    type = type,
+                                    daysMask = daysMask,
+                                    intervalDays = intervalDays,
+                                    cycleOnDays = cycleOn,
+                                    cycleOffDays = cycleOff,
+                                    repeatCycle = repeatCycle,
+                                    selectedDates = dates,
+                                    durationDays = durationDays
+                                )
+                            )
+                        },
+                        enabled = valid && durationMessage == null,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
@@ -877,12 +1001,12 @@ private fun ScheduleSheet(
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                patternTitle(current),
+                                patternTitle(type),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                patternExample(current),
+                                patternExample(type),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -890,7 +1014,7 @@ private fun ScheduleSheet(
                     }
                     Spacer(Modifier.height(18.dp))
 
-                    when (current) {
+                    when (type) {
                         1 -> {
                             FieldLabel("Which days?")
                             Spacer(Modifier.height(12.dp))
@@ -1105,81 +1229,29 @@ private fun ScheduleSheet(
                             }
                         }
                     }
-                    if (current != PatternType.PRN) {
-                        Spacer(Modifier.height(20.dp))
-                        FieldLabel("For how long?", hint = "(optional)")
-                        val durationIsCustom =
-                            durationDays > 0 && durationDays != 7 && durationDays != 30
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            listOf(0 to "Keep taking", 7 to "7 days", 30 to "30 days", -1 to "Custom")
-                                .forEach { (days, label) ->
-                                    val selected =
-                                        if (days == -1) durationIsCustom else durationDays == days
-                                    DurationChip(
-                                        label = label,
-                                        selected = selected,
-                                        onClick = {
-                                            if (days == -1) {
-                                                durationDays = customDurationText.toIntOrNull()
-                                                    ?.coerceIn(1, 365) ?: 14
-                                            } else {
-                                                durationDays = days
-                                            }
-                                        },
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
-                        }
-                        if (durationIsCustom) {
-                            Spacer(Modifier.height(10.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    "For",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                OutlinedTextField(
-                                    value = customDurationText,
-                                    onValueChange = { value ->
-                                        val filtered = value.filter { it.isDigit() }.take(3)
-                                        customDurationText = filtered
-                                        val n = filtered.toIntOrNull()
-                                        if (n != null && n in 1..365) durationDays = n
-                                    },
-                                    singleLine = true,
-                                    modifier = Modifier.width(96.dp)
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    "days",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-
+                    val needsDuration = type != PatternType.PRN &&
+                        !(type == PatternType.CUSTOM && !repeatCycle)
                     Spacer(Modifier.height(22.dp))
                     GradientPillButton(
-                        text = "Save schedule",
-                        icon = Icons.Rounded.Check,
+                        text = if (needsDuration) "Next: for how long?" else "Save schedule",
+                        icon = if (needsDuration) Icons.Rounded.ChevronRight else Icons.Rounded.Check,
                         onClick = {
-                            onSave(
-                                SchedulePattern(
-                                    type = current,
-                                    daysMask = daysMask,
-                                    intervalDays = intervalDays,
-                                    cycleOnDays = cycleOn,
-                                    cycleOffDays = cycleOff,
-                                    repeatCycle = repeatCycle,
-                                    selectedDates = dates,
-                                    durationDays = if (current == PatternType.PRN) 0 else durationDays
+                            if (needsDuration) {
+                                durationStep = true
+                            } else {
+                                onSave(
+                                    SchedulePattern(
+                                        type = type,
+                                        daysMask = daysMask,
+                                        intervalDays = intervalDays,
+                                        cycleOnDays = cycleOn,
+                                        cycleOffDays = cycleOff,
+                                        repeatCycle = repeatCycle,
+                                        selectedDates = dates,
+                                        durationDays = 0
+                                    )
                                 )
-                            )
+                            }
                         },
                         enabled = valid,
                         modifier = Modifier.fillMaxWidth()
@@ -1341,6 +1413,32 @@ private fun patternValid(
     3 -> if (repeatCycle) true else dates.isNotEmpty()
     5 -> dates.isNotEmpty()
     else -> true
+}
+
+private fun durationError(
+    type: Int,
+    durationDays: Int,
+    cycleOn: Int,
+    cycleOff: Int,
+    intervalDays: Int,
+    repeatCycle: Boolean
+): String? {
+    if (durationDays <= 0) return null
+    return when {
+        type == PatternType.CUSTOM && repeatCycle -> {
+            val period = (cycleOn + cycleOff).coerceAtLeast(1)
+            when {
+                durationDays < period -> "Must be at least $period days (one full cycle)."
+                durationDays % period != 0 ->
+                    "Choose a multiple of $period days (${period}, ${period * 2}, " +
+                        "${period * 3}\u2026) or Keep taking."
+                else -> null
+            }
+        }
+        type == PatternType.EVERY_N ->
+            if (durationDays < intervalDays) "Must be at least $intervalDays days." else null
+        else -> null
+    }
 }
 
 private fun patternSummary(pattern: SchedulePattern): String = when (pattern.type) {
