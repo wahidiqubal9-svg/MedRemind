@@ -1258,14 +1258,12 @@ private fun DoseActionButton(
 }
 
 private fun doseSubtitle(dose: TodayDose): String {
-    val doseText = dose.schedule.doseLabel.takeIf { it.isNotBlank() }
-        ?: dose.medicine.strength.takeIf { it.isNotBlank() }
-        ?: "1 dose"
-    val pattern = schedulePatternLabel(dose.schedule)
-    val intake = com.medremind.app.data.IntakeInstruction.label(dose.medicine.intakeInstruction)
-    return listOf(doseText, pattern, intake)
+    val strength = dose.medicine.strength
+    val perTime = dose.schedule.doseLabel
+    return listOf(strength, perTime)
         .filter { it.isNotBlank() }
-        .joinToString("  |  ")
+        .joinToString(" \u00b7 ")
+        .ifBlank { "1 dose" }
 }
 
 private fun weekdayLetter(date: LocalDate): String =

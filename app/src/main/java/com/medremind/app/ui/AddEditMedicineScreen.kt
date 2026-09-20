@@ -805,7 +805,7 @@ private fun ScheduleStep(
     }
     Spacer(Modifier.height(8.dp))
     Text(
-        "Tap any time to adjust it.",
+        "Tap a time (or the pencil) to change it.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -1474,7 +1474,7 @@ private fun AlarmRow(
             ) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        text = formatTimeLabel(time),
+                        text = timeWithoutSuffix(time),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Light
                     )
@@ -1500,6 +1500,13 @@ private fun AlarmRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                Spacer(Modifier.width(10.dp))
+                Icon(
+                    imageVector = Icons.Rounded.Edit,
+                    contentDescription = "Change time",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }
@@ -2295,6 +2302,17 @@ private fun daysLabel(mask: Int): String = when {
     else -> dayNamesFull.filterIndexed { index, _ -> (mask and (1 shl index)) != 0 }
         .joinToString(", ")
         .ifBlank { "No days" }
+}
+
+private fun timeWithoutSuffix(time: String): String {
+    val hour = time.substringBefore(':').toIntOrNull() ?: return time
+    val minute = time.substringAfter(':', "0").toIntOrNull() ?: 0
+    val h = when {
+        hour == 0 -> 12
+        hour > 12 -> hour - 12
+        else -> hour
+    }
+    return String.format(Locale.getDefault(), "%d:%02d", h, minute)
 }
 
 private fun formatTimeLabel(time: String): String {
