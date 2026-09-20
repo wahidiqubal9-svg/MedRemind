@@ -195,12 +195,12 @@ fun AddEditMedicineScreen(
     var trackRefill by rememberSaveable { mutableStateOf((initial?.quantity ?: 0) > 0) }
     var timesCount by remember { mutableIntStateOf(2) }
     var isCustomCount by remember { mutableStateOf(false) }
-    var patterns by remember { mutableStateOf<List<SchedulePattern>>(emptyList()) }
+    var pattern by remember { mutableStateOf(SchedulePattern(PatternType.DAILY)) }
     var showScheduleSheet by remember { mutableStateOf(false) }
     var durationDays by remember { mutableIntStateOf(0) }
     var times by remember { mutableStateOf(listOf("08:00", "20:00")) }
     var editingTimeIndex by remember { mutableStateOf<Int?>(null) }
-    val allPrn = patterns.isNotEmpty() && patterns.all { it.type == PatternType.PRN }
+    val allPrn = pattern.type == PatternType.PRN
 
     LaunchedEffect(initial?.id) {
         if (initial != null) {
@@ -216,7 +216,8 @@ fun AddEditMedicineScreen(
                     .ifEmpty { listOf("08:00") }
                 timesCount = times.size.coerceIn(1, 10)
                 isCustomCount = timesCount > 4
-                patterns = existing.map { it.toPattern() }
+                pattern = existing.firstOrNull()?.toPattern()
+                    ?: SchedulePattern(PatternType.DAILY)
                 durationDays = first.endDate?.let { end ->
                     val days = ((end - System.currentTimeMillis()) / 86_400_000L).toInt()
                     days.coerceAtLeast(1)
@@ -261,7 +262,7 @@ fun AddEditMedicineScreen(
                 timesCount = 2
                 isCustomCount = false
                 trackRefill = false
-                patterns = emptyList()
+                pattern = SchedulePattern(PatternType.DAILY)
                 showScheduleSheet = false
                 durationDays = 0
                 times = listOf("08:00", "20:00")
@@ -347,11 +348,8 @@ fun AddEditMedicineScreen(
                         onForm = { form = it }
                     )
                     1 -> ScheduleStep(
-                        patterns = patterns,
-                        onAdd = { showScheduleSheet = true },
-                        onRemovePattern = { index ->
-                            patterns = patterns.filterIndexed { i, _ -> i != index }
-                        },
+                        pattern = pattern,
+                        onChange = { showScheduleSheet = true },
                         timesCount = timesCount,
                         isCustomCount = isCustomCount,
                         onSelectCount = { count, custom ->
@@ -383,8 +381,7 @@ fun AddEditMedicineScreen(
                         formLabel = MedicineForm.label(form),
                         timeLabel = if (allPrn) "Take when needed"
                         else times.joinToString(" · ") { formatTimeLabel(it) },
-                        daysLabel = if (patterns.isEmpty()) "No schedule"
-                        else patterns.joinToString(", ") { patternSummary(it) },
+                        daysLabel = patternSummary(pattern),
                         durationLabel = if (allPrn) "Ongoing"
                         else if (durationDays == 0) "Continue" else "$durationDays days",
                         intakeLabel = com.medremind.app.data.IntakeInstruction.label(intake),
@@ -451,20 +448,18 @@ fun AddEditMedicineScreen(
                                 val endMillis = if (!allPrn && durationDays > 0) {
                                     System.currentTimeMillis() + durationDays * 86_400_000L
                                 } else null
-                                val schedules = patterns.map { p ->
-                                    p.toSchedule(
-                                        medicineId = base.id,
-                                        times = sharedTimes,
-                                        endDate = endMillis,
-                                        doseLabel = "$qtyAmount $qtyUnit".trim()
-                                    )
-                                }
-                                vm.saveMedicine(medicine, schedules) { saved = true }
+                                val schedule = pattern.toSchedule(
+                                    medicineId = base.id,
+                                    times = sharedTimes,
+                                    endDate = endMillis,
+                                    doseLabel = "$qtyAmount $qtyUnit".trim()
+                                )
+                                vm.saveMedicine(medicine, listOf(schedule)) { saved = true }
                             }
                         },
                         enabled = when (step) {
                             0 -> name.isNotBlank()
-                            1 -> patterns.isNotEmpty()
+                            1 -> true
                             else -> true
                         },
                         modifier = Modifier.fillMaxWidth()
@@ -526,8 +521,8 @@ fun AddEditMedicineScreen(
     if (showScheduleSheet) {
         ScheduleSheet(
             onDismiss = { showScheduleSheet = false },
-            onSave = { pattern ->
-                patterns = patterns + pattern
+            onSave = { chosen ->
+                pattern = chosen
                 showScheduleSheet = false
             }
         )
@@ -709,9 +704,8 @@ private fun StepperButton(
 
 @Composable
 private fun ScheduleStep(
-    patterns: List<SchedulePattern>,
-    onAdd: () -> Unit,
-    onRemovePattern: (Int) -> Unit,
+    pattern: SchedulePattern,
+    onChange: () -> Unit,
     timesCount: Int,
     isCustomCount: Boolean,
     onSelectCount: (Int, Boolean) -> Unit,
@@ -737,35 +731,13 @@ private fun ScheduleStep(
     )
 
     Spacer(Modifier.height(18.dp))
-    FieldLabel("Schedules")
-    if (patterns.isEmpty()) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            color = MaterialTheme.colorScheme.surface,
-            border = androidx.compose.foundation.BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.outlineVariant
-            )
-        ) {
-            Text(
-                "No schedule added yet. Tap \u201cAdd schedule\u201d below.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(22.dp)
-            )
-        }
-    } else {
-        patterns.forEachIndexed { index, pattern ->
-            PatternCard(pattern = pattern, onRemove = { onRemovePattern(index) })
-            Spacer(Modifier.height(10.dp))
-        }
-    }
-    Spacer(Modifier.height(6.dp))
+    FieldLabel("Schedule")
+    PatternCard(pattern = pattern)
+    Spacer(Modifier.height(10.dp))
     GradientPillButton(
-        text = "Add schedule",
-        icon = Icons.Rounded.Add,
-        onClick = onAdd,
+        text = "Change schedule",
+        icon = Icons.Rounded.Autorenew,
+        onClick = onChange,
         modifier = Modifier.fillMaxWidth()
     )
 
@@ -1251,8 +1223,7 @@ private fun SheetTypeRow(type: Int, onClick: () -> Unit) {
 }
 
 @Composable
-private fun PatternCard(pattern: SchedulePattern, onRemove: () -> Unit) {
-    val haptics = rememberMedHaptics()
+private fun PatternCard(pattern: SchedulePattern) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -1293,19 +1264,6 @@ private fun PatternCard(pattern: SchedulePattern, onRemove: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-            Surface(
-                onClick = {
-                    haptics.reject()
-                    onRemove()
-                },
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-            ) {
-                Box(modifier = Modifier.size(34.dp), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Remove", modifier = Modifier.size(16.dp))
-                }
             }
         }
     }
