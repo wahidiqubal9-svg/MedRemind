@@ -2315,8 +2315,8 @@ private fun PatternCalendar(
                     if (dayNumber in 1..month.lengthOfMonth()) {
                         val date = month.atDay(dayNumber)
                         val diff = date.toEpochDay() - today.toEpochDay()
-                        val mod = (((diff % period) + period) % period)
-                        val on = mod < onDays
+                        val isPast = diff < 0
+                        val on = !isPast && (diff % period) < onDays
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -2328,8 +2328,11 @@ private fun PatternCalendar(
                                     .size(36.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        if (on) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.surfaceContainerHigh
+                                        when {
+                                            on -> MaterialTheme.colorScheme.primary
+                                            isPast -> Color.Transparent
+                                            else -> MaterialTheme.colorScheme.surfaceContainerHigh
+                                        }
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -2337,8 +2340,11 @@ private fun PatternCalendar(
                                     text = dayNumber.toString(),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
-                                    color = if (on) MaterialTheme.colorScheme.onPrimary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = when {
+                                        on -> MaterialTheme.colorScheme.onPrimary
+                                        isPast -> MaterialTheme.colorScheme.outlineVariant
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
                                 )
                             }
                         }
