@@ -1154,12 +1154,9 @@ private fun DoseRow(
     onSkip: (TodayDose) -> Unit
 ) {
     val completed = dose.status != DoseStatus.PENDING
-    val pill = listOf(dose.medicine.strength, dose.schedule.doseLabel)
+    val detail = listOf(dose.medicine.strength, dose.schedule.doseLabel)
         .filter { it.isNotBlank() }
         .joinToString(" \u00b7 ")
-    val instruction = com.medremind.app.data.IntakeInstruction
-        .label(dose.medicine.intakeInstruction)
-        .ifBlank { schedulePatternLabel(dose.schedule) }
 
     Row(
         modifier = Modifier
@@ -1175,24 +1172,17 @@ private fun DoseRow(
         )
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = dose.medicine.name,
+                style = MaterialTheme.typography.titleMedium,
+                textDecoration = if (completed) TextDecoration.LineThrough else null,
+                color = if (completed) MaterialTheme.colorScheme.onSurfaceVariant
+                else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1
+            )
+            if (detail.isNotBlank()) {
                 Text(
-                    text = dose.medicine.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    textDecoration = if (completed) TextDecoration.LineThrough else null,
-                    color = if (completed) MaterialTheme.colorScheme.onSurfaceVariant
-                    else MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f, fill = false)
-                )
-                if (pill.isNotBlank()) {
-                    Spacer(Modifier.width(6.dp))
-                    StrengthPill(pill)
-                }
-            }
-            if (instruction.isNotBlank()) {
-                Text(
-                    text = instruction,
+                    text = detail,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1

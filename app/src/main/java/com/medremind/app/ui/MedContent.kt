@@ -414,7 +414,7 @@ private fun MedicineCard(
     val line = MaterialTheme.colorScheme.outlineVariant
     val soft = MaterialTheme.colorScheme.surfaceContainerLow
     val doseLabel = schedules.firstNotNullOfOrNull { s -> s.doseLabel.takeIf { it.isNotBlank() } }.orEmpty()
-    val sub = listOf(doseLabel, MedicineForm.label(medicine.form))
+    val sub = listOf(medicine.strength, doseLabel)
         .filter { it.isNotBlank() }.joinToString(" \u00b7 ")
     val daysSchedule = schedules.firstOrNull { it.type == ScheduleType.WEEKDAYS }
     val tracked = medicine.quantity > 0
@@ -440,29 +440,16 @@ private fun MedicineCard(
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text(
-                            medicine.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            maxLines = 1,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                        if (medicine.strength.isNotBlank()) {
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                medicine.strength,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.ExtraBold,
-                                maxLines = 1
-                            )
-                        }
-                    }
+                    Text(
+                        text = medicine.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1
+                    )
                     if (sub.isNotBlank()) {
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            sub,
+                            text = sub,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.SemiBold,
