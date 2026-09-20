@@ -4,6 +4,10 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +20,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Bloodtype
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -38,6 +46,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.medremind.app.data.Metric
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 
@@ -256,7 +269,7 @@ fun VitalsStatCard(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier,
+        modifier = modifier.height(118.dp),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(
@@ -461,6 +474,174 @@ fun MetricChartCard(
                     } else {
                         drawCircle(s.color, radius = 3.5f, center = Offset(cx, cy))
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun GlucoseTrendsCard(
+    readings: List<Metric>,
+    modifier: Modifier = Modifier
+) {
+    if (readings.isEmpty()) return
+    val chips = readings.takeLast(6)
+    var selectedIndex by remember(readings.size) { mutableStateOf(chips.lastIndex) }
+    val index = selectedIndex.coerceIn(0, chips.lastIndex)
+    val selected = chips[index]
+    val zone = Vitals.classifyCBG(selected.value)
+    val zoneColor = Vitals.color(zone)
+    val zoneBg = when (zone) {
+        HealthZone.GREEN -> Vitals.GreenBg
+        HealthZone.YELLOW -> Vitals.YellowBg
+        HealthZone.RED -> Vitals.RedBg
+    }
+    val statusText = when (zone) {
+        HealthZone.GREEN -> "In Control"
+        HealthZone.YELLOW -> "Borderline"
+        HealthZone.RED -> "Out of control"
+    }
+    val hour = Calendar.getInstance().apply { timeInMillis = selected.recordedAt }
+        .get(Calendar.HOUR_OF_DAY)
+    val context = when (hour) {
+        in 5..11 -> "Morning"
+        in 12..16 -> "Afternoon"
+        in 17..20 -> "Evening"
+        else -> "Night"
+    }
+    val dateFormat = remember { SimpleDateFormat("d MMM, h:mm a", Locale.getDefault()) }
+    val isMostRecent = index == chips.lastIndex
+
+    MedCard(modifier = modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(Vitals.Red),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Rounded.Bloodtype,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            Text(
+                "Blood Glucose",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                Icons.Rounded.Info,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ) {
+                Text(
+                    "Records ${readings.size}",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                )
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(zoneBg)
+                .border(1.5.dp, zoneColor.copy(alpha = 0.5f), RoundedCornerShape(18.dp))
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    statusText,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = zoneColor
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    context,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    dateFormat.format(Date(selected.recordedAt)) +
+                        if (isMostRecent) "  (Most Recent)" else "",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    "${selected.value.toInt()}",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = zoneColor
+                )
+                Text(
+                    "mg/dL",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            chips.forEachIndexed { chipIndex, metric ->
+                val z = Vitals.classifyCBG(metric.value)
+                val c = Vitals.color(z)
+                val selectedChip = chipIndex == index
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Surface(
+                        onClick = { selectedIndex = chipIndex },
+                        shape = CircleShape,
+                        color = if (selectedChip) c.copy(alpha = 0.12f)
+                        else MaterialTheme.colorScheme.surface,
+                        border = androidx.compose.foundation.BorderStroke(
+                            if (selectedChip) 2.5.dp else 1.dp,
+                            if (selectedChip) c else c.copy(alpha = 0.45f)
+                        )
+                    ) {
+                        Box(
+                            modifier = Modifier.size(56.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "${metric.value.toInt()}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = c
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        SimpleDateFormat("h a", Locale.getDefault())
+                            .format(Date(metric.recordedAt)),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }

@@ -463,6 +463,7 @@ private fun HealthScreen(
                     yMin = 40f,
                     yMax = 300f
                 )
+                GlucoseTrendsCard(readings = glucoseReadings)
             }
 
             if (weightReadings.isNotEmpty()) {
