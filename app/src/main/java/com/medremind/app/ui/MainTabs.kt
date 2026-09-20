@@ -412,6 +412,10 @@ private fun HealthScreen(
             }
 
             if (glucoseReadings.isNotEmpty()) {
+                GlucoseTrendsCard(
+                    readings = glucoseReadings,
+                    onAdd = { showAddGlucose = true }
+                )
                 VitalsChartCard(
                     title = "Blood Glucose",
                     subtitle = "CBG (mg/dL) \u00b7 last ${glucoseReadings.size}",
@@ -439,45 +443,9 @@ private fun HealthScreen(
                     },
                     onAdd = { showAddGlucose = true }
                 )
-                GlucoseTrendsCard(
-                    readings = glucoseReadings,
-                    onAdd = { showAddGlucose = true }
-                )
             }
 
             if (bpReadings.isNotEmpty()) {
-                VitalsChartCard(
-                    title = "Blood Pressure",
-                    subtitle = "Systolic / Diastolic (mmHg) \u00b7 last ${bpReadings.size}",
-                    currentText = "${bpReadings.last().value.toInt()}/" +
-                        "${bpReadings.last().value2.toInt()}",
-                    series = listOf(
-                        VitalSeries(
-                            label = "Systolic",
-                            color = Vitals.Systolic,
-                            values = bpReadings.map { it.value },
-                            zones = bpReadings.map { Vitals.classifyBP(it.value, it.value2) }
-                        ),
-                        VitalSeries(
-                            label = "Diastolic",
-                            color = Vitals.Diastolic,
-                            values = bpReadings.map { it.value2 },
-                            zones = bpReadings.map { Vitals.classifyBP(it.value, it.value2) }
-                        )
-                    ),
-                    bands = listOf(
-                        ZoneBand(140f, 180f, Vitals.Red),
-                        ZoneBand(120f, 140f, Vitals.Yellow),
-                        ZoneBand(90f, 120f, Vitals.Green),
-                        ZoneBand(50f, 90f, Vitals.Red)
-                    ),
-                    yMin = 50f,
-                    yMax = 180f,
-                    xLabels = bpReadings.map {
-                        SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(it.recordedAt))
-                    },
-                    onAdd = { showAddBp = true }
-                )
                 BpTrendsCard(
                     readings = bpReadings,
                     onAdd = { showAddBp = true }

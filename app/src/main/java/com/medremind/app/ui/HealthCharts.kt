@@ -208,9 +208,9 @@ fun VitalsChartCard(
                 .fillMaxWidth()
                 .height(chartHeight)
         ) {
-            val left = 36f
-            val right = size.width - 6f
-            val top = 8f
+            val left = 68f
+            val right = size.width - 24f
+            val top = 14f
             val bottom = size.height - 24f
             val width = (right - left).coerceAtLeast(1f)
             val height = (bottom - top).coerceAtLeast(1f)
@@ -330,7 +330,7 @@ fun VitalsStatCard(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier.height(118.dp),
+        modifier = modifier.height(102.dp),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(
@@ -339,22 +339,23 @@ fun VitalsStatCard(
         ),
         shadowElevation = MedElevation.card
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Text(
                 label.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 0.5.sp
+                letterSpacing = 0.4.sp
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
             Text(
                 value,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.ExtraBold
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1
             )
             if (badgeText != null) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
                 Surface(
                     shape = RoundedCornerShape(50),
                     color = badgeTint.copy(alpha = 0.16f),
@@ -362,9 +363,9 @@ fun VitalsStatCard(
                 ) {
                     Text(
                         badgeText,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
             }
@@ -687,15 +688,24 @@ fun GlucoseTrendsCard(
                 val c = Vitals.color(z)
                 val selectedChip = chipIndex == index
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier.height(14.dp),
+                        contentAlignment = Alignment.BottomCenter
+                    ) {
+                        if (selectedChip) {
+                            Text(
+                                "\u25BC",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = c
+                            )
+                        }
+                    }
                     Surface(
                         onClick = { selectedIndex = chipIndex },
                         shape = CircleShape,
-                        color = if (selectedChip) c.copy(alpha = 0.12f)
-                        else MaterialTheme.colorScheme.surface,
-                        border = androidx.compose.foundation.BorderStroke(
-                            if (selectedChip) 2.5.dp else 1.dp,
-                            if (selectedChip) c else c.copy(alpha = 0.45f)
-                        )
+                        color = if (selectedChip) c else MaterialTheme.colorScheme.surface,
+                        border = if (selectedChip) null
+                        else androidx.compose.foundation.BorderStroke(1.dp, c.copy(alpha = 0.45f))
                     ) {
                         Box(
                             modifier = Modifier.size(56.dp),
@@ -705,7 +715,7 @@ fun GlucoseTrendsCard(
                                 "${metric.value.toInt()}",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = c
+                                color = if (selectedChip) Color.White else c
                             )
                         }
                     }
@@ -871,15 +881,24 @@ fun BpTrendsCard(
                 val c = Vitals.color(z)
                 val selectedChip = chipIndex == index
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier.height(14.dp),
+                        contentAlignment = Alignment.BottomCenter
+                    ) {
+                        if (selectedChip) {
+                            Text(
+                                "\u25BC",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = c
+                            )
+                        }
+                    }
                     Surface(
                         onClick = { selectedIndex = chipIndex },
                         shape = CircleShape,
-                        color = if (selectedChip) c.copy(alpha = 0.12f)
-                        else MaterialTheme.colorScheme.surface,
-                        border = androidx.compose.foundation.BorderStroke(
-                            if (selectedChip) 2.5.dp else 1.dp,
-                            if (selectedChip) c else c.copy(alpha = 0.45f)
-                        )
+                        color = if (selectedChip) c else MaterialTheme.colorScheme.surface,
+                        border = if (selectedChip) null
+                        else androidx.compose.foundation.BorderStroke(1.dp, c.copy(alpha = 0.45f))
                     ) {
                         Box(
                             modifier = Modifier.size(58.dp),
@@ -889,7 +908,7 @@ fun BpTrendsCard(
                                 "${metric.value.toInt()}/${metric.value2.toInt()}",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = c
+                                color = if (selectedChip) Color.White else c
                             )
                         }
                     }
