@@ -77,6 +77,28 @@ object ReminderScheduler {
             return null
         }
 
+        if (schedule.type == ScheduleType.CYCLE) {
+            val on = schedule.cycleOnDays.coerceAtLeast(1)
+            val off = schedule.cycleOffDays.coerceAtLeast(0)
+            val period = on + off
+            val anchor = if (schedule.startDate > 0) dateOf(schedule.startDate) else from.toLocalDate()
+            var day = from.toLocalDate()
+            var i = 0
+            while (i < period + 2) {
+                if (endDate != null && day.isAfter(endDate)) return null
+                val diff = day.toEpochDay() - anchor.toEpochDay()
+                if (diff >= 0 && (diff % period) < on) {
+                    for (t in times) {
+                        val ms = toMillis(day, t)
+                        if (ms > fromMillis) return ms
+                    }
+                }
+                day = day.plusDays(1)
+                i++
+            }
+            return null
+        }
+
         if (schedule.type == ScheduleType.EVERY_N_DAYS) {
             val gap = schedule.intervalDays.coerceAtLeast(2)
             val anchor = if (schedule.startDate > 0) dateOf(schedule.startDate) else from.toLocalDate()
@@ -164,6 +186,19 @@ object ReminderScheduler {
                 } else {
                     val diff = date.toEpochDay() - anchor.toEpochDay()
                     if (diff < 0 || diff % gap != 0L) emptyList()
+                    else parseTimes(schedule.times).map { toMillis(date, it) }
+                }
+            }
+            ScheduleType.CYCLE -> {
+                val on = schedule.cycleOnDays.coerceAtLeast(1)
+                val off = schedule.cycleOffDays.coerceAtLeast(0)
+                val period = on + off
+                val anchor = if (schedule.startDate > 0) dateOf(schedule.startDate) else null
+                if (anchor == null) {
+                    emptyList()
+                } else {
+                    val diff = date.toEpochDay() - anchor.toEpochDay()
+                    if (diff < 0 || (diff % period) >= on) emptyList()
                     else parseTimes(schedule.times).map { toMillis(date, it) }
                 }
             }

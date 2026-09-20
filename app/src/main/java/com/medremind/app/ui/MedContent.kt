@@ -1049,6 +1049,7 @@ private fun frequencyLabel(schedules: List<Schedule>): String {
         ScheduleType.WEEKDAYS -> "${Integer.bitCount(s.daysMask)} days / week"
         ScheduleType.INTERVAL -> "Every ${s.intervalHours} h"
         ScheduleType.EVERY_N_DAYS -> "Every ${s.intervalDays.coerceAtLeast(2)} days"
+        ScheduleType.CYCLE -> "${s.cycleOnDays} days on \u00b7 ${s.cycleOffDays} rest"
         ScheduleType.SELECTED_DATES -> {
             val count = s.selectedDates.split(',').count { it.trim().isNotEmpty() }
             "$count date" + (if (count == 1) "" else "s")
@@ -1407,6 +1408,11 @@ private fun dailyDose(schedules: List<Schedule>): Float {
         val factor = when (s.type) {
             ScheduleType.WEEKDAYS -> Integer.bitCount(s.daysMask) / 7f
             ScheduleType.EVERY_N_DAYS -> 1f / s.intervalDays.coerceAtLeast(2)
+            ScheduleType.CYCLE -> {
+                val on = s.cycleOnDays.coerceAtLeast(1)
+                val off = s.cycleOffDays.coerceAtLeast(0)
+                on / (on + off).toFloat()
+            }
             ScheduleType.SELECTED_DATES -> {
                 val today = java.time.LocalDate.now().toEpochDay()
                 val recent = s.selectedDates.split(',').mapNotNull { it.trim().toLongOrNull() }
@@ -1471,6 +1477,7 @@ internal fun schedulePatternLabel(schedule: Schedule): String = when (schedule.t
     }
     ScheduleType.INTERVAL -> "Every ${schedule.intervalHours} h"
     ScheduleType.EVERY_N_DAYS -> "Every ${schedule.intervalDays.coerceAtLeast(2)} days"
+    ScheduleType.CYCLE -> "${schedule.cycleOnDays} days on, ${schedule.cycleOffDays} rest"
     ScheduleType.SELECTED_DATES -> {
         val count = schedule.selectedDates.split(',').count { it.trim().isNotEmpty() }
         "$count selected date" + (if (count == 1) "" else "s")

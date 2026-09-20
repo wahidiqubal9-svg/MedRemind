@@ -17,6 +17,9 @@ object ScheduleType {
 
     /** Only the specific calendar dates in [Schedule.selectedDates]. */
     const val SELECTED_DATES = "SELECTED_DATES"
+
+    /** On for N days, then off for M days, repeating (e.g. 21 on / 7 off). */
+    const val CYCLE = "CYCLE"
 }
 
 @Entity(
@@ -45,5 +48,9 @@ data class Schedule(
     /** For EVERY_N_DAYS: the gap in days. */
     val intervalDays: Int = 0,
     /** For SELECTED_DATES: comma-separated epoch days. */
-    val selectedDates: String = ""
+    val selectedDates: String = "",
+    /** For CYCLE: number of days on. */
+    val cycleOnDays: Int = 0,
+    /** For CYCLE: number of days off between cycles. */
+    val cycleOffDays: Int = 0
 )

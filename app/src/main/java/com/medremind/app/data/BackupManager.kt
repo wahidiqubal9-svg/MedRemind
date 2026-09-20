@@ -70,6 +70,8 @@ object BackupManager {
                         put("enabled", s.enabled)
                         put("intervalDays", s.intervalDays)
                         put("selectedDates", s.selectedDates)
+                        put("cycleOnDays", s.cycleOnDays)
+                        put("cycleOffDays", s.cycleOffDays)
                     })
                 }
             })
@@ -194,7 +196,9 @@ object BackupManager {
                     doseLabel = o.optString("doseLabel"),
                     enabled = o.optBoolean("enabled", true),
                     intervalDays = o.optInt("intervalDays", 0),
-                    selectedDates = o.optString("selectedDates", "")
+                    selectedDates = o.optString("selectedDates", ""),
+                    cycleOnDays = o.optInt("cycleOnDays", 0),
+                    cycleOffDays = o.optInt("cycleOffDays", 0)
                 )
             )
         }
