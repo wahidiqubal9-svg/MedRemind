@@ -119,20 +119,6 @@ fun HistoryContent(
     val prevPercent = if (prevDue == 0) null else prevTaken * 100 / prevDue
 
     val zone = ZoneId.systemDefault()
-    fun dayOf(millis: Long): LocalDate =
-        Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
-
-    // Per-day adherence across the current period.
-    val byDay = remember(log) {
-        log.groupBy { dayOf(it.scheduledAt) }.mapValues { (_, entries) ->
-            val dueCount = entries.count { it.status != FUTURE_STATUS && it.status != DoseStatus.PENDING }
-            val takenCount = entries.count { it.status == DoseStatus.TAKEN }
-            dueCount to takenCount
-        }
-    }
-
-    val today = LocalDate.now()
-    val weekDays = (6 downTo 0).map { today.minusDays(it.toLong()) }
 
     // Time-of-day reliability.
     val buckets = remember(log) {
@@ -179,31 +165,31 @@ fun HistoryContent(
         }
     }
 
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        item(key = "progress_header") {
-            ScreenHeader("Progress") {
-                SquareIconButton(
-                    icon = Icons.Rounded.Person,
-                    contentDescription = "Me",
-                    onClick = onOpenMe,
-                    photoPath = profilePhoto
-                )
-            }
-        }
-
-        item(key = "range") {
-            MedSegmentedButtons(
-                options = periodLabels,
-                selectedIndex = periodDays.indexOf(rangeDays).coerceAtLeast(0),
-                onSelect = { rangeDays = periodDays[it] },
-                modifier = Modifier.fillMaxWidth()
+    Column(modifier = modifier.fillMaxSize()) {
+        ScreenHeader("Progress") {
+            SquareIconButton(
+                icon = Icons.Rounded.Person,
+                contentDescription = "Me",
+                onClick = onOpenMe,
+                photoPath = profilePhoto
             )
         }
+        MedSegmentedButtons(
+            options = periodLabels,
+            selectedIndex = periodDays.indexOf(rangeDays).coerceAtLeast(0),
+            onSelect = { rangeDays = periodDays[it] },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+        )
 
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 200.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
         item(key = "adherence") {
             AdherenceHeroCard(
                 percent = percent,
@@ -238,10 +224,6 @@ fun HistoryContent(
                     tint = statusTint(DoseStatus.SKIPPED)
                 )
             }
-        }
-
-        item(key = "week_strip") {
-            WeeklyStripCard(days = weekDays, byDay = byDay, today = today)
         }
 
         item(key = "reliability") {
@@ -303,6 +285,7 @@ fun HistoryContent(
                 }
             }
         }
+    }
     }
 }
 
@@ -407,127 +390,6 @@ private fun AdherenceHeroCard(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun WeeklyStripCard(
-    days: List<LocalDate>,
-    byDay: Map<LocalDate, Pair<Int, Int>>,
-    today: LocalDate
-) {
-    MedCard(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Rounded.CalendarMonth,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                "Weekly streak",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                "Last 7 days",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Spacer(Modifier.height(14.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            days.forEach { date ->
-                val info = byDay[date]
-                val due = info?.first ?: 0
-                val taken = info?.second ?: 0
-                val isToday = date == today
-                DayCell(
-                    date = date,
-                    due = due,
-                    taken = taken,
-                    isToday = isToday,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun DayCell(
-    date: LocalDate,
-    due: Int,
-    taken: Int,
-    isToday: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val complete = due > 0 && taken == due
-    val partial = due > 0 && taken in 1 until due
-    val missed = due > 0 && taken == 0
-    val container = when {
-        isToday -> MaterialTheme.colorScheme.primary
-        complete -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.16f)
-        partial -> Color(0xFFFFF4E0)
-        missed -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
-        else -> MaterialTheme.colorScheme.surfaceContainerHigh
-    }
-    val content = when {
-        isToday -> MaterialTheme.colorScheme.onPrimary
-        complete -> MaterialTheme.colorScheme.tertiary
-        partial -> Color(0xFF9A5B00)
-        missed -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val label = when {
-        isToday -> "TODAY"
-        complete -> "100%"
-        due > 0 -> "${taken * 100 / due}%"
-        else -> "\u2014"
-    }
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = date.dayOfWeek.name.take(1),
-            style = MaterialTheme.typography.labelSmall,
-            color = if (isToday) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal
-        )
-        Spacer(Modifier.height(6.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(container),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = when {
-                    complete || isToday -> Icons.Rounded.Check
-                    partial -> Icons.Rounded.Schedule
-                    else -> Icons.Rounded.TaskAlt
-                },
-                contentDescription = null,
-                tint = content,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-        Spacer(Modifier.height(5.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-            color = content,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1
-        )
     }
 }
 

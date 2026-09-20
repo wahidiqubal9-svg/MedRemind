@@ -304,16 +304,11 @@ private fun HealthScreen(
     val metrics by vm.metrics.collectAsState()
     var showAddMetric by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .navigationBarsPadding()
-            .padding(16.dp)
-            .padding(bottom = 120.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        ScreenHeader("Health") {
+    Column(modifier = modifier.fillMaxSize()) {
+        ScreenHeader(
+            "Health",
+            modifier = Modifier.padding(horizontal = 16.dp)
+        ) {
             SquareIconButton(
                 icon = Icons.Rounded.Person,
                 contentDescription = "Me",
@@ -321,7 +316,15 @@ private fun HealthScreen(
                 photoPath = settings.profilePhoto
             )
         }
-
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 120.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
         MedCard(modifier = Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -411,6 +414,7 @@ private fun HealthScreen(
                     )
                 )
             )
+        }
         }
     }
 
