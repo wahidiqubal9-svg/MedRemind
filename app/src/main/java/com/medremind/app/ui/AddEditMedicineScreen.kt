@@ -48,6 +48,7 @@ import androidx.compose.material.icons.rounded.Autorenew
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronLeft
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material.icons.rounded.DeleteOutline
@@ -194,17 +195,19 @@ fun AddEditMedicineScreen(
     var trackRefill by rememberSaveable { mutableStateOf((initial?.quantity ?: 0) > 0) }
     var timesCount by remember { mutableIntStateOf(2) }
     var isCustomCount by remember { mutableStateOf(false) }
-    var frequencyMode by remember { mutableIntStateOf(0) }
-    var daysMask by remember { mutableIntStateOf(0) }
-    var intervalDays by remember { mutableIntStateOf(2) }
-    var cycleOnDays by remember { mutableIntStateOf(21) }
-    var cycleOffDays by remember { mutableIntStateOf(7) }
-    var selectedDates by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var patterns by remember { mutableStateOf<List<SchedulePattern>>(emptyList()) }
+    var addingType by remember { mutableStateOf<Int?>(null) }
+    var showScheduleSheet by remember { mutableStateOf(false) }
+    var draftDaysMask by remember { mutableIntStateOf(0) }
+    var draftIntervalDays by remember { mutableIntStateOf(2) }
+    var draftCycleOn by remember { mutableIntStateOf(21) }
+    var draftCycleOff by remember { mutableIntStateOf(7) }
+    var draftDates by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var calendarMonth by remember { mutableStateOf(YearMonth.now()) }
     var durationDays by remember { mutableIntStateOf(0) }
     var times by remember { mutableStateOf(listOf("08:00", "20:00")) }
     var editingTimeIndex by remember { mutableStateOf<Int?>(null) }
-    val asNeeded = frequencyMode == 4
+    val allPrn = patterns.isNotEmpty() && patterns.all { it.type == PatternType.PRN }
 
     LaunchedEffect(initial?.id) {
         if (initial != null) {
@@ -220,21 +223,7 @@ fun AddEditMedicineScreen(
                     .ifEmpty { listOf("08:00") }
                 timesCount = times.size.coerceIn(1, 10)
                 isCustomCount = timesCount > 4
-                frequencyMode = when (first.type) {
-                    ScheduleType.WEEKDAYS -> 1
-                    ScheduleType.EVERY_N_DAYS -> 2
-                    ScheduleType.CYCLE -> 3
-                    ScheduleType.AS_NEEDED -> 4
-                    ScheduleType.SELECTED_DATES -> 5
-                    else -> 0
-                }
-                daysMask = if (first.type == ScheduleType.WEEKDAYS) first.daysMask else 0
-                intervalDays = first.intervalDays.takeIf { it > 0 } ?: 2
-                cycleOnDays = first.cycleOnDays.takeIf { it > 0 } ?: 21
-                cycleOffDays = first.cycleOffDays.takeIf { it > 0 } ?: 7
-                selectedDates = first.selectedDates.split(',')
-                    .mapNotNull { it.trim().toLongOrNull() }
-                    .toSet()
+                patterns = existing.map { it.toPattern() }
                 durationDays = first.endDate?.let { end ->
                     val days = ((end - System.currentTimeMillis()) / 86_400_000L).toInt()
                     days.coerceAtLeast(1)
@@ -279,12 +268,13 @@ fun AddEditMedicineScreen(
                 timesCount = 2
                 isCustomCount = false
                 trackRefill = false
-                frequencyMode = 0
-                daysMask = 0
-                intervalDays = 2
-                cycleOnDays = 21
-                cycleOffDays = 7
-                selectedDates = emptySet()
+                patterns = emptyList()
+                addingType = null
+                draftDaysMask = 0
+                draftIntervalDays = 2
+                draftCycleOn = 21
+                draftCycleOff = 7
+                draftDates = emptySet()
                 durationDays = 0
                 times = listOf("08:00", "20:00")
                 step = 0
@@ -369,6 +359,58 @@ fun AddEditMedicineScreen(
                         onForm = { form = it }
                     )
                     1 -> ScheduleStep(
+                        patterns = patterns,
+                        showSheet = showScheduleSheet,
+                        onShowSheet = { showScheduleSheet = it },
+                        addingType = addingType,
+                        onChooseType = { type ->
+                            addingType = type
+                            draftDaysMask = 0
+                            draftIntervalDays = 2
+                            draftCycleOn = 21
+                            draftCycleOff = 7
+                            draftDates = emptySet()
+                            showScheduleSheet = false
+                        },
+                        onCancelSub = { addingType = null },
+                        onRemovePattern = { index ->
+                            patterns = patterns.filterIndexed { i, _ -> i != index }
+                        },
+                        onSavePattern = {
+                            val type = addingType
+                            if (type != null) {
+                                patterns = patterns + SchedulePattern(
+                                    type = type,
+                                    daysMask = draftDaysMask,
+                                    intervalDays = draftIntervalDays,
+                                    cycleOnDays = draftCycleOn,
+                                    cycleOffDays = draftCycleOff,
+                                    selectedDates = draftDates
+                                )
+                            }
+                            addingType = null
+                        },
+                        canSavePattern = addingType
+                            ?.let { patternValid(it, draftDaysMask, draftDates) } ?: true,
+                        draftDaysMask = draftDaysMask,
+                        onToggleDay = { index -> draftDaysMask = draftDaysMask xor (1 shl index) },
+                        draftIntervalDays = draftIntervalDays,
+                        onIntervalDays = { draftIntervalDays = it },
+                        draftCycleOn = draftCycleOn,
+                        onCycleOn = { draftCycleOn = it },
+                        draftCycleOff = draftCycleOff,
+                        onCycleOff = { draftCycleOff = it },
+                        draftDates = draftDates,
+                        onToggleDate = { epochDay ->
+                            draftDates = if (epochDay in draftDates) {
+                                draftDates - epochDay
+                            } else {
+                                draftDates + epochDay
+                            }
+                        },
+                        onClearDates = { draftDates = emptySet() },
+                        calendarMonth = calendarMonth,
+                        onCalendarMonth = { calendarMonth = it },
                         timesCount = timesCount,
                         isCustomCount = isCustomCount,
                         onSelectCount = { count, custom ->
@@ -376,27 +418,6 @@ fun AddEditMedicineScreen(
                             timesCount = count
                             times = suggestedTimes(count)
                         },
-                        frequencyMode = frequencyMode,
-                        onFrequencyMode = { frequencyMode = it },
-                        daysMask = daysMask,
-                        onToggleDay = { index -> daysMask = daysMask xor (1 shl index) },
-                        intervalDays = intervalDays,
-                        onIntervalDays = { intervalDays = it },
-                        cycleOnDays = cycleOnDays,
-                        onCycleOnDays = { cycleOnDays = it },
-                        cycleOffDays = cycleOffDays,
-                        onCycleOffDays = { cycleOffDays = it },
-                        selectedDates = selectedDates,
-                        onToggleDate = { epochDay ->
-                            selectedDates = if (epochDay in selectedDates) {
-                                selectedDates - epochDay
-                            } else {
-                                selectedDates + epochDay
-                            }
-                        },
-                        onClearDates = { selectedDates = emptySet() },
-                        calendarMonth = calendarMonth,
-                        onCalendarMonth = { calendarMonth = it },
                         times = times,
                         onEditTime = { index -> editingTimeIndex = index },
                         durationDays = durationDays,
@@ -419,19 +440,11 @@ fun AddEditMedicineScreen(
                         photoPath = photoPath,
                         onEdit = { step = 0 },
                         formLabel = MedicineForm.label(form),
-                        timeLabel = if (asNeeded) "Take when needed"
+                        timeLabel = if (allPrn) "Take when needed"
                         else times.joinToString(" · ") { formatTimeLabel(it) },
-                        daysLabel = when {
-                            asNeeded -> "As needed"
-                            frequencyMode == 1 -> daysLabel(daysMask)
-                            frequencyMode == 2 -> "Every $intervalDays days"
-                            frequencyMode == 3 -> "$cycleOnDays days on, $cycleOffDays rest"
-                            frequencyMode == 5 ->
-                                "${selectedDates.size} selected date" +
-                                    (if (selectedDates.size == 1) "" else "s")
-                            else -> "Every day"
-                        },
-                        durationLabel = if (asNeeded) "Ongoing"
+                        daysLabel = if (patterns.isEmpty()) "No schedule"
+                        else patterns.joinToString(", ") { patternSummary(it) },
+                        durationLabel = if (allPrn) "Ongoing"
                         else if (durationDays == 0) "Continue" else "$durationDays days",
                         intakeLabel = com.medremind.app.data.IntakeInstruction.label(intake),
                         inventoryLabel = buildInventoryLabel(stockAmount, refillBelow)
@@ -482,39 +495,6 @@ fun AddEditMedicineScreen(
                                 step++
                             } else {
                                 val base = initial ?: Medicine(name = "")
-                                val anchorMillis = selectedDates.minOrNull()
-                                    ?.let { epochDayToMillis(it) }
-                                    ?: System.currentTimeMillis()
-                                val schedule = Schedule(
-                                    id = initial?.let { 0L } ?: 0L,
-                                    medicineId = base.id,
-                                    type = when {
-                                        frequencyMode == 4 -> ScheduleType.AS_NEEDED
-                                        frequencyMode == 1 -> ScheduleType.WEEKDAYS
-                                        frequencyMode == 2 -> ScheduleType.EVERY_N_DAYS
-                                        frequencyMode == 3 -> ScheduleType.CYCLE
-                                        frequencyMode == 5 -> ScheduleType.SELECTED_DATES
-                                        else -> ScheduleType.DAILY
-                                    },
-                                    times = if (frequencyMode == 4) "" else times.joinToString(","),
-                                    daysMask = if (frequencyMode == 1) daysMask else 0,
-                                    intervalDays = if (frequencyMode == 2) intervalDays else 0,
-                                    selectedDates = if (frequencyMode == 5) {
-                                        selectedDates.sorted().joinToString(",")
-                                    } else "",
-                                    cycleOnDays = if (frequencyMode == 3) cycleOnDays else 0,
-                                    cycleOffDays = if (frequencyMode == 3) cycleOffDays else 0,
-                                    startDate = when (frequencyMode) {
-                                        2 -> anchorMillis
-                                        3 -> System.currentTimeMillis()
-                                        else -> 0L
-                                    },
-                                    doseLabel = "$qtyAmount $qtyUnit".trim(),
-                                    endDate = if (!asNeeded && durationDays > 0) {
-                                        System.currentTimeMillis() + durationDays * 86_400_000L
-                                    } else null,
-                                    enabled = true
-                                )
                                 val medicine = base.copy(
                                     name = name.trim(),
                                     strength = "$doseAmount $doseUnit".trim(),
@@ -526,15 +506,24 @@ fun AddEditMedicineScreen(
                                     intakeInstruction = intake,
                                     form = form
                                 )
-                                vm.saveMedicine(medicine, listOf(schedule)) { saved = true }
+                                val sharedTimes = if (allPrn) "" else times.joinToString(",")
+                                val endMillis = if (!allPrn && durationDays > 0) {
+                                    System.currentTimeMillis() + durationDays * 86_400_000L
+                                } else null
+                                val schedules = patterns.map { p ->
+                                    p.toSchedule(
+                                        medicineId = base.id,
+                                        times = sharedTimes,
+                                        endDate = endMillis,
+                                        doseLabel = "$qtyAmount $qtyUnit".trim()
+                                    )
+                                }
+                                vm.saveMedicine(medicine, schedules) { saved = true }
                             }
                         },
                         enabled = when (step) {
                             0 -> name.isNotBlank()
-                            1 -> !(
-                                (frequencyMode == 1 && daysMask == 0) ||
-                                    (frequencyMode == 5 && selectedDates.isEmpty())
-                                )
+                            1 -> patterns.isNotEmpty() && addingType == null
                             else -> true
                         },
                         modifier = Modifier.fillMaxWidth()
@@ -769,24 +758,31 @@ private fun StepperButton(
 
 @Composable
 private fun ScheduleStep(
-    timesCount: Int,
-    isCustomCount: Boolean,
-    onSelectCount: (Int, Boolean) -> Unit,
-    frequencyMode: Int,
-    onFrequencyMode: (Int) -> Unit,
-    daysMask: Int,
+    patterns: List<SchedulePattern>,
+    showSheet: Boolean,
+    onShowSheet: (Boolean) -> Unit,
+    addingType: Int?,
+    onChooseType: (Int) -> Unit,
+    onCancelSub: () -> Unit,
+    onRemovePattern: (Int) -> Unit,
+    onSavePattern: () -> Unit,
+    canSavePattern: Boolean,
+    draftDaysMask: Int,
     onToggleDay: (Int) -> Unit,
-    intervalDays: Int,
+    draftIntervalDays: Int,
     onIntervalDays: (Int) -> Unit,
-    cycleOnDays: Int,
-    onCycleOnDays: (Int) -> Unit,
-    cycleOffDays: Int,
-    onCycleOffDays: (Int) -> Unit,
-    selectedDates: Set<Long>,
+    draftCycleOn: Int,
+    onCycleOn: (Int) -> Unit,
+    draftCycleOff: Int,
+    onCycleOff: (Int) -> Unit,
+    draftDates: Set<Long>,
     onToggleDate: (Long) -> Unit,
     onClearDates: () -> Unit,
     calendarMonth: YearMonth,
     onCalendarMonth: (YearMonth) -> Unit,
+    timesCount: Int,
+    isCustomCount: Boolean,
+    onSelectCount: (Int, Boolean) -> Unit,
     times: List<String>,
     onEditTime: (Int) -> Unit,
     durationDays: Int,
@@ -794,399 +790,508 @@ private fun ScheduleStep(
 ) {
     var customCountText by remember { mutableStateOf(if (isCustomCount) timesCount.toString() else "5") }
     var customDurationText by remember { mutableStateOf(if (durationDays > 0) durationDays.toString() else "14") }
-    var intervalText by remember { mutableStateOf(intervalDays.toString()) }
-    var cycleOnText by remember { mutableStateOf(cycleOnDays.toString()) }
-    var cycleOffText by remember { mutableStateOf(cycleOffDays.toString()) }
-    LaunchedEffect(intervalDays) { intervalText = intervalDays.toString() }
-    LaunchedEffect(cycleOnDays) { cycleOnText = cycleOnDays.toString() }
-    LaunchedEffect(cycleOffDays) { cycleOffText = cycleOffDays.toString() }
+    var intervalText by remember { mutableStateOf(draftIntervalDays.toString()) }
+    var cycleOnText by remember { mutableStateOf(draftCycleOn.toString()) }
+    var cycleOffText by remember { mutableStateOf(draftCycleOff.toString()) }
+    LaunchedEffect(draftIntervalDays) { intervalText = draftIntervalDays.toString() }
+    LaunchedEffect(draftCycleOn) { cycleOnText = draftCycleOn.toString() }
+    LaunchedEffect(draftCycleOff) { cycleOffText = draftCycleOff.toString() }
     val durationIsCustom = durationDays > 0 && durationDays != 7 && durationDays != 30
 
-    Text(
-        "When do you take it?",
-        style = MaterialTheme.typography.headlineMedium,
-        fontWeight = FontWeight.Bold
-    )
-    Spacer(Modifier.height(4.dp))
-    Text(
-        "Choose what matches your prescription. You can change it later.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-    Spacer(Modifier.height(16.dp))
-
-    val choices = listOf(
-        Triple("Every day", "You take it once every day", Icons.Rounded.CalendarMonth),
-        Triple(
-            "Some days of the week",
-            "For example, only Monday, Wednesday and Friday",
-            Icons.Rounded.DateRange
-        ),
-        Triple("Every other day", "You skip one day between doses", Icons.Rounded.Repeat),
-        Triple(
-            "Repeating cycle",
-            "For example: 21 days on, then 7 days rest, then repeat",
-            Icons.Rounded.Autorenew
-        ),
-        Triple(
-            "Only when needed",
-            "No fixed times \u2014 take it whenever required",
-            Icons.Rounded.Schedule
-        ),
-        Triple("Only on certain dates", "Pick the exact dates on a calendar", Icons.Rounded.Event)
-    )
-    choices.forEachIndexed { index, (title, example, icon) ->
-        FrequencyChoice(
-            title = title,
-            example = example,
-            icon = icon,
-            selected = frequencyMode == index,
-            onClick = { onFrequencyMode(index) }
-        )
-        Spacer(Modifier.height(10.dp))
-    }
-
-    if (frequencyMode == 4) {
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Log each dose from the Today page whenever you take it.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    } else {
-        Spacer(Modifier.height(18.dp))
-
-        FieldLabel("How many times a day?")
-        MedSegmentedButtons(
-            options = listOf("1x", "2x", "3x", "4x", "Custom"),
-            selectedIndex = if (isCustomCount || timesCount !in 1..4) 4 else timesCount - 1,
-            onSelect = { index ->
-                if (index == 4) {
-                    onSelectCount(customCountText.toIntOrNull()?.coerceIn(5, 10) ?: 5, true)
-                } else {
-                    onSelectCount(index + 1, false)
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        )
-        AnimatedVisibility(visible = isCustomCount) {
+    AnimatedContent(
+        targetState = addingType,
+        transitionSpec = {
+            val forward = targetState != null
+            val enter = slideInHorizontally(motionTween(MedMotion.Medium)) { w ->
+                if (forward) w else -w
+            } + fadeIn(motionTween(MedMotion.Medium))
+            val exit = slideOutHorizontally(motionTween(MedMotion.Medium)) { w ->
+                if (forward) -w else w
+            } + fadeOut(motionTween(MedMotion.Fast))
+            enter togetherWith exit
+        },
+        label = "scheduleView"
+    ) { current ->
+        if (current == null) {
             Column {
-                Spacer(Modifier.height(10.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "How many times?",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    OutlinedTextField(
-                        value = customCountText,
-                        onValueChange = { value ->
-                            val filtered = value.filter { it.isDigit() }.take(2)
-                            customCountText = filtered
-                            val n = filtered.toIntOrNull()
-                            if (n != null && n in 5..10) onSelectCount(n, true)
-                        },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.width(96.dp)
-                    )
-                }
-            }
-        }
+                Text(
+                    "When do you take it?",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Add the timings for this medicine. You can change them later.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-        Spacer(Modifier.height(20.dp))
-        when (frequencyMode) {
-            1 -> {
-                FieldLabel("Which days?")
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(18.dp))
+                FieldLabel("Schedules")
+                if (patterns.isEmpty()) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant
+                        )
+                    ) {
+                        Text(
+                            "No schedule added yet. Tap \u201cAdd schedule\u201d below.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(22.dp)
+                        )
+                    }
+                } else {
+                    patterns.forEachIndexed { index, pattern ->
+                        PatternCard(pattern = pattern, onRemove = { onRemovePattern(index) })
+                        Spacer(Modifier.height(10.dp))
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                GradientPillButton(
+                    text = "Add schedule",
+                    icon = Icons.Rounded.Add,
+                    onClick = { onShowSheet(true) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(22.dp))
+                FieldLabel("How many times a day?")
+                MedSegmentedButtons(
+                    options = listOf("1x", "2x", "3x", "4x", "Custom"),
+                    selectedIndex = if (isCustomCount || timesCount !in 1..4) 4 else timesCount - 1,
+                    onSelect = { index ->
+                        if (index == 4) {
+                            onSelectCount(customCountText.toIntOrNull()?.coerceIn(5, 10) ?: 5, true)
+                        } else {
+                            onSelectCount(index + 1, false)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                AnimatedVisibility(visible = isCustomCount) {
+                    Column {
+                        Spacer(Modifier.height(10.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "How many times?",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            OutlinedTextField(
+                                value = customCountText,
+                                onValueChange = { value ->
+                                    val filtered = value.filter { it.isDigit() }.take(2)
+                                    customCountText = filtered
+                                    val n = filtered.toIntOrNull()
+                                    if (n != null && n in 5..10) onSelectCount(n, true)
+                                },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.width(96.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(22.dp))
+                FieldLabel("What time(s)?")
+                Box {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(top = 22.dp, bottom = 22.dp)
+                            .offset(x = 7.dp)
+                            .width(2.dp)
+                            .fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        key(times.joinToString(",")) {
+                            times.forEachIndexed { index, time ->
+                                AlarmRow(index = index, time = time, onClick = { onEditTime(index) })
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Tap any time to adjust it.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(Modifier.height(20.dp))
+                FieldLabel("For how long?", hint = "(optional)")
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    dayLabels.forEachIndexed { index, label ->
-                        DayPill(
-                            label = label,
-                            selected = (daysMask and (1 shl index)) != 0,
-                            onClick = { onToggleDay(index) },
-                            modifier = Modifier.weight(1f)
+                    listOf(0 to "Keep taking", 7 to "7 days", 30 to "30 days", -1 to "Custom")
+                        .forEach { (days, label) ->
+                            val selected = if (days == -1) durationIsCustom else durationDays == days
+                            DurationChip(
+                                label = label,
+                                selected = selected,
+                                onClick = {
+                                    if (days == -1) {
+                                        onDuration(
+                                            customDurationText.toIntOrNull()?.coerceIn(1, 365) ?: 14
+                                        )
+                                    } else {
+                                        onDuration(days)
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                }
+                if (durationIsCustom) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "For",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        OutlinedTextField(
+                            value = customDurationText,
+                            onValueChange = { value ->
+                                val filtered = value.filter { it.isDigit() }.take(3)
+                                customDurationText = filtered
+                                val n = filtered.toIntOrNull()
+                                if (n != null && n in 1..365) onDuration(n)
+                            },
+                            singleLine = true,
+                            modifier = Modifier.width(96.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "days",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = if (daysMask == 0) {
-                        "Choose at least one day."
-                    } else {
-                        "You take it on " + dayNamesFull
-                            .filterIndexed { index, _ -> (daysMask and (1 shl index)) != 0 }
-                            .joinToString(", ")
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (daysMask == 0) MaterialTheme.colorScheme.error
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
-            2 -> {
-                FieldLabel("Every how many days?")
-                Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "Take it every",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    OutlinedTextField(
-                        value = intervalText,
-                        onValueChange = { value ->
-                            val filtered = value.filter { it.isDigit() }.take(3)
-                            intervalText = filtered
-                            filtered.toIntOrNull()?.let {
-                                if (it >= 2) onIntervalDays(it.coerceAtMost(90))
-                            }
-                        },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.width(88.dp)
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        "days",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(Modifier.height(6.dp))
+        } else {
+            Column {
+                TextButton(onClick = onCancelSub) { Text("\u2039 Back") }
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    text = if (intervalDays == 2) "2 means: take it, skip a day, take it again."
-                    else "There will be ${intervalDays - 1} day" + (if (intervalDays - 1 == 1) "" else "s") +
-                        " between doses.",
-                    style = MaterialTheme.typography.bodySmall,
+                    patternTitle(current),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    patternExample(current),
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-            3 -> {
-                FieldLabel("On and off cycle")
-                Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "Take it for",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    OutlinedTextField(
-                        value = cycleOnText,
-                        onValueChange = { value ->
-                            val filtered = value.filter { it.isDigit() }.take(3)
-                            cycleOnText = filtered
-                            filtered.toIntOrNull()?.let {
-                                if (it >= 1) onCycleOnDays(it.coerceAtMost(180))
-                            }
-                        },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.width(82.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "days",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "Then rest for",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    OutlinedTextField(
-                        value = cycleOffText,
-                        onValueChange = { value ->
-                            val filtered = value.filter { it.isDigit() }.take(3)
-                            cycleOffText = filtered
-                            filtered.toIntOrNull()?.let {
-                                if (it >= 1) onCycleOffDays(it.coerceAtMost(180))
-                            }
-                        },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.width(82.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "days",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    DurationChip(
-                        label = "21 / 7",
-                        selected = cycleOnDays == 21 && cycleOffDays == 7,
-                        onClick = {
-                            onCycleOnDays(21)
-                            onCycleOffDays(7)
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                    DurationChip(
-                        label = "5 / 2",
-                        selected = cycleOnDays == 5 && cycleOffDays == 2,
-                        onClick = {
-                            onCycleOnDays(5)
-                            onCycleOffDays(2)
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                Spacer(Modifier.height(12.dp))
-                CyclePreview(onDays = cycleOnDays, offDays = cycleOffDays)
-            }
-            5 -> {
-                FieldLabel("Which dates?")
-                Spacer(Modifier.height(12.dp))
-                ScheduleCalendar(
-                    month = calendarMonth,
-                    selected = selectedDates,
-                    onToggle = onToggleDate,
-                    onPrev = { onCalendarMonth(calendarMonth.minusMonths(1)) },
-                    onNext = { onCalendarMonth(calendarMonth.plusMonths(1)) }
-                )
-                Spacer(Modifier.height(6.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = if (selectedDates.isEmpty()) {
-                            "Tap the dates you take it."
-                        } else {
-                            "${selectedDates.size} date" +
-                                (if (selectedDates.size == 1) "" else "s") + " chosen"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (selectedDates.isEmpty()) MaterialTheme.colorScheme.error
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (selectedDates.isNotEmpty()) {
-                        TextButton(onClick = onClearDates) { Text("Clear") }
-                    }
-                }
-            }
-        }
+                Spacer(Modifier.height(18.dp))
 
-        Spacer(Modifier.height(20.dp))
-        FieldLabel("What time(s)?")
-        Box {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(top = 22.dp, bottom = 22.dp)
-                    .offset(x = 7.dp)
-                    .width(2.dp)
-                    .fillMaxHeight()
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                key(times.joinToString(",")) {
-                    times.forEachIndexed { index, time ->
-                        AlarmRow(index = index, time = time, onClick = { onEditTime(index) })
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Tap any time to adjust it.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(Modifier.height(20.dp))
-        FieldLabel("For how long?", hint = "(optional)")
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            listOf(0 to "Keep taking", 7 to "7 days", 30 to "30 days", -1 to "Custom").forEach { (days, label) ->
-                val selected = if (days == -1) durationIsCustom else durationDays == days
-                DurationChip(
-                    label = label,
-                    selected = selected,
-                    onClick = {
-                        if (days == -1) {
-                            onDuration(customDurationText.toIntOrNull()?.coerceIn(1, 365) ?: 14)
-                        } else {
-                            onDuration(days)
+                when (current) {
+                    1 -> {
+                        FieldLabel("Which days?")
+                        Spacer(Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            dayLabels.forEachIndexed { index, label ->
+                                DayPill(
+                                    label = label,
+                                    selected = (draftDaysMask and (1 shl index)) != 0,
+                                    onClick = { onToggleDay(index) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                         }
-                    },
-                    modifier = Modifier.weight(1f)
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = if (draftDaysMask == 0) {
+                                "Choose at least one day."
+                            } else {
+                                "You take it on " + dayNamesFull
+                                    .filterIndexed { index, _ ->
+                                        (draftDaysMask and (1 shl index)) != 0
+                                    }
+                                    .joinToString(", ")
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (draftDaysMask == 0) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    2 -> {
+                        FieldLabel("Every how many days?")
+                        Spacer(Modifier.height(12.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "Take it every",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            OutlinedTextField(
+                                value = intervalText,
+                                onValueChange = { value ->
+                                    val filtered = value.filter { it.isDigit() }.take(3)
+                                    intervalText = filtered
+                                    filtered.toIntOrNull()?.let {
+                                        if (it >= 2) onIntervalDays(it.coerceAtMost(90))
+                                    }
+                                },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.width(88.dp)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                "days",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = if (draftIntervalDays == 2) {
+                                "2 means: take it, skip a day, take it again."
+                            } else {
+                                "There will be ${draftIntervalDays - 1} day" +
+                                    (if (draftIntervalDays - 1 == 1) "" else "s") +
+                                    " between doses."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    3 -> {
+                        FieldLabel("On and off cycle")
+                        Spacer(Modifier.height(12.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "Take it for",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            OutlinedTextField(
+                                value = cycleOnText,
+                                onValueChange = { value ->
+                                    val filtered = value.filter { it.isDigit() }.take(3)
+                                    cycleOnText = filtered
+                                    filtered.toIntOrNull()?.let {
+                                        if (it >= 1) onCycleOn(it.coerceAtMost(180))
+                                    }
+                                },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.width(82.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "days",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "Then rest for",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            OutlinedTextField(
+                                value = cycleOffText,
+                                onValueChange = { value ->
+                                    val filtered = value.filter { it.isDigit() }.take(3)
+                                    cycleOffText = filtered
+                                    filtered.toIntOrNull()?.let {
+                                        if (it >= 1) onCycleOff(it.coerceAtMost(180))
+                                    }
+                                },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.width(82.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "days",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            DurationChip(
+                                label = "21 / 7",
+                                selected = draftCycleOn == 21 && draftCycleOff == 7,
+                                onClick = {
+                                    onCycleOn(21)
+                                    onCycleOff(7)
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                            DurationChip(
+                                label = "5 / 2",
+                                selected = draftCycleOn == 5 && draftCycleOff == 2,
+                                onClick = {
+                                    onCycleOn(5)
+                                    onCycleOff(2)
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        CyclePreview(onDays = draftCycleOn, offDays = draftCycleOff)
+                    }
+                    5 -> {
+                        FieldLabel("Which dates?")
+                        Spacer(Modifier.height(12.dp))
+                        ScheduleCalendar(
+                            month = calendarMonth,
+                            selected = draftDates,
+                            onToggle = onToggleDate,
+                            onPrev = { onCalendarMonth(calendarMonth.minusMonths(1)) },
+                            onNext = { onCalendarMonth(calendarMonth.plusMonths(1)) }
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = if (draftDates.isEmpty()) {
+                                    "Tap the dates you take it."
+                                } else {
+                                    "${draftDates.size} date" +
+                                        (if (draftDates.size == 1) "" else "s") + " chosen"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (draftDates.isEmpty()) MaterialTheme.colorScheme.error
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (draftDates.isNotEmpty()) {
+                                TextButton(onClick = onClearDates) { Text("Clear") }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(22.dp))
+                GradientPillButton(
+                    text = "Save schedule",
+                    icon = Icons.Rounded.Check,
+                    onClick = onSavePattern,
+                    enabled = canSavePattern,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
-        if (durationIsCustom) {
-            Spacer(Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "For",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.width(8.dp))
-                OutlinedTextField(
-                    value = customDurationText,
-                    onValueChange = { value ->
-                        val filtered = value.filter { it.isDigit() }.take(3)
-                        customDurationText = filtered
-                        val n = filtered.toIntOrNull()
-                        if (n != null && n in 1..365) onDuration(n)
-                    },
-                    singleLine = true,
-                    modifier = Modifier.width(96.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "days",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+    }
+
+    if (showSheet) {
+        ScheduleTypeSheet(
+            onDismiss = { onShowSheet(false) },
+            onPick = onChooseType
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ScheduleTypeSheet(
+    onDismiss: () -> Unit,
+    onPick: (Int) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp)
+        ) {
+            Text(
+                text = "Add schedule",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 12.dp, bottom = 8.dp)
+            )
+            listOf(0, 1, 2, 3, 4, 5).forEach { type ->
+                Surface(
+                    onClick = { onPick(type) },
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color.Transparent,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(RoundedCornerShape(13.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = patternIcon(type),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(21.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                patternTitle(type),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                patternExample(type),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun FrequencyChoice(
-    title: String,
-    example: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
+private fun PatternCard(pattern: SchedulePattern, onRemove: () -> Unit) {
     val haptics = rememberMedHaptics()
     Surface(
-        onClick = {
-            haptics.tap()
-            onClick()
-        },
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.surface,
-        contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-        else MaterialTheme.colorScheme.onSurface,
+        color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(
-            if (selected) 1.6.dp else 1.dp,
-            if (selected) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.outlineVariant
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant
         ),
-        modifier = Modifier.fillMaxWidth()
+        shadowElevation = MedElevation.card
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
@@ -1196,39 +1301,164 @@ private fun FrequencyChoice(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        if (selected) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.surfaceContainerHigh
-                    ),
+                    .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = icon,
+                    imageVector = patternIcon(pattern.type),
                     contentDescription = null,
-                    tint = if (selected) MaterialTheme.colorScheme.onPrimary
-                    else MaterialTheme.colorScheme.primary,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(20.dp)
                 )
             }
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
-                    example,
+                    patternTitle(pattern.type),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    patternSummary(pattern),
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            if (selected) {
-                Icon(
-                    imageVector = Icons.Rounded.CheckCircle,
-                    contentDescription = null,
-                    modifier = Modifier.size(22.dp)
-                )
+            Surface(
+                onClick = {
+                    haptics.reject()
+                    onRemove()
+                },
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ) {
+                Box(modifier = Modifier.size(34.dp), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Rounded.Close, contentDescription = "Remove", modifier = Modifier.size(16.dp))
+                }
             }
         }
     }
+}
+
+private object PatternType {
+    const val DAILY = 0
+    const val WEEKLY = 1
+    const val EVERY_N = 2
+    const val CYCLE = 3
+    const val PRN = 4
+    const val DATES = 5
+}
+
+private data class SchedulePattern(
+    val type: Int,
+    val daysMask: Int = 0,
+    val intervalDays: Int = 2,
+    val cycleOnDays: Int = 21,
+    val cycleOffDays: Int = 7,
+    val selectedDates: Set<Long> = emptySet()
+)
+
+private fun patternTitle(type: Int): String = when (type) {
+    0 -> "Every day"
+    1 -> "Some days of the week"
+    2 -> "Every other day"
+    3 -> "Repeating cycle"
+    4 -> "Only when needed"
+    else -> "Only on certain dates"
+}
+
+private fun patternExample(type: Int): String = when (type) {
+    0 -> "You take it once every day"
+    1 -> "For example, only Monday, Wednesday and Friday"
+    2 -> "You skip one day between doses"
+    3 -> "For example: 21 days on, then 7 days rest, then repeat"
+    4 -> "No fixed times \u2014 take it whenever required"
+    else -> "Pick the exact dates on a calendar"
+}
+
+private fun patternIcon(type: Int): androidx.compose.ui.graphics.vector.ImageVector = when (type) {
+    0 -> Icons.Rounded.CalendarMonth
+    1 -> Icons.Rounded.DateRange
+    2 -> Icons.Rounded.Repeat
+    3 -> Icons.Rounded.Autorenew
+    4 -> Icons.Rounded.Schedule
+    else -> Icons.Rounded.Event
+}
+
+private fun patternValid(type: Int, daysMask: Int, dates: Set<Long>): Boolean = when (type) {
+    1 -> daysMask != 0
+    5 -> dates.isNotEmpty()
+    else -> true
+}
+
+private fun patternSummary(pattern: SchedulePattern): String = when (pattern.type) {
+    0 -> "Every day"
+    1 -> dayNamesFull
+        .filterIndexed { index, _ -> (pattern.daysMask and (1 shl index)) != 0 }
+        .joinToString(", ")
+        .ifBlank { "No days" }
+    2 -> "Every ${pattern.intervalDays} days"
+    3 -> "${pattern.cycleOnDays} days on \u00b7 ${pattern.cycleOffDays} rest"
+    4 -> "Only when needed"
+    else -> "${pattern.selectedDates.size} date(s)"
+}
+
+private fun Schedule.toPattern(): SchedulePattern = when (type) {
+    ScheduleType.WEEKDAYS -> SchedulePattern(PatternType.WEEKLY, daysMask = daysMask)
+    ScheduleType.EVERY_N_DAYS -> SchedulePattern(
+        PatternType.EVERY_N,
+        intervalDays = intervalDays.coerceAtLeast(2)
+    )
+    ScheduleType.CYCLE -> SchedulePattern(
+        PatternType.CYCLE,
+        cycleOnDays = cycleOnDays.takeIf { it > 0 } ?: 21,
+        cycleOffDays = cycleOffDays.takeIf { it > 0 } ?: 7
+    )
+    ScheduleType.AS_NEEDED -> SchedulePattern(PatternType.PRN)
+    ScheduleType.SELECTED_DATES -> SchedulePattern(
+        PatternType.DATES,
+        selectedDates = selectedDates.split(',').mapNotNull { it.trim().toLongOrNull() }.toSet()
+    )
+    else -> SchedulePattern(PatternType.DAILY)
+}
+
+private fun SchedulePattern.toSchedule(
+    medicineId: Long,
+    times: String,
+    endDate: Long?,
+    doseLabel: String
+): Schedule {
+    val anchor = selectedDates.minOrNull()?.let { epochDayToMillis(it) }
+        ?: System.currentTimeMillis()
+    val typeName = when (type) {
+        PatternType.WEEKLY -> ScheduleType.WEEKDAYS
+        PatternType.EVERY_N -> ScheduleType.EVERY_N_DAYS
+        PatternType.CYCLE -> ScheduleType.CYCLE
+        PatternType.PRN -> ScheduleType.AS_NEEDED
+        PatternType.DATES -> ScheduleType.SELECTED_DATES
+        else -> ScheduleType.DAILY
+    }
+    return Schedule(
+        medicineId = medicineId,
+        type = typeName,
+        times = if (type == PatternType.PRN) "" else times,
+        daysMask = if (type == PatternType.WEEKLY) daysMask else 0,
+        intervalDays = if (type == PatternType.EVERY_N) intervalDays else 0,
+        selectedDates = if (type == PatternType.DATES) {
+            selectedDates.sorted().joinToString(",")
+        } else "",
+        cycleOnDays = if (type == PatternType.CYCLE) cycleOnDays else 0,
+        cycleOffDays = if (type == PatternType.CYCLE) cycleOffDays else 0,
+        startDate = when (type) {
+            PatternType.EVERY_N -> anchor
+            PatternType.CYCLE -> System.currentTimeMillis()
+            else -> 0L
+        },
+        doseLabel = doseLabel,
+        endDate = if (type == PatternType.PRN) null else endDate,
+        enabled = true
+    )
 }
 
 @Composable
