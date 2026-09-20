@@ -420,10 +420,6 @@ private fun MedicineCard(
     val tracked = medicine.quantity > 0
 
     Surface(
-        onClick = {
-            haptics.tap()
-            onEdit()
-        },
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surface,
