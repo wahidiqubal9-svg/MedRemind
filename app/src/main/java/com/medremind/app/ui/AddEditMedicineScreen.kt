@@ -875,9 +875,10 @@ private fun ScheduleSheet(
     var intervalDays by remember { mutableIntStateOf(2) }
     var cycleOn by remember { mutableIntStateOf(21) }
     var cycleOff by remember { mutableIntStateOf(7) }
+    var repeatCycle by remember { mutableStateOf(true) }
     var dates by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var month by remember { mutableStateOf(YearMonth.now()) }
-    val valid = picked?.let { patternValid(it, daysMask, dates) } ?: false
+    val valid = picked?.let { patternValid(it, daysMask, dates, repeatCycle) } ?: false
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -919,7 +920,7 @@ private fun ScheduleSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(12.dp))
-                    listOf(0, 1, 2, 3, 4, 5).forEach { type ->
+                    listOf(0, 1, 2, 3, 4).forEach { type ->
                         SheetTypeRow(type = type, onClick = { picked = type })
                     }
                 } else {
@@ -1027,7 +1028,7 @@ private fun ScheduleSheet(
                             )
                         }
                         3 -> {
-                            FieldLabel("On and off cycle")
+                            FieldLabel("Custom schedule")
                             Spacer(Modifier.height(12.dp))
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1094,77 +1095,75 @@ private fun ScheduleSheet(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
+                                    Spacer(Modifier.height(14.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                "Repeat",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Text(
+                                                if (repeatCycle) "The pattern keeps repeating"
+                                                else "Only the dates you pick",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Switch(
+                                            checked = repeatCycle,
+                                            onCheckedChange = { repeatCycle = it }
+                                        )
+                                    }
                                 }
                             }
                             Spacer(Modifier.height(12.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                DurationChip(
-                                    label = "21 / 7",
-                                    selected = cycleOn == 21 && cycleOff == 7,
-                                    onClick = {
-                                        cycleOn = 21
-                                        cycleOff = 7
-                                    },
-                                    modifier = Modifier.weight(1f)
+                            if (repeatCycle) {
+                                PatternCalendar(
+                                    month = month,
+                                    onDays = cycleOn,
+                                    offDays = cycleOff,
+                                    onPrev = { month = month.minusMonths(1) },
+                                    onNext = { month = month.plusMonths(1) }
                                 )
-                                DurationChip(
-                                    label = "5 / 2",
-                                    selected = cycleOn == 5 && cycleOff == 2,
-                                    onClick = {
-                                        cycleOn = 5
-                                        cycleOff = 2
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                )
-                                DurationChip(
-                                    label = "3 / 1",
-                                    selected = cycleOn == 3 && cycleOff == 1,
-                                    onClick = {
-                                        cycleOn = 3
-                                        cycleOff = 1
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                            Spacer(Modifier.height(12.dp))
-                            CyclePreview(onDays = cycleOn, offDays = cycleOff)
-                        }
-                        5 -> {
-                            FieldLabel("Which dates?")
-                            Spacer(Modifier.height(12.dp))
-                            ScheduleCalendar(
-                                month = month,
-                                selected = dates,
-                                onToggle = { epochDay ->
-                                    dates = if (epochDay in dates) dates - epochDay else dates + epochDay
-                                },
-                                onPrev = { month = month.minusMonths(1) },
-                                onNext = { month = month.plusMonths(1) }
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Spacer(Modifier.height(6.dp))
                                 Text(
-                                    text = if (dates.isEmpty()) {
-                                        "Tap the dates you take it."
-                                    } else {
-                                        "${dates.size} date" +
-                                            (if (dates.size == 1) "" else "s") + " chosen"
-                                    },
+                                    "Preview only. Turn off Repeat to pick exact dates.",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = if (dates.isEmpty()) MaterialTheme.colorScheme.error
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.weight(1f)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                if (dates.isNotEmpty()) {
-                                    TextButton(onClick = { dates = emptySet() }) { Text("Clear") }
+                            } else {
+                                ScheduleCalendar(
+                                    month = month,
+                                    selected = dates,
+                                    onToggle = { epochDay ->
+                                        dates = if (epochDay in dates) dates - epochDay
+                                        else dates + epochDay
+                                    },
+                                    onPrev = { month = month.minusMonths(1) },
+                                    onNext = { month = month.plusMonths(1) }
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = if (dates.isEmpty()) {
+                                            "Tap the dates you take it."
+                                        } else {
+                                            "${dates.size} date" +
+                                                (if (dates.size == 1) "" else "s") + " chosen"
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (dates.isEmpty()) MaterialTheme.colorScheme.error
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (dates.isNotEmpty()) {
+                                        TextButton(onClick = { dates = emptySet() }) { Text("Clear") }
+                                    }
                                 }
                             }
                         }
                     }
-
                     Spacer(Modifier.height(22.dp))
                     GradientPillButton(
                         text = "Save schedule",
@@ -1177,6 +1176,7 @@ private fun ScheduleSheet(
                                     intervalDays = intervalDays,
                                     cycleOnDays = cycleOn,
                                     cycleOffDays = cycleOff,
+                                    repeatCycle = repeatCycle,
                                     selectedDates = dates
                                 )
                             )
@@ -1288,7 +1288,7 @@ private object PatternType {
     const val DAILY = 0
     const val WEEKLY = 1
     const val EVERY_N = 2
-    const val CYCLE = 3
+    const val CUSTOM = 3
     const val PRN = 4
     const val DATES = 5
 }
@@ -1299,6 +1299,7 @@ private data class SchedulePattern(
     val intervalDays: Int = 2,
     val cycleOnDays: Int = 21,
     val cycleOffDays: Int = 7,
+    val repeatCycle: Boolean = true,
     val selectedDates: Set<Long> = emptySet()
 )
 
@@ -1306,7 +1307,7 @@ private fun patternTitle(type: Int): String = when (type) {
     0 -> "Every day"
     1 -> "Some days of the week"
     2 -> "Fixed interval"
-    3 -> "Repeating cycle"
+    3 -> "Custom schedule"
     4 -> "Only when needed"
     else -> "Only on certain dates"
 }
@@ -1315,7 +1316,7 @@ private fun patternExample(type: Int): String = when (type) {
     0 -> "You take it once every day"
     1 -> "For example, only Monday, Wednesday and Friday"
     2 -> "Take it every 2, 3 or 4 days \u2014 skip the days in between"
-    3 -> "For example: 21 days on, then 7 days rest, then repeat"
+    3 -> "Days on / days rest that repeats, or pick exact dates"
     4 -> "No fixed times \u2014 take it whenever required"
     else -> "Pick the exact dates on a calendar"
 }
@@ -1329,8 +1330,14 @@ private fun patternIcon(type: Int): androidx.compose.ui.graphics.vector.ImageVec
     else -> Icons.Rounded.Event
 }
 
-private fun patternValid(type: Int, daysMask: Int, dates: Set<Long>): Boolean = when (type) {
+private fun patternValid(
+    type: Int,
+    daysMask: Int,
+    dates: Set<Long>,
+    repeatCycle: Boolean
+): Boolean = when (type) {
     1 -> daysMask != 0
+    3 -> if (repeatCycle) true else dates.isNotEmpty()
     5 -> dates.isNotEmpty()
     else -> true
 }
@@ -1342,7 +1349,11 @@ private fun patternSummary(pattern: SchedulePattern): String = when (pattern.typ
         .joinToString(", ")
         .ifBlank { "No days" }
     2 -> "Every ${pattern.intervalDays} days"
-    3 -> "${pattern.cycleOnDays} days on \u00b7 ${pattern.cycleOffDays} rest"
+    3 -> if (pattern.repeatCycle) {
+        "${pattern.cycleOnDays} days on \u00b7 ${pattern.cycleOffDays} rest"
+    } else {
+        "${pattern.selectedDates.size} date(s)"
+    }
     4 -> "Only when needed"
     else -> "${pattern.selectedDates.size} date(s)"
 }
@@ -1354,13 +1365,15 @@ private fun Schedule.toPattern(): SchedulePattern = when (type) {
         intervalDays = intervalDays.coerceAtLeast(2)
     )
     ScheduleType.CYCLE -> SchedulePattern(
-        PatternType.CYCLE,
+        PatternType.CUSTOM,
+        repeatCycle = true,
         cycleOnDays = cycleOnDays.takeIf { it > 0 } ?: 21,
         cycleOffDays = cycleOffDays.takeIf { it > 0 } ?: 7
     )
     ScheduleType.AS_NEEDED -> SchedulePattern(PatternType.PRN)
     ScheduleType.SELECTED_DATES -> SchedulePattern(
-        PatternType.DATES,
+        PatternType.CUSTOM,
+        repeatCycle = false,
         selectedDates = selectedDates.split(',').mapNotNull { it.trim().toLongOrNull() }.toSet()
     )
     else -> SchedulePattern(PatternType.DAILY)
@@ -1374,12 +1387,14 @@ private fun SchedulePattern.toSchedule(
 ): Schedule {
     val anchor = selectedDates.minOrNull()?.let { epochDayToMillis(it) }
         ?: System.currentTimeMillis()
-    val typeName = when (type) {
-        PatternType.WEEKLY -> ScheduleType.WEEKDAYS
-        PatternType.EVERY_N -> ScheduleType.EVERY_N_DAYS
-        PatternType.CYCLE -> ScheduleType.CYCLE
-        PatternType.PRN -> ScheduleType.AS_NEEDED
-        PatternType.DATES -> ScheduleType.SELECTED_DATES
+    val customIsCycle = type == PatternType.CUSTOM && repeatCycle
+    val customIsDates = type == PatternType.CUSTOM && !repeatCycle
+    val typeName = when {
+        type == PatternType.WEEKLY -> ScheduleType.WEEKDAYS
+        type == PatternType.EVERY_N -> ScheduleType.EVERY_N_DAYS
+        customIsCycle -> ScheduleType.CYCLE
+        customIsDates -> ScheduleType.SELECTED_DATES
+        type == PatternType.PRN -> ScheduleType.AS_NEEDED
         else -> ScheduleType.DAILY
     }
     return Schedule(
@@ -1388,14 +1403,14 @@ private fun SchedulePattern.toSchedule(
         times = if (type == PatternType.PRN) "" else times,
         daysMask = if (type == PatternType.WEEKLY) daysMask else 0,
         intervalDays = if (type == PatternType.EVERY_N) intervalDays else 0,
-        selectedDates = if (type == PatternType.DATES) {
+        selectedDates = if (customIsDates) {
             selectedDates.sorted().joinToString(",")
         } else "",
-        cycleOnDays = if (type == PatternType.CYCLE) cycleOnDays else 0,
-        cycleOffDays = if (type == PatternType.CYCLE) cycleOffDays else 0,
-        startDate = when (type) {
-            PatternType.EVERY_N -> anchor
-            PatternType.CYCLE -> System.currentTimeMillis()
+        cycleOnDays = if (customIsCycle) cycleOnDays else 0,
+        cycleOffDays = if (customIsCycle) cycleOffDays else 0,
+        startDate = when {
+            type == PatternType.EVERY_N -> anchor
+            customIsCycle -> System.currentTimeMillis()
             else -> 0L
         },
         doseLabel = doseLabel,
@@ -2247,6 +2262,90 @@ private fun ReviewRow(icon: androidx.compose.ui.graphics.vector.ImageVector, lab
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun PatternCalendar(
+    month: YearMonth,
+    onDays: Int,
+    offDays: Int,
+    onPrev: () -> Unit,
+    onNext: () -> Unit
+) {
+    val today = LocalDate.now()
+    val period = (onDays + offDays).coerceAtLeast(1)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onPrev) {
+                Icon(Icons.Rounded.ChevronLeft, contentDescription = "Previous month")
+            }
+            Text(
+                text = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
+                    .format(Date(monthStartMillis(month))),
+                style = MaterialTheme.typography.titleSmall,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = onNext) {
+                Icon(Icons.Rounded.ChevronRight, contentDescription = "Next month")
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth()) {
+            listOf("S", "M", "T", "W", "T", "F", "S").forEach { label ->
+                Text(
+                    text = label,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        val leading = month.atDay(1).dayOfWeek.value % 7
+        val totalCells = leading + month.lengthOfMonth()
+        val rows = (totalCells + 6) / 7
+        for (row in 0 until rows) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                for (col in 0 until 7) {
+                    val dayNumber = row * 7 + col - leading + 1
+                    if (dayNumber in 1..month.lengthOfMonth()) {
+                        val date = month.atDay(dayNumber)
+                        val diff = date.toEpochDay() - today.toEpochDay()
+                        val mod = (((diff % period) + period) % period)
+                        val on = mod < onDays
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(42.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (on) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.surfaceContainerHigh
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = dayNumber.toString(),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = if (on) MaterialTheme.colorScheme.onPrimary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else {
+                        Spacer(Modifier.weight(1f).height(42.dp))
+                    }
+                }
+            }
         }
     }
 }
