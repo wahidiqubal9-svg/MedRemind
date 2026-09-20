@@ -96,6 +96,7 @@ object BackupManager {
                         put("value", m.value.toDouble())
                         put("value2", m.value2.toDouble())
                         put("recordedAt", m.recordedAt)
+                        put("context", m.context)
                     })
                 }
             })
@@ -230,7 +231,8 @@ object BackupManager {
                     type = o.optString("type"),
                     value = o.optDouble("value", 0.0).toFloat(),
                     value2 = o.optDouble("value2", 0.0).toFloat(),
-                    recordedAt = o.optLong("recordedAt", System.currentTimeMillis())
+                    recordedAt = o.optLong("recordedAt", System.currentTimeMillis()),
+                    context = o.optString("context", "")
                 )
             )
         }

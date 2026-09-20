@@ -313,7 +313,8 @@ private fun HealthScreen(
     onOpenMe: () -> Unit
 ) {
     val metrics by vm.metrics.collectAsState()
-    var showAddMetric by remember { mutableStateOf(false) }
+    var showAddGlucose by remember { mutableStateOf(false) }
+    var showAddBp by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -327,7 +328,7 @@ private fun HealthScreen(
     } * 100 / bpReadings.size
     val cbgControl = if (glucoseReadings.isEmpty()) null
     else glucoseReadings.count {
-        Vitals.classifyCBG(it.value) == HealthZone.GREEN
+        Vitals.classifyCBG(it.value, it.context) == HealthZone.GREEN
     } * 100 / glucoseReadings.size
     val bpAvgText = if (bpReadings.isEmpty()) "\u2014"
     else "${bpReadings.map { it.value }.average().toInt()}/" +
@@ -410,6 +411,40 @@ private fun HealthScreen(
                 )
             }
 
+            if (glucoseReadings.isNotEmpty()) {
+                VitalsChartCard(
+                    title = "Blood Glucose",
+                    subtitle = "CBG (mg/dL) \u00b7 last ${glucoseReadings.size}",
+                    currentText = "${glucoseReadings.last().value.toInt()}",
+                    series = listOf(
+                        VitalSeries(
+                            label = "Blood glucose",
+                            color = Vitals.Glucose,
+                            values = glucoseReadings.map { it.value },
+                            zones = glucoseReadings.map {
+                                Vitals.classifyCBG(it.value, it.context)
+                            }
+                        )
+                    ),
+                    bands = listOf(
+                        ZoneBand(180f, 300f, Vitals.Red),
+                        ZoneBand(130f, 180f, Vitals.Yellow),
+                        ZoneBand(80f, 130f, Vitals.Green),
+                        ZoneBand(40f, 70f, Vitals.Red)
+                    ),
+                    yMin = 40f,
+                    yMax = 300f,
+                    xLabels = glucoseReadings.map {
+                        SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(it.recordedAt))
+                    },
+                    onAdd = { showAddGlucose = true }
+                )
+                GlucoseTrendsCard(
+                    readings = glucoseReadings,
+                    onAdd = { showAddGlucose = true }
+                )
+            }
+
             if (bpReadings.isNotEmpty()) {
                 VitalsChartCard(
                     title = "Blood Pressure",
@@ -437,33 +472,12 @@ private fun HealthScreen(
                         ZoneBand(50f, 90f, Vitals.Red)
                     ),
                     yMin = 50f,
-                    yMax = 180f
+                    yMax = 180f,
+                    xLabels = bpReadings.map {
+                        SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(it.recordedAt))
+                    },
+                    onAdd = { showAddBp = true }
                 )
-            }
-
-            if (glucoseReadings.isNotEmpty()) {
-                VitalsChartCard(
-                    title = "Blood Glucose",
-                    subtitle = "CBG (mg/dL) \u00b7 last ${glucoseReadings.size}",
-                    currentText = "${glucoseReadings.last().value.toInt()}",
-                    series = listOf(
-                        VitalSeries(
-                            label = "Blood glucose",
-                            color = Vitals.Glucose,
-                            values = glucoseReadings.map { it.value },
-                            zones = glucoseReadings.map { Vitals.classifyCBG(it.value) }
-                        )
-                    ),
-                    bands = listOf(
-                        ZoneBand(180f, 300f, Vitals.Red),
-                        ZoneBand(130f, 180f, Vitals.Yellow),
-                        ZoneBand(80f, 130f, Vitals.Green),
-                        ZoneBand(40f, 70f, Vitals.Red)
-                    ),
-                    yMin = 40f,
-                    yMax = 300f
-                )
-                GlucoseTrendsCard(readings = glucoseReadings)
             }
 
             if (weightReadings.isNotEmpty()) {
@@ -481,22 +495,7 @@ private fun HealthScreen(
             }
 
             MedCard(modifier = Modifier.fillMaxWidth()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "Health log",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextButton(onClick = { showAddMetric = true }) {
-                        Icon(
-                            Icons.Rounded.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text("Add reading")
-                    }
-                }
+                Text("Recent readings", style = MaterialTheme.typography.titleMedium)
                 if (metrics.isEmpty()) {
                     Text(
                         "Log blood pressure, glucose or weight to keep a simple history here.",
@@ -529,15 +528,122 @@ private fun HealthScreen(
         }
     }
 
-    if (showAddMetric) {
-        AddMetricDialog(
-            onDismiss = { showAddMetric = false },
-            onSave = { type, v1, v2 ->
-                vm.addMetric(type, v1, v2)
-                showAddMetric = false
+    if (showAddGlucose) {
+        AddGlucoseDialog(
+            onDismiss = { showAddGlucose = false },
+            onSave = { ctx, value ->
+                vm.addMetric(MetricType.GLUCOSE, value, 0f, ctx)
+                showAddGlucose = false
             }
         )
     }
+    if (showAddBp) {
+        AddBpDialog(
+            onDismiss = { showAddBp = false },
+            onSave = { sys, dia ->
+                vm.addMetric(MetricType.BP, sys, dia)
+                showAddBp = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun AddGlucoseDialog(
+    onDismiss: () -> Unit,
+    onSave: (context: String, value: Float) -> Unit
+) {
+    val options = com.medremind.app.data.MetricContext.glucoseOptions
+    var context by remember { mutableStateOf(options.first()) }
+    var value by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add glucose reading") },
+        text = {
+            Column {
+                Text(
+                    "When was this reading taken?",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(10.dp))
+                FilterChipRow(
+                    options = options.map { com.medremind.app.data.MetricContext.label(it) },
+                    selectedIndex = options.indexOf(context).coerceAtLeast(0),
+                    onSelect = { context = options[it] }
+                )
+                Spacer(Modifier.height(14.dp))
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it.filter { c -> c.isDigit() || c == '.' }.take(5) },
+                    label = { Text("Glucose") },
+                    suffix = { Text("mg/dL") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = value.toFloatOrNull() != null,
+                onClick = { onSave(context, value.toFloatOrNull() ?: 0f) }
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
+@Composable
+private fun AddBpDialog(
+    onDismiss: () -> Unit,
+    onSave: (sys: Float, dia: Float) -> Unit
+) {
+    var sys by remember { mutableStateOf("") }
+    var dia by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add blood pressure") },
+        text = {
+            Column {
+                Text(
+                    "Systolic / Diastolic (mmHg)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = sys,
+                        onValueChange = { sys = it.filter { c -> c.isDigit() }.take(3) },
+                        label = { Text("Systolic") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = dia,
+                        onValueChange = { dia = it.filter { c -> c.isDigit() }.take(3) },
+                        label = { Text("Diastolic") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = sys.toFloatOrNull() != null && dia.toFloatOrNull() != null,
+                onClick = { onSave(sys.toFloatOrNull() ?: 0f, dia.toFloatOrNull() ?: 0f) }
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable
@@ -657,83 +763,4 @@ private fun formatMetric(metric: Metric): String {
             "$number $unit"
         }
     }
-}
-
-@Composable
-private fun AddMetricDialog(
-    onDismiss: () -> Unit,
-    onSave: (String, Float, Float) -> Unit
-) {
-    var typeIndex by remember { mutableIntStateOf(0) }
-    val types = listOf(MetricType.BP, MetricType.GLUCOSE, MetricType.WEIGHT)
-    var first by remember { mutableStateOf("") }
-    var second by remember { mutableStateOf("") }
-    val type = types[typeIndex]
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Add reading") },
-        text = {
-            Column {
-                MedSegmentedButtons(
-                    options = listOf("BP", "Glucose", "Weight"),
-                    selectedIndex = typeIndex,
-                    onSelect = {
-                        typeIndex = it
-                        first = ""
-                        second = ""
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(14.dp))
-                if (type == MetricType.BP) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedTextField(
-                            value = first,
-                            onValueChange = { first = it.filter { c -> c.isDigit() }.take(3) },
-                            label = { Text("Systolic") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = second,
-                            onValueChange = { second = it.filter { c -> c.isDigit() }.take(3) },
-                            label = { Text("Diastolic") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                } else {
-                    OutlinedTextField(
-                        value = first,
-                        onValueChange = {
-                            first = it.filter { c -> c.isDigit() || c == '.' }.take(6)
-                        },
-                        label = { Text(MetricType.label(type)) },
-                        suffix = { Text(MetricType.unit(type)) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            val valid = first.toFloatOrNull() != null &&
-                (type != MetricType.BP || second.toFloatOrNull() != null)
-            TextButton(
-                enabled = valid,
-                onClick = {
-                    onSave(type, first.toFloatOrNull() ?: 0f, second.toFloatOrNull() ?: 0f)
-                }
-            ) {
-                Text("Save")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
 }

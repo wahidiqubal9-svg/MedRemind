@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bloodtype
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.Icon
@@ -40,6 +41,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
@@ -84,10 +86,24 @@ object Vitals {
         else -> HealthZone.RED
     }
 
-    fun classifyCBG(value: Float): HealthZone = when {
-        value in 80f..130f -> HealthZone.GREEN
-        value > 130f && value <= 180f -> HealthZone.YELLOW
-        else -> HealthZone.RED
+    fun classifyCBG(
+        value: Float,
+        context: String = com.medremind.app.data.MetricContext.NONE
+    ): HealthZone {
+        val preMeal = context == com.medremind.app.data.MetricContext.PRE_MEAL
+        return if (preMeal) {
+            when {
+                value in 80f..130f -> HealthZone.GREEN
+                value > 130f && value <= 180f -> HealthZone.YELLOW
+                else -> HealthZone.RED
+            }
+        } else {
+            when {
+                value in 80f..180f -> HealthZone.GREEN
+                value > 180f && value <= 250f -> HealthZone.YELLOW
+                else -> HealthZone.RED
+            }
+        }
     }
 
     fun color(zone: HealthZone): Color = when (zone) {
@@ -121,8 +137,10 @@ fun VitalsChartCard(
     bands: List<ZoneBand>,
     yMin: Float,
     yMax: Float,
+    xLabels: List<String> = emptyList(),
+    onAdd: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
-    chartHeight: Dp = 170.dp
+    chartHeight: Dp = 180.dp
 ) {
     MedCard(modifier = modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -147,6 +165,32 @@ fun VitalsChartCard(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                 )
             }
+            if (onAdd != null) {
+                Spacer(Modifier.width(8.dp))
+                Surface(
+                    onClick = onAdd,
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Rounded.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "Add",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
         }
 
         Spacer(Modifier.height(10.dp))
@@ -163,54 +207,59 @@ fun VitalsChartCard(
                 .fillMaxWidth()
                 .height(chartHeight)
         ) {
-            val left = 6f
+            val left = 36f
             val right = size.width - 6f
             val top = 8f
-            val bottom = size.height - 20f
+            val bottom = size.height - 24f
             val width = (right - left).coerceAtLeast(1f)
             val height = (bottom - top).coerceAtLeast(1f)
             val span = (yMax - yMin).coerceAtLeast(1f)
 
             fun yFor(v: Float): Float = bottom - ((v - yMin) / span) * height
+            fun xFor(i: Int, n: Int): Float =
+                if (n <= 1) left + width / 2f
+                else left + width * i / (n - 1).toFloat()
 
-            // Shaded target/zone bands.
-            bands.forEach { band ->
-                val yTop = yFor(band.to)
-                val yBottom = yFor(band.from)
-                drawRect(
-                    color = band.color.copy(alpha = 0.12f),
-                    topLeft = Offset(left, yTop),
-                    size = Size(width, (yBottom - yTop).coerceAtLeast(1f))
+            val yPaint = android.graphics.Paint().apply {
+                color = 0xFF98A2B3.toInt()
+                textSize = 10.sp.toPx()
+                isAntiAlias = true
+            }
+            val xPaint = android.graphics.Paint().apply {
+                color = 0xFF98A2B3.toInt()
+                textSize = 9.sp.toPx()
+                isAntiAlias = true
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+
+            val gridColor = Color.Gray.copy(alpha = 0.16f)
+            for (i in 0..4) {
+                val value = yMin + span * i / 4f
+                val gy = yFor(value)
+                drawLine(gridColor, Offset(left, gy), Offset(right, gy), strokeWidth = 1f)
+                drawContext.canvas.nativeCanvas.drawText(
+                    value.toInt().toString(), left - 6f, gy + 4f, yPaint
                 )
             }
 
-            // Grid lines.
-            val gridColor = Color.Gray.copy(alpha = 0.16f)
-            for (i in 0..3) {
-                val gy = top + height * i / 3f
-                drawLine(gridColor, Offset(left, gy), Offset(right, gy), strokeWidth = 1f)
-            }
-
             val maxCount = series.maxOfOrNull { it.values.size } ?: 0
-            fun xFor(i: Int): Float =
-                if (maxCount <= 1) left + width / 2f
-                else left + width * i / (maxCount - 1).toFloat()
 
             series.forEach { s ->
                 val values = s.values
                 if (values.isEmpty()) return@forEach
-                val drawn = progress * (values.size - 1).toFloat()
+                val n = values.size
+                val drawn = progress * (n - 1).toFloat()
                 val path = Path()
-                path.moveTo(xFor(0), yFor(values[0]))
+                path.moveTo(xFor(0, n), yFor(values[0]))
                 var i = 1
-                while (i < values.size && i <= drawn) {
-                    path.lineTo(xFor(i), yFor(values[i]))
+                while (i < n && i <= drawn) {
+                    path.lineTo(xFor(i, n), yFor(values[i]))
                     i++
                 }
-                if (i - 1 < drawn && i < values.size) {
+                if (i - 1 < drawn && i < n) {
                     val frac = drawn - (i - 1)
-                    val x0 = xFor(i - 1)
-                    val x1 = xFor(i)
+                    val x0 = xFor(i - 1, n)
+                    val x1 = xFor(i, n)
                     val y0 = yFor(values[i - 1])
                     val y1 = yFor(values[i])
                     path.lineTo(x0 + (x1 - x0) * frac, y0 + (y1 - y0) * frac)
@@ -219,16 +268,27 @@ fun VitalsChartCard(
 
                 for (index in values.indices) {
                     if (index > drawn) break
-                    val isLast = index == values.size - 1
-                    val cx = xFor(index)
+                    val isLast = index == n - 1
+                    val cx = xFor(index, n)
                     val cy = yFor(values[index])
                     val dot = s.zones.getOrElse(index) { HealthZone.GREEN }.let { Vitals.color(it) }
                     if (isLast) {
+                        drawCircle(Color.White, radius = 9f, center = Offset(cx, cy))
+                        drawCircle(dot, radius = 6.5f, center = Offset(cx, cy))
+                    } else {
                         drawCircle(Color.White, radius = 7f, center = Offset(cx, cy))
                         drawCircle(dot, radius = 5f, center = Offset(cx, cy))
-                    } else {
-                        drawCircle(dot, radius = 4f, center = Offset(cx, cy))
                     }
+                }
+            }
+
+            // X-axis labels (dates).
+            val step = if (xLabels.size <= 8) 1 else (xLabels.size / 7).coerceAtLeast(1)
+            xLabels.forEachIndexed { index, label ->
+                if (index % step == 0) {
+                    drawContext.canvas.nativeCanvas.drawText(
+                        label, xFor(index, maxCount), bottom + 15f, xPaint
+                    )
                 }
             }
         }
@@ -483,6 +543,7 @@ fun MetricChartCard(
 @Composable
 fun GlucoseTrendsCard(
     readings: List<Metric>,
+    onAdd: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (readings.isEmpty()) return
@@ -490,7 +551,7 @@ fun GlucoseTrendsCard(
     var selectedIndex by remember(readings.size) { mutableStateOf(chips.lastIndex) }
     val index = selectedIndex.coerceIn(0, chips.lastIndex)
     val selected = chips[index]
-    val zone = Vitals.classifyCBG(selected.value)
+    val zone = Vitals.classifyCBG(selected.value, selected.context)
     val zoneColor = Vitals.color(zone)
     val zoneBg = when (zone) {
         HealthZone.GREEN -> Vitals.GreenBg
@@ -504,12 +565,12 @@ fun GlucoseTrendsCard(
     }
     val hour = Calendar.getInstance().apply { timeInMillis = selected.recordedAt }
         .get(Calendar.HOUR_OF_DAY)
-    val context = when (hour) {
-        in 5..11 -> "Morning"
-        in 12..16 -> "Afternoon"
-        in 17..20 -> "Evening"
-        else -> "Night"
-    }
+            val timeOfDay = when (hour) {
+                in 5..11 -> "Morning"
+                in 12..16 -> "Afternoon"
+                in 17..20 -> "Evening"
+                else -> "Night"
+            }
     val dateFormat = remember { SimpleDateFormat("d MMM, h:mm a", Locale.getDefault()) }
     val isMostRecent = index == chips.lastIndex
 
@@ -543,16 +604,27 @@ fun GlucoseTrendsCard(
             )
             Spacer(Modifier.width(8.dp))
             Surface(
+                onClick = onAdd,
                 shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                color = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
-                Text(
-                    "Records ${readings.size}",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Rounded.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        "Add",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
 
@@ -575,7 +647,8 @@ fun GlucoseTrendsCard(
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    context,
+                    com.medremind.app.data.MetricContext.label(selected.context)
+                        .ifBlank { timeOfDay },
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -609,7 +682,7 @@ fun GlucoseTrendsCard(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             chips.forEachIndexed { chipIndex, metric ->
-                val z = Vitals.classifyCBG(metric.value)
+                val z = Vitals.classifyCBG(metric.value, metric.context)
                 val c = Vitals.color(z)
                 val selectedChip = chipIndex == index
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -637,10 +710,14 @@ fun GlucoseTrendsCard(
                     }
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        SimpleDateFormat("h a", Locale.getDefault())
-                            .format(Date(metric.recordedAt)),
+                        com.medremind.app.data.MetricContext.label(metric.context)
+                            .ifBlank {
+                                SimpleDateFormat("h a", Locale.getDefault())
+                                    .format(Date(metric.recordedAt))
+                            },
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
                     )
                 }
             }

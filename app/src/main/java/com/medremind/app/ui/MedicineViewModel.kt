@@ -58,10 +58,18 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
     val metrics: StateFlow<List<Metric>> = db.metricDao().observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    fun addMetric(type: String, value: Float, value2: Float = 0f, onDone: () -> Unit = {}) {
+    fun addMetric(
+        type: String,
+        value: Float,
+        value2: Float = 0f,
+        context: String = com.medremind.app.data.MetricContext.NONE,
+        onDone: () -> Unit = {}
+    ) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                db.metricDao().insert(Metric(type = type, value = value, value2 = value2))
+                db.metricDao().insert(
+                    Metric(type = type, value = value, value2 = value2, context = context)
+                )
             }
             onDone()
         }

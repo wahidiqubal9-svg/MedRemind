@@ -23,6 +23,24 @@ object MetricType {
     }
 }
 
+object MetricContext {
+    const val NONE = ""
+    const val PRE_MEAL = "PRE_MEAL"
+    const val AFTER_MEAL = "AFTER_MEAL"
+    const val DINNER = "DINNER"
+    const val SNACKS = "SNACKS"
+
+    val glucoseOptions = listOf(PRE_MEAL, AFTER_MEAL, DINNER, SNACKS)
+
+    fun label(value: String): String = when (value) {
+        PRE_MEAL -> "Pre meal"
+        AFTER_MEAL -> "After meal"
+        DINNER -> "Dinner"
+        SNACKS -> "Snacks"
+        else -> ""
+    }
+}
+
 @Entity(tableName = "metrics")
 data class Metric(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
@@ -30,5 +48,7 @@ data class Metric(
     val value: Float,
     /** Second value, used for blood pressure (diastolic). */
     val value2: Float = 0f,
-    val recordedAt: Long = System.currentTimeMillis()
+    val recordedAt: Long = System.currentTimeMillis(),
+    /** Meal context for glucose readings. */
+    val context: String = MetricContext.NONE
 )
