@@ -189,7 +189,7 @@ fun AddEditMedicineScreen(
     }
     var intake by rememberSaveable { mutableStateOf(initial?.intakeInstruction ?: "") }
     var form by rememberSaveable {
-        mutableStateOf(initial?.form ?: com.medremind.app.data.MedicineForm.TABLET)
+        mutableStateOf(MedicineForm.normalize(initial?.form ?: MedicineForm.TABLET))
     }
 
     var trackRefill by rememberSaveable { mutableStateOf((initial?.quantity ?: 0) > 0) }
@@ -334,7 +334,7 @@ fun AddEditMedicineScreen(
                         when (stepIndex) {
                     0 -> DetailsStep(
                         name = name,
-                        onName = { name = it },
+                        onName = { name = capitalizeWords(it) },
                         doseAmount = doseAmount,
                         onDoseAmount = { doseAmount = it },
                         doseUnit = doseUnit,
@@ -571,7 +571,9 @@ private fun DetailsStep(
         value = name,
         onValueChange = onName,
         placeholder = { Text("e.g. Metformin") },
-        leadingIcon = { Icon(Icons.Rounded.Medication, contentDescription = null) },
+        leadingIcon = {
+            Text("\uD83D\uDC8A", style = MaterialTheme.typography.titleMedium)
+        },
         singleLine = true,
         modifier = Modifier.fillMaxWidth()
     )
@@ -2260,6 +2262,11 @@ private fun monthStartMillis(month: YearMonth): Long =
 
 private fun epochDayToMillis(epochDay: Long): Long =
     LocalDate.ofEpochDay(epochDay).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+private fun capitalizeWords(value: String): String =
+    value.split(" ").joinToString(" ") { word ->
+        word.replaceFirstChar { c -> if (c.isLowerCase()) c.titlecase() else c.toString() }
+    }
 
 private fun buildInventoryLabel(stockAmount: String, refillBelow: String): String {
     val parts = mutableListOf<String>()

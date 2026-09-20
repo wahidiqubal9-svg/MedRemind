@@ -34,15 +34,30 @@ object MedicineCategory {
 object MedicineForm {
     const val TABLET = "tablet"
     const val CAPSULE = "capsule"
-    const val SOFTGEL = "softgel"
-    const val LIQUID = "liquid"
+    const val SYRUP = "syrup"
+    const val DROP = "drop"
     const val INJECTION = "injection"
+    const val OINTMENT = "ointment"
     const val OTHER = "other"
 
-    val all = listOf(TABLET, CAPSULE, SOFTGEL, LIQUID, INJECTION, OTHER)
+    val all = listOf(TABLET, CAPSULE, SYRUP, DROP, INJECTION, OINTMENT, OTHER)
 
-    fun label(value: String): String =
-        value.replaceFirstChar { it.uppercase() }
+    fun label(value: String): String = when (value) {
+        TABLET -> "Tablet"
+        CAPSULE, "softgel" -> "Capsule"
+        SYRUP, "liquid" -> "Syrup"
+        DROP -> "Drop"
+        INJECTION -> "Injection"
+        OINTMENT -> "Ointment"
+        else -> "Others"
+    }
+
+    /** Maps legacy values to the current set. */
+    fun normalize(value: String): String = when (value) {
+        "softgel" -> CAPSULE
+        "liquid" -> SYRUP
+        else -> value
+    }
 }
 
 @Entity(tableName = "medicines")

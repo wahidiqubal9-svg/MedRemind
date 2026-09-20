@@ -945,13 +945,13 @@ fun DropZone(
                     cornerRadius = CornerRadius(26.dp.toPx())
                 )
             }
-            .padding(vertical = 42.dp),
+            .padding(vertical = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
-                .size(56.dp)
-                .clip(RoundedCornerShape(18.dp))
+                .size(44.dp)
+                .clip(RoundedCornerShape(14.dp))
                 .background(MedGradients.heroHorizontal()),
             contentAlignment = Alignment.Center
         ) {
@@ -959,12 +959,12 @@ fun DropZone(
                 imageVector = Icons.Rounded.PhotoCamera,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(8.dp))
         Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold)
-        Spacer(Modifier.height(3.dp))
+        Spacer(Modifier.height(2.dp))
         Text(
             subtitle,
             style = MaterialTheme.typography.bodySmall,

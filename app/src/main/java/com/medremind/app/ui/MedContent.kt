@@ -153,12 +153,16 @@ fun MedContent(
                 onOpenMe = onOpenMe,
                 profilePhoto = profilePhoto
             )
+            CabinetSummaryRow(
+                allCount = medicines.size,
+                lowCount = lowMedicines.size
+            )
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
                 contentPadding = PaddingValues(
-                    start = 16.dp, end = 16.dp, top = 4.dp, bottom = 120.dp
+                    start = 16.dp, end = 16.dp, top = 10.dp, bottom = 200.dp
                 ),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
@@ -825,6 +829,85 @@ private fun MedicineCard(
 }
 
 @Composable
+private fun CabinetSummaryRow(allCount: Int, lowCount: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        SummaryBox(
+            icon = Icons.Rounded.Medication,
+            label = "All medicines",
+            value = allCount,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f)
+        )
+        SummaryBox(
+            icon = Icons.Rounded.Warning,
+            label = "Low stock",
+            value = lowCount,
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun SummaryBox(
+    icon: ImageVector,
+    label: String,
+    value: Int,
+    tint: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant
+        ),
+        shadowElevation = MedElevation.card
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(tint.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = tint,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(
+                    value.toString(),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = tint
+                )
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun DetailItem(
     icon: ImageVector,
     label: String,
@@ -1429,9 +1512,10 @@ private fun dailyDose(schedules: List<Schedule>): Float {
 private fun unitLabel(form: String, plural: Boolean): String {
     val base = when (form) {
         MedicineForm.CAPSULE -> "capsule"
-        MedicineForm.SOFTGEL -> "softgel"
-        MedicineForm.LIQUID -> "dose"
+        MedicineForm.SYRUP -> "ml"
+        MedicineForm.DROP -> "drop"
         MedicineForm.INJECTION -> "dose"
+        MedicineForm.OINTMENT -> "application"
         MedicineForm.OTHER -> "unit"
         else -> "tablet"
     }
