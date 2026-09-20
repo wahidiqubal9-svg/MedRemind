@@ -33,8 +33,11 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -50,8 +53,16 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
+import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -303,12 +314,53 @@ private fun HealthScreen(
 ) {
     val metrics by vm.metrics.collectAsState()
     var showAddMetric by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val bpReadings = metrics.filter { it.type == MetricType.BP }.sortedBy { it.recordedAt }
+    val glucoseReadings = metrics.filter { it.type == MetricType.GLUCOSE }.sortedBy { it.recordedAt }
+    val weightReadings = metrics.filter { it.type == MetricType.WEIGHT }.sortedBy { it.recordedAt }
+
+    val bpControl = if (bpReadings.isEmpty()) null
+    else bpReadings.count {
+        Vitals.classifyBP(it.value, it.value2) == HealthZone.GREEN
+    } * 100 / bpReadings.size
+    val cbgControl = if (glucoseReadings.isEmpty()) null
+    else glucoseReadings.count {
+        Vitals.classifyCBG(it.value) == HealthZone.GREEN
+    } * 100 / glucoseReadings.size
+    val bpAvgText = if (bpReadings.isEmpty()) "\u2014"
+    else "${bpReadings.map { it.value }.average().toInt()}/" +
+        "${bpReadings.map { it.value2 }.average().toInt()} mmHg"
+    val cbgAvgText = if (glucoseReadings.isEmpty()) "\u2014"
+    else "${glucoseReadings.map { it.value }.average().toInt()} mg/dL"
+
+    fun badgeFor(pct: Int?): String? = when {
+        pct == null -> null
+        pct >= 70 -> "Well controlled"
+        pct >= 50 -> "Needs attention"
+        else -> "Out of control"
+    }
+
+    fun shareVitals(mime: String, chooser: String, build: () -> File) {
+        scope.launch {
+            val file = withContext(Dispatchers.IO) { build() }
+            val uri = FileProvider.getUriForFile(
+                context,
+                context.packageName + ".fileprovider",
+                file
+            )
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = mime
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(intent, chooser))
+        }
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
-        ScreenHeader(
-            "Health",
-            modifier = Modifier.padding(horizontal = 16.dp)
-        ) {
+        ScreenHeader("Health", modifier = Modifier.padding(horizontal = 16.dp)) {
             SquareIconButton(
                 icon = Icons.Rounded.Person,
                 contentDescription = "Me",
@@ -325,96 +377,154 @@ private fun HealthScreen(
                 .padding(bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-        MedCard(modifier = Modifier.fillMaxWidth()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "Health log",
-                    style = MaterialTheme.typography.titleMedium,
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                VitalsStatCard(
+                    label = "BP in control",
+                    value = if (bpControl != null) "$bpControl%" else "\u2014",
+                    badgeText = badgeFor(bpControl),
+                    badgeTint = bpControl?.let { Vitals.badgeTint(it) } ?: Vitals.Green,
                     modifier = Modifier.weight(1f)
                 )
-                TextButton(onClick = { showAddMetric = true }) {
-                    Icon(
-                        Icons.Rounded.Add,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text("Add reading")
-                }
-            }
-            if (metrics.isEmpty()) {
-                Text(
-                    "Log blood pressure, glucose or weight to keep a simple history here.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                VitalsStatCard(
+                    label = "CBG in range",
+                    value = if (cbgControl != null) "$cbgControl%" else "\u2014",
+                    badgeText = badgeFor(cbgControl),
+                    badgeTint = cbgControl?.let { Vitals.badgeTint(it) } ?: Vitals.Green,
+                    modifier = Modifier.weight(1f)
                 )
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    metrics.take(10).forEach { metric ->
-                        MetricRow(metric = metric, onDelete = { vm.deleteMetric(metric) })
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                VitalsStatCard(
+                    label = "BP avg",
+                    value = bpAvgText,
+                    badgeText = null,
+                    badgeTint = Vitals.Systolic,
+                    modifier = Modifier.weight(1f)
+                )
+                VitalsStatCard(
+                    label = "CBG avg",
+                    value = cbgAvgText,
+                    badgeText = null,
+                    badgeTint = Vitals.Glucose,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            if (bpReadings.isNotEmpty()) {
+                VitalsChartCard(
+                    title = "Blood Pressure",
+                    subtitle = "Systolic / Diastolic (mmHg) \u00b7 last ${bpReadings.size}",
+                    currentText = "${bpReadings.last().value.toInt()}/" +
+                        "${bpReadings.last().value2.toInt()}",
+                    series = listOf(
+                        VitalSeries(
+                            label = "Systolic",
+                            color = Vitals.Systolic,
+                            values = bpReadings.map { it.value },
+                            zones = bpReadings.map { Vitals.classifyBP(it.value, it.value2) }
+                        ),
+                        VitalSeries(
+                            label = "Diastolic",
+                            color = Vitals.Diastolic,
+                            values = bpReadings.map { it.value2 },
+                            zones = bpReadings.map { Vitals.classifyBP(it.value, it.value2) }
+                        )
+                    ),
+                    bands = listOf(
+                        ZoneBand(140f, 180f, Vitals.Red),
+                        ZoneBand(120f, 140f, Vitals.Yellow),
+                        ZoneBand(90f, 120f, Vitals.Green),
+                        ZoneBand(50f, 90f, Vitals.Red)
+                    ),
+                    yMin = 50f,
+                    yMax = 180f
+                )
+            }
+
+            if (glucoseReadings.isNotEmpty()) {
+                VitalsChartCard(
+                    title = "Blood Glucose",
+                    subtitle = "CBG (mg/dL) \u00b7 last ${glucoseReadings.size}",
+                    currentText = "${glucoseReadings.last().value.toInt()}",
+                    series = listOf(
+                        VitalSeries(
+                            label = "Blood glucose",
+                            color = Vitals.Glucose,
+                            values = glucoseReadings.map { it.value },
+                            zones = glucoseReadings.map { Vitals.classifyCBG(it.value) }
+                        )
+                    ),
+                    bands = listOf(
+                        ZoneBand(180f, 300f, Vitals.Red),
+                        ZoneBand(130f, 180f, Vitals.Yellow),
+                        ZoneBand(80f, 130f, Vitals.Green),
+                        ZoneBand(40f, 70f, Vitals.Red)
+                    ),
+                    yMin = 40f,
+                    yMax = 300f
+                )
+            }
+
+            if (weightReadings.isNotEmpty()) {
+                MetricChartCard(
+                    title = "Weight",
+                    currentText = formatMetric(weightReadings.last()),
+                    series = listOf(
+                        ChartSeries(
+                            values = weightReadings.map { it.value },
+                            color = MaterialTheme.colorScheme.secondary,
+                            label = "Weight"
+                        )
+                    )
+                )
+            }
+
+            MedCard(modifier = Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Health log",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = { showAddMetric = true }) {
+                        Icon(
+                            Icons.Rounded.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Add reading")
+                    }
+                }
+                if (metrics.isEmpty()) {
+                    Text(
+                        "Log blood pressure, glucose or weight to keep a simple history here.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        metrics.take(10).forEach { metric ->
+                            MetricRow(metric = metric, onDelete = { vm.deleteMetric(metric) })
+                        }
                     }
                 }
             }
-        }
 
-        val bpReadings = metrics.filter { it.type == MetricType.BP }.sortedBy { it.recordedAt }
-        if (bpReadings.isNotEmpty()) {
-            MetricChartCard(
-                title = "Blood pressure",
-                currentText = "${bpReadings.last().value.toInt()}/${bpReadings.last().value2.toInt()} mmHg",
-                series = listOf(
-                    ChartSeries(
-                        values = bpReadings.map { it.value },
-                        color = MaterialTheme.colorScheme.primary,
-                        label = "Systolic",
-                        low = 90f,
-                        high = 130f
-                    ),
-                    ChartSeries(
-                        values = bpReadings.map { it.value2 },
-                        color = MaterialTheme.colorScheme.tertiary,
-                        label = "Diastolic",
-                        low = 60f,
-                        high = 85f
-                    )
-                )
+            HealthExportCard(
+                enabled = metrics.isNotEmpty(),
+                onCsv = {
+                    shareVitals("text/csv", "Share CSV report") {
+                        ReportExporter.exportVitalsCsv(context, metrics)
+                    }
+                },
+                onPdf = {
+                    shareVitals("application/pdf", "Share PDF report") {
+                        ReportExporter.exportVitalsPdf(context, metrics)
+                    }
+                }
             )
-        }
-
-        val glucoseReadings = metrics.filter { it.type == MetricType.GLUCOSE }
-            .sortedBy { it.recordedAt }
-        if (glucoseReadings.isNotEmpty()) {
-            MetricChartCard(
-                title = "Blood sugar",
-                currentText = "${glucoseReadings.last().value.toInt()} mg/dL",
-                series = listOf(
-                    ChartSeries(
-                        values = glucoseReadings.map { it.value },
-                        color = MaterialTheme.colorScheme.tertiary,
-                        label = "Glucose",
-                        low = 70f,
-                        high = 140f
-                    )
-                )
-            )
-        }
-
-        val weightReadings = metrics.filter { it.type == MetricType.WEIGHT }
-            .sortedBy { it.recordedAt }
-        if (weightReadings.isNotEmpty()) {
-            MetricChartCard(
-                title = "Weight",
-                currentText = formatMetric(weightReadings.last()) ,
-                series = listOf(
-                    ChartSeries(
-                        values = weightReadings.map { it.value },
-                        color = MaterialTheme.colorScheme.secondary,
-                        label = "Weight"
-                    )
-                )
-            )
-        }
         }
     }
 
@@ -426,6 +536,72 @@ private fun HealthScreen(
                 showAddMetric = false
             }
         )
+    }
+}
+
+@Composable
+private fun HealthExportCard(
+    enabled: Boolean,
+    onCsv: () -> Unit,
+    onPdf: () -> Unit
+) {
+    MedCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MedGradients.heroHorizontal()),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.FileDownload,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Export report", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Share your health readings as CSV or PDF.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedButton(
+                onClick = onCsv,
+                enabled = enabled,
+                shape = RoundedCornerShape(50),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    Icons.Rounded.Description,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text("CSV")
+            }
+            OutlinedButton(
+                onClick = onPdf,
+                enabled = enabled,
+                shape = RoundedCornerShape(50),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    Icons.Rounded.PictureAsPdf,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text("PDF")
+            }
+        }
     }
 }
 

@@ -5,6 +5,8 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
+import com.medremind.app.data.Metric
+import com.medremind.app.data.MetricType
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -127,6 +129,118 @@ object ReportExporter {
         doc.close()
         return file
     }
+
+    fun exportVitalsCsv(context: Context, metrics: List<Metric>): File {
+        val file = File(exportsDir(context), "medremind-health-${stamp()}.csv")
+        val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val time = SimpleDateFormat("HH:mm", Locale.getDefault())
+        file.bufferedWriter().use { writer ->
+            writer.write("Date,Time,Type,Reading,Unit\n")
+            metrics.sortedByDescending { it.recordedAt }.forEach { metric ->
+                val d = Date(metric.recordedAt)
+                writer.write(
+                    "${date.format(d)},${time.format(d)}," +
+                        "${csv(MetricType.label(metric.type))}," +
+                        "${csv(vitalsReading(metric))},${csv(MetricType.unit(metric.type))}\n"
+                )
+            }
+        }
+        return file
+    }
+
+    fun exportVitalsPdf(context: Context, metrics: List<Metric>): File {
+        val ordered = metrics.sortedByDescending { it.recordedAt }
+        val doc = PdfDocument()
+        val pageWidth = 595
+        val pageHeight = 842
+        val margin = 40f
+
+        val titlePaint = Paint().apply {
+            color = Color.rgb(49, 46, 129)
+            textSize = 20f
+            isFakeBoldText = true
+        }
+        val subPaint = Paint().apply {
+            color = Color.rgb(107, 114, 128)
+            textSize = 11f
+        }
+        val labelPaint = Paint().apply {
+            color = Color.rgb(17, 24, 39)
+            textSize = 12f
+        }
+        val boldPaint = Paint().apply {
+            color = Color.rgb(17, 24, 39)
+            textSize = 12f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val linePaint = Paint().apply {
+            color = Color.rgb(229, 231, 235)
+            strokeWidth = 1f
+        }
+        val date = SimpleDateFormat("d MMM yyyy", Locale.getDefault())
+        val time = SimpleDateFormat("HH:mm", Locale.getDefault())
+
+        var pageNumber = 1
+        var page = doc.startPage(
+            PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
+        )
+        var canvas = page.canvas
+        var y = margin + 10f
+
+        canvas.drawText("MedRemind health report", margin, y, titlePaint)
+        y += 18f
+        canvas.drawText("Blood pressure, glucose & weight \u00b7 generated ${stamp()}", margin, y, subPaint)
+        y += 30f
+
+        canvas.drawText("Date", margin, y, boldPaint)
+        canvas.drawText("Time", margin + 120f, y, boldPaint)
+        canvas.drawText("Type", margin + 185f, y, boldPaint)
+        canvas.drawText("Reading", margin + 360f, y, boldPaint)
+        y += 8f
+        canvas.drawLine(margin, y, pageWidth - margin, y, linePaint)
+        y += 16f
+
+        fun newPage() {
+            doc.finishPage(page)
+            pageNumber++
+            page = doc.startPage(
+                PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
+            )
+            canvas = page.canvas
+            y = margin
+        }
+
+        ordered.forEach { metric ->
+            if (y > pageHeight - margin - 20f) newPage()
+            val d = Date(metric.recordedAt)
+            canvas.drawText(date.format(d), margin, y, labelPaint)
+            canvas.drawText(time.format(d), margin + 120f, y, labelPaint)
+            canvas.drawText(MetricType.label(metric.type), margin + 185f, y, labelPaint)
+            canvas.drawText(
+                vitalsReading(metric) + " " + MetricType.unit(metric.type),
+                margin + 360f, y, labelPaint
+            )
+            y += 18f
+        }
+        if (ordered.isEmpty()) {
+            canvas.drawText("No readings recorded yet.", margin, y, subPaint)
+        }
+
+        doc.finishPage(page)
+        val file = File(exportsDir(context), "medremind-health-${stamp()}.pdf")
+        file.outputStream().use { doc.writeTo(it) }
+        doc.close()
+        return file
+    }
+
+    private fun vitalsReading(metric: Metric): String =
+        if (metric.type == MetricType.BP) {
+            "${metric.value.toInt()}/${metric.value2.toInt()}"
+        } else {
+            val v = metric.value
+            if (v % 1f == 0f) v.toInt().toString()
+            else String.format(Locale.getDefault(), "%.1f", v)
+        }
 
     private fun exportsDir(context: Context): File =
         File(context.cacheDir, "exports").apply { mkdirs() }

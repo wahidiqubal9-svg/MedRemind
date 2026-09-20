@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlin.math.max
 import kotlin.math.min
 
@@ -47,6 +48,255 @@ data class ChartSeries(
     val low: Float? = null,
     val high: Float? = null
 )
+
+/* ---------------- Vitals (BP & CBG) ---------------- */
+
+enum class HealthZone { GREEN, YELLOW, RED }
+
+object Vitals {
+    val Green = Color(0xFF2E9C6E)
+    val Yellow = Color(0xFFE6B422)
+    val Red = Color(0xFFD94A4A)
+    val Systolic = Color(0xFF1E5B9E)
+    val Diastolic = Color(0xFF8B5CF6)
+    val Glucose = Color(0xFF2B7A4B)
+
+    val GreenBg = Color(0xFFE1F3EA)
+    val YellowBg = Color(0xFFFEF5E0)
+    val RedBg = Color(0xFFFDE7E7)
+
+    fun classifyBP(sys: Float, dia: Float): HealthZone = when {
+        sys in 90f..120f && dia in 60f..80f -> HealthZone.GREEN
+        sys <= 139f && dia <= 89f -> HealthZone.YELLOW
+        else -> HealthZone.RED
+    }
+
+    fun classifyCBG(value: Float): HealthZone = when {
+        value in 80f..130f -> HealthZone.GREEN
+        value > 130f && value <= 180f -> HealthZone.YELLOW
+        else -> HealthZone.RED
+    }
+
+    fun color(zone: HealthZone): Color = when (zone) {
+        HealthZone.GREEN -> Green
+        HealthZone.YELLOW -> Yellow
+        HealthZone.RED -> Red
+    }
+
+    fun badgeTint(pct: Int): Color = when {
+        pct >= 70 -> Green
+        pct >= 50 -> Yellow
+        else -> Red
+    }
+}
+
+data class ZoneBand(val from: Float, val to: Float, val color: Color)
+
+data class VitalSeries(
+    val label: String,
+    val color: Color,
+    val values: List<Float>,
+    val zones: List<HealthZone>
+)
+
+@Composable
+fun VitalsChartCard(
+    title: String,
+    subtitle: String,
+    currentText: String,
+    series: List<VitalSeries>,
+    bands: List<ZoneBand>,
+    yMin: Float,
+    yMax: Float,
+    modifier: Modifier = Modifier,
+    chartHeight: Dp = 170.dp
+) {
+    MedCard(modifier = modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ) {
+                Text(
+                    currentText,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+        var started by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) { started = true }
+        val progress by animateFloatAsState(
+            targetValue = if (started) 1f else 0f,
+            animationSpec = tween(MedMotion.Slow, easing = MedMotion.Emphasized),
+            label = "vitalsProgress"
+        )
+
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(chartHeight)
+        ) {
+            val left = 6f
+            val right = size.width - 6f
+            val top = 8f
+            val bottom = size.height - 20f
+            val width = (right - left).coerceAtLeast(1f)
+            val height = (bottom - top).coerceAtLeast(1f)
+            val span = (yMax - yMin).coerceAtLeast(1f)
+
+            fun yFor(v: Float): Float = bottom - ((v - yMin) / span) * height
+
+            // Shaded target/zone bands.
+            bands.forEach { band ->
+                val yTop = yFor(band.to)
+                val yBottom = yFor(band.from)
+                drawRect(
+                    color = band.color.copy(alpha = 0.12f),
+                    topLeft = Offset(left, yTop),
+                    size = Size(width, (yBottom - yTop).coerceAtLeast(1f))
+                )
+            }
+
+            // Grid lines.
+            val gridColor = Color.Gray.copy(alpha = 0.16f)
+            for (i in 0..3) {
+                val gy = top + height * i / 3f
+                drawLine(gridColor, Offset(left, gy), Offset(right, gy), strokeWidth = 1f)
+            }
+
+            val maxCount = series.maxOfOrNull { it.values.size } ?: 0
+            fun xFor(i: Int): Float =
+                if (maxCount <= 1) left + width / 2f
+                else left + width * i / (maxCount - 1).toFloat()
+
+            series.forEach { s ->
+                val values = s.values
+                if (values.isEmpty()) return@forEach
+                val drawn = progress * (values.size - 1).toFloat()
+                val path = Path()
+                path.moveTo(xFor(0), yFor(values[0]))
+                var i = 1
+                while (i < values.size && i <= drawn) {
+                    path.lineTo(xFor(i), yFor(values[i]))
+                    i++
+                }
+                if (i - 1 < drawn && i < values.size) {
+                    val frac = drawn - (i - 1)
+                    val x0 = xFor(i - 1)
+                    val x1 = xFor(i)
+                    val y0 = yFor(values[i - 1])
+                    val y1 = yFor(values[i])
+                    path.lineTo(x0 + (x1 - x0) * frac, y0 + (y1 - y0) * frac)
+                }
+                drawPath(path, color = s.color, style = Stroke(width = 3f, cap = StrokeCap.Round))
+
+                for (index in values.indices) {
+                    if (index > drawn) break
+                    val isLast = index == values.size - 1
+                    val cx = xFor(index)
+                    val cy = yFor(values[index])
+                    val dot = s.zones.getOrElse(index) { HealthZone.GREEN }.let { Vitals.color(it) }
+                    if (isLast) {
+                        drawCircle(Color.White, radius = 7f, center = Offset(cx, cy))
+                        drawCircle(dot, radius = 5f, center = Offset(cx, cy))
+                    } else {
+                        drawCircle(dot, radius = 4f, center = Offset(cx, cy))
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            LegendDot(Vitals.Green, "In range")
+            LegendDot(Vitals.Yellow, "Borderline")
+            LegendDot(Vitals.Red, "Out of range")
+        }
+    }
+}
+
+@Composable
+private fun LegendDot(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(9.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+fun VitalsStatCard(
+    label: String,
+    value: String,
+    badgeText: String?,
+    badgeTint: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant
+        ),
+        shadowElevation = MedElevation.card
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Text(
+                label.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                value,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold
+            )
+            if (badgeText != null) {
+                Spacer(Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = badgeTint.copy(alpha = 0.16f),
+                    contentColor = badgeTint
+                ) {
+                    Text(
+                        badgeText,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        }
+    }
+}
 
 /**
  * A compact line chart with an optional healthy "target band" (lower/upper limit)
