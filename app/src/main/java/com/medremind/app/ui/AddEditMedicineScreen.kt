@@ -877,9 +877,6 @@ private fun ScheduleSheet(
     var cycleOff by remember { mutableIntStateOf(7) }
     var dates by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var month by remember { mutableStateOf(YearMonth.now()) }
-    var intervalText by remember { mutableStateOf("2") }
-    var cycleOnText by remember { mutableStateOf("21") }
-    var cycleOffText by remember { mutableStateOf("7") }
     val valid = picked?.let { patternValid(it, daysMask, dates) } ?: false
 
     ModalBottomSheet(
@@ -989,7 +986,7 @@ private fun ScheduleSheet(
                             )
                         }
                         2 -> {
-                            FieldLabel("Every how many days?")
+                            FieldLabel("Fixed interval")
                             Spacer(Modifier.height(12.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
@@ -998,18 +995,11 @@ private fun ScheduleSheet(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Spacer(Modifier.width(10.dp))
-                                OutlinedTextField(
-                                    value = intervalText,
-                                    onValueChange = { value ->
-                                        val filtered = value.filter { it.isDigit() }.take(3)
-                                        intervalText = filtered
-                                        filtered.toIntOrNull()?.let {
-                                            if (it >= 2) intervalDays = it.coerceAtMost(90)
-                                        }
-                                    },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.width(88.dp)
+                                NumberStepper(
+                                    value = intervalDays,
+                                    onValueChange = { intervalDays = it },
+                                    min = 2,
+                                    max = 90
                                 )
                                 Spacer(Modifier.width(10.dp))
                                 Text(
@@ -1029,66 +1019,84 @@ private fun ScheduleSheet(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "Minimum is 2 \u2014 choose \u201cEvery day\u201d if you take it daily.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                         3 -> {
                             FieldLabel("On and off cycle")
                             Spacer(Modifier.height(12.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    "Take it for",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(18.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.outlineVariant
                                 )
-                                Spacer(Modifier.width(8.dp))
-                                OutlinedTextField(
-                                    value = cycleOnText,
-                                    onValueChange = { value ->
-                                        val filtered = value.filter { it.isDigit() }.take(3)
-                                        cycleOnText = filtered
-                                        filtered.toIntOrNull()?.let {
-                                            if (it >= 1) cycleOn = it.coerceAtMost(180)
-                                        }
-                                    },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.width(82.dp)
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    "days",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.primary)
+                                        )
+                                        Spacer(Modifier.width(10.dp))
+                                        Text(
+                                            "Take it for",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        NumberStepper(
+                                            value = cycleOn,
+                                            onValueChange = { cycleOn = it },
+                                            min = 1,
+                                            max = 180
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            "days",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Spacer(Modifier.height(12.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                                        )
+                                        Spacer(Modifier.width(10.dp))
+                                        Text(
+                                            "Then rest for",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        NumberStepper(
+                                            value = cycleOff,
+                                            onValueChange = { cycleOff = it },
+                                            min = 1,
+                                            max = 180
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            "days",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
                             }
-                            Spacer(Modifier.height(8.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    "Then rest for",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                OutlinedTextField(
-                                    value = cycleOffText,
-                                    onValueChange = { value ->
-                                        val filtered = value.filter { it.isDigit() }.take(3)
-                                        cycleOffText = filtered
-                                        filtered.toIntOrNull()?.let {
-                                            if (it >= 1) cycleOff = it.coerceAtMost(180)
-                                        }
-                                    },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.width(82.dp)
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    "days",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Spacer(Modifier.height(10.dp))
+                            Spacer(Modifier.height(12.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1099,8 +1107,6 @@ private fun ScheduleSheet(
                                     onClick = {
                                         cycleOn = 21
                                         cycleOff = 7
-                                        cycleOnText = "21"
-                                        cycleOffText = "7"
                                     },
                                     modifier = Modifier.weight(1f)
                                 )
@@ -1110,8 +1116,15 @@ private fun ScheduleSheet(
                                     onClick = {
                                         cycleOn = 5
                                         cycleOff = 2
-                                        cycleOnText = "5"
-                                        cycleOffText = "2"
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                DurationChip(
+                                    label = "3 / 1",
+                                    selected = cycleOn == 3 && cycleOff == 1,
+                                    onClick = {
+                                        cycleOn = 3
+                                        cycleOff = 1
                                     },
                                     modifier = Modifier.weight(1f)
                                 )
@@ -1292,7 +1305,7 @@ private data class SchedulePattern(
 private fun patternTitle(type: Int): String = when (type) {
     0 -> "Every day"
     1 -> "Some days of the week"
-    2 -> "Every other day"
+    2 -> "Fixed interval"
     3 -> "Repeating cycle"
     4 -> "Only when needed"
     else -> "Only on certain dates"
@@ -1301,7 +1314,7 @@ private fun patternTitle(type: Int): String = when (type) {
 private fun patternExample(type: Int): String = when (type) {
     0 -> "You take it once every day"
     1 -> "For example, only Monday, Wednesday and Friday"
-    2 -> "You skip one day between doses"
+    2 -> "Take it every 2, 3 or 4 days \u2014 skip the days in between"
     3 -> "For example: 21 days on, then 7 days rest, then repeat"
     4 -> "No fixed times \u2014 take it whenever required"
     else -> "Pick the exact dates on a calendar"
@@ -1389,6 +1402,77 @@ private fun SchedulePattern.toSchedule(
         endDate = if (type == PatternType.PRN) null else endDate,
         enabled = true
     )
+}
+
+@Composable
+private fun NumberStepper(
+    value: Int,
+    onValueChange: (Int) -> Unit,
+    min: Int,
+    max: Int,
+    modifier: Modifier = Modifier
+) {
+    val haptics = rememberMedHaptics()
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            StepperIcon(
+                icon = Icons.Rounded.Remove,
+                enabled = value > min,
+                onClick = {
+                    haptics.tick()
+                    onValueChange((value - 1).coerceAtLeast(min))
+                }
+            )
+            Text(
+                text = value.toString(),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.width(46.dp)
+            )
+            StepperIcon(
+                icon = Icons.Rounded.Add,
+                enabled = value < max,
+                onClick = {
+                    haptics.tick()
+                    onValueChange((value + 1).coerceAtMost(max))
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun StepperIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        shape = CircleShape,
+        color = if (enabled) MaterialTheme.colorScheme.primaryContainer
+        else MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = if (enabled) MaterialTheme.colorScheme.onPrimaryContainer
+        else MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.size(38.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        }
+    }
 }
 
 @Composable
