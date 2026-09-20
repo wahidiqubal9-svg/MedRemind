@@ -478,6 +478,10 @@ private fun HealthScreen(
                     },
                     onAdd = { showAddBp = true }
                 )
+                BpTrendsCard(
+                    readings = bpReadings,
+                    onAdd = { showAddBp = true }
+                )
             }
 
             if (weightReadings.isNotEmpty()) {
