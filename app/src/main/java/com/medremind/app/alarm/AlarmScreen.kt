@@ -59,6 +59,9 @@ import java.util.Locale
 
 @Composable
 fun AlarmScreen(doseEventId: Long, snoozeMinutes: Int = 5, onAction: (String) -> Unit) {
+    // Block the system back gesture/button: the alarm can only be dismissed by
+    // Taken, Skipped or Snooze.
+    androidx.activity.compose.BackHandler(enabled = true) { }
     val context = LocalContext.current
     var medicine by remember { mutableStateOf<Medicine?>(null) }
     var scheduledText by remember { mutableStateOf("") }

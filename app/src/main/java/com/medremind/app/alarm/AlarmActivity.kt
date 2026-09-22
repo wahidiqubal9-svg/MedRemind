@@ -1,11 +1,14 @@
 package com.medremind.app.alarm
 
 import android.content.Context
+import android.content.Intent
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -26,6 +29,7 @@ class AlarmActivity : ComponentActivity() {
     private var player: MediaPlayer? = null
     private var vibrator: Vibrator? = null
     private var snoozeMinutes: Int = 5
+    private var acted: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -102,7 +106,33 @@ class AlarmActivity : ComponentActivity() {
         vibrator = null
     }
 
+    private fun bringBack() {
+        if (acted) return
+        runCatching {
+            startActivity(
+                Intent(this, AlarmActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    .putExtra("doseEventId", intent.getLongExtra("doseEventId", -1L))
+            )
+        }
+    }
+
+    // The alarm cannot be dismissed by Home or Recents; it comes back until the
+    // user taps Taken / Skipped / Snooze.
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (!acted) bringBack()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (!acted) {
+            Handler(Looper.getMainLooper()).postDelayed({ bringBack() }, 350)
+        }
+    }
+
     private fun handleAction(doseEventId: Long, action: String) {
+        acted = true
         val appContext = applicationContext
         lifecycleScope.launch {
             withContext(Dispatchers.IO) {
