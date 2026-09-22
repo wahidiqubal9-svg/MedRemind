@@ -596,12 +596,17 @@ private fun SummaryCard(
 @Composable
 private fun NextDoseBanner(dose: TodayDose, onTake: () -> Unit) {
     val haptics = rememberMedHaptics()
-    val minutes = ((dose.timeMillis - System.currentTimeMillis()) / 60_000L).toInt()
+    val totalMinutes = ((dose.timeMillis - System.currentTimeMillis()) / 60_000L).toInt()
     val label = when {
-        minutes > 1 -> "UP NEXT IN $minutes MINS"
-        minutes == 1 -> "UP NEXT IN 1 MIN"
-        minutes == 0 -> "DUE NOW"
-        else -> "OVERDUE"
+        totalMinutes <= 0 -> if (totalMinutes == 0) "DUE NOW" else "OVERDUE"
+        totalMinutes < 60 -> "UP NEXT IN $totalMinutes MIN" + (if (totalMinutes == 1) "" else "S")
+        else -> {
+            val hours = totalMinutes / 60
+            val mins = totalMinutes % 60
+            val hourText = "$hours HR" + (if (hours == 1) "" else "S")
+            val minText = if (mins > 0) " $mins MIN" else ""
+            "UP NEXT IN $hourText$minText"
+        }
     }
     val timeText = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(dose.timeMillis))
     val intake = com.medremind.app.data.IntakeInstruction.label(dose.medicine.intakeInstruction)
