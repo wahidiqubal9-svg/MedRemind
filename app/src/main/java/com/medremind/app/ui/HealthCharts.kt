@@ -6,7 +6,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -139,10 +141,13 @@ fun VitalsChartCard(
     yMin: Float,
     yMax: Float,
     xLabels: List<String> = emptyList(),
+    pointLabels: List<String> = emptyList(),
+    unit: String = "",
     onAdd: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     chartHeight: Dp = 180.dp
 ) {
+    var selectedPoint by remember { mutableStateOf<Int?>(null) }
     MedCard(modifier = modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
@@ -207,11 +212,40 @@ fun VitalsChartCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(chartHeight)
+                .pointerInput(series, pointLabels, yMin, yMax) {
+                    detectTapGestures { tap ->
+                        val l = 74f
+                        val r = size.width - 26f
+                        val t = 14f
+                        val b = size.height - 36f
+                        val w = (r - l).coerceAtLeast(1f)
+                        val h = (b - t).coerceAtLeast(1f)
+                        val sp = (yMax - yMin).coerceAtLeast(1f)
+                        val count = series.maxOfOrNull { it.values.size } ?: 0
+                        fun px(i: Int): Float =
+                            if (count <= 1) l + w / 2f else l + w * i / (count - 1).toFloat()
+                        fun py(v: Float): Float = b - ((v - yMin) / sp) * h
+                        var best = -1
+                        var bestDist = Float.MAX_VALUE
+                        series.forEach { s ->
+                            s.values.forEachIndexed { i, v ->
+                                val dx = tap.x - px(i)
+                                val dy = tap.y - py(v)
+                                val dist = kotlin.math.hypot(dx, dy)
+                                if (dist < bestDist) {
+                                    bestDist = dist
+                                    best = i
+                                }
+                            }
+                        }
+                        selectedPoint = if (best >= 0 && bestDist < 46f) best else null
+                    }
+                }
         ) {
             val left = 74f
-            val right = size.width - 24f
+            val right = size.width - 26f
             val top = 14f
-            val bottom = size.height - 24f
+            val bottom = size.height - 36f
             val width = (right - left).coerceAtLeast(1f)
             val height = (bottom - top).coerceAtLeast(1f)
             val span = (yMax - yMin).coerceAtLeast(1f)
@@ -281,18 +315,80 @@ fun VitalsChartCard(
                         drawCircle(Color.White, radius = 21f, center = Offset(cx, cy))
                         drawCircle(dot, radius = 16f, center = Offset(cx, cy))
                     }
+                    if (index == selectedPoint) {
+                        drawCircle(
+                            color = s.color,
+                            radius = if (isLast) 25f else 21f,
+                            center = Offset(cx, cy),
+                            style = Stroke(width = 3f)
+                        )
+                    }
                 }
             }
 
             // X-axis labels (dates), spaced out to avoid overlap.
             if (xLabels.isNotEmpty()) {
-                val slot = 60f
-                val maxLabels = (width / slot).toInt().coerceAtLeast(1)
-                val step = ((xLabels.size + maxLabels - 1) / maxLabels).coerceAtLeast(1)
+                val gapPerPoint = if (maxCount > 1) width / (maxCount - 1) else width
+                val step = kotlin.math.ceil(60f / gapPerPoint).toInt().coerceAtLeast(1)
                 xLabels.forEachIndexed { index, label ->
                     if (index % step == 0 || index == xLabels.lastIndex) {
                         drawContext.canvas.nativeCanvas.drawText(
-                            label, xFor(index, maxCount), bottom + 15f, xPaint
+                            label, xFor(index, maxCount), bottom + 22f, xPaint
+                        )
+                    }
+                }
+            }
+        }
+
+        val sel = selectedPoint
+        if (sel != null) {
+            val valueText = series.joinToString(" / ") { s ->
+                s.values.getOrNull(sel)?.let { formatChartValue(it) } ?: ""
+            }
+            val zone = series.firstOrNull()?.zones?.getOrNull(sel) ?: HealthZone.GREEN
+            val zc = Vitals.color(zone)
+            val status = when (zone) {
+                HealthZone.GREEN -> "In range"
+                HealthZone.YELLOW -> "Borderline"
+                HealthZone.RED -> "Out of range"
+            }
+            Spacer(Modifier.height(8.dp))
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            pointLabels.getOrNull(sel).orEmpty(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            "$valueText $unit".trim(),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = zc
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = zc.copy(alpha = 0.16f),
+                        contentColor = zc
+                    ) {
+                        Text(
+                            status,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                         )
                     }
                 }
@@ -930,3 +1026,7 @@ fun BpTrendsCard(
         }
     }
 }
+
+private fun formatChartValue(v: Float): String =
+    if (v % 1f == 0f) v.toInt().toString()
+    else String.format(Locale.getDefault(), "%.1f", v)

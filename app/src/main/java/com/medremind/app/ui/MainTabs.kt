@@ -441,6 +441,11 @@ private fun HealthScreen(
                     xLabels = glucoseReadings.map {
                         SimpleDateFormat("d MMM", Locale.getDefault()).format(Date(it.recordedAt))
                     },
+                    pointLabels = glucoseReadings.map {
+                        SimpleDateFormat("d MMM, h:mm a", Locale.getDefault())
+                            .format(Date(it.recordedAt))
+                    },
+                    unit = "mg/dL",
                     onAdd = { showAddGlucose = true }
                 )
             }
