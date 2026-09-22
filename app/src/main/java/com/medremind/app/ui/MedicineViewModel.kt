@@ -75,6 +75,19 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    /** Adds [amount] pills to the medicine's current stock (refill). */
+    fun refillStock(medicine: Medicine, amount: Int, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                if (amount <= 0) return@withContext
+                val current = db.medicineDao().byId(medicine.id) ?: return@withContext
+                db.medicineDao().update(current.copy(quantity = current.quantity + amount))
+            }
+            refreshWidget()
+            onDone()
+        }
+    }
+
     fun deleteMetric(metric: Metric, onDone: () -> Unit = {}) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { db.metricDao().delete(metric) }

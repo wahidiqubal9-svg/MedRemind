@@ -47,6 +47,7 @@ import androidx.compose.material.icons.rounded.AccessTime
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.HourglassEmpty
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.PriorityHigh
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Repeat
@@ -55,10 +56,14 @@ import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -130,6 +135,7 @@ fun MedContent(
     var showPharmacyDialog by remember { mutableStateOf(false) }
     var bannerDismissed by remember { mutableStateOf(false) }
     var refillMedicine by remember { mutableStateOf<Medicine?>(null) }
+    var stockMedicine by remember { mutableStateOf<Medicine?>(null) }
     val filterOptions = listOf("All", "Daily", "Weekly", "Course")
 
     val lowMedicines = medicines.filter { it.quantity > 0 && it.quantity <= it.refillThreshold }
@@ -230,6 +236,7 @@ fun MedContent(
                     onEdit = { onEdit(medicine) },
                     onDuplicate = { vm.duplicateMedicine(medicine, schedules) },
                     onShare = { shareMedicine(medicine, schedules) },
+                    onRefill = { stockMedicine = medicine },
                     onDelete = { pendingDelete = medicine },
                     modifier = Modifier.animateItem()
                 )
@@ -275,6 +282,18 @@ fun MedContent(
         )
     }
 
+    val stockTarget = stockMedicine
+    if (stockTarget != null) {
+        StockRefillSheet(
+            medicine = stockTarget,
+            onDismiss = { stockMedicine = null },
+            onSave = { amount ->
+                vm.refillStock(stockTarget, amount)
+                stockMedicine = null
+            }
+        )
+    }
+
     val refillTarget = refillMedicine
     if (refillTarget != null) {
         RefillDaysDialog(
@@ -297,6 +316,78 @@ fun MedContent(
         )
     }
 
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StockRefillSheet(
+    medicine: Medicine,
+    onDismiss: () -> Unit,
+    onSave: (Int) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var added by remember { mutableStateOf("30") }
+    val addValue = added.toIntOrNull() ?: 0
+    val newTotal = medicine.quantity + addValue
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 28.dp)
+        ) {
+            Text(
+                "Refill stock",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                listOf(medicine.name, medicine.strength)
+                    .filter { it.isNotBlank() }.joinToString(" "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(16.dp))
+            OutlinedTextField(
+                value = added,
+                onValueChange = { added = it.filter { c -> c.isDigit() }.take(5) },
+                label = { Text("Pills to add") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Current: ${medicine.quantity}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "New stock: $newTotal",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(Modifier.height(20.dp))
+            GradientPillButton(
+                text = "Add to stock",
+                icon = Icons.Rounded.Inventory2,
+                onClick = { onSave(addValue) },
+                enabled = addValue > 0,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
 }
 
 @Composable
@@ -406,6 +497,7 @@ private fun MedicineCard(
     onEdit: () -> Unit,
     onDuplicate: () -> Unit,
     onShare: () -> Unit,
+    onRefill: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -501,6 +593,16 @@ private fun MedicineCard(
                             onClick = {
                                 menuExpanded = false
                                 onShare()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Refill stock") },
+                            leadingIcon = {
+                                Icon(Icons.Rounded.Inventory2, contentDescription = null)
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onRefill()
                             }
                         )
                         HorizontalDivider(color = line)
