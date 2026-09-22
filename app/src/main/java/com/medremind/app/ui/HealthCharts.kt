@@ -45,6 +45,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
@@ -214,7 +215,7 @@ fun VitalsChartCard(
                 .height(chartHeight)
                 .pointerInput(series, pointLabels, yMin, yMax) {
                     detectTapGestures { tap ->
-                        val l = 74f
+                        val l = 88f
                         val r = size.width - 26f
                         val t = 14f
                         val b = size.height - 36f
@@ -242,7 +243,7 @@ fun VitalsChartCard(
                     }
                 }
         ) {
-            val left = 74f
+            val left = 88f
             val right = size.width - 26f
             val top = 14f
             val bottom = size.height - 36f
@@ -338,60 +339,59 @@ fun VitalsChartCard(
                     }
                 }
             }
-        }
 
-        val sel = selectedPoint
-        if (sel != null) {
-            val valueText = series.joinToString(" / ") { s ->
-                s.values.getOrNull(sel)?.let { formatChartValue(it) } ?: ""
-            }
-            val zone = series.firstOrNull()?.zones?.getOrNull(sel) ?: HealthZone.GREEN
-            val zc = Vitals.color(zone)
-            val status = when (zone) {
-                HealthZone.GREEN -> "In range"
-                HealthZone.YELLOW -> "Borderline"
-                HealthZone.RED -> "Out of range"
-            }
-            Spacer(Modifier.height(8.dp))
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.outlineVariant
-                )
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            pointLabels.getOrNull(sel).orEmpty(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            "$valueText $unit".trim(),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = zc
-                        )
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = zc.copy(alpha = 0.16f),
-                        contentColor = zc
-                    ) {
-                        Text(
-                            status,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
-                    }
+            // In-chart tooltip for the tapped point.
+            val sel = selectedPoint
+            val firstSeries = series.firstOrNull()
+            if (sel != null && firstSeries != null && sel < firstSeries.values.size) {
+                val cx = xFor(sel, maxCount)
+                val cy = yFor(firstSeries.values[sel])
+                val valueText = series.joinToString("/") { s ->
+                    s.values.getOrNull(sel)?.let { formatChartValue(it) } ?: ""
                 }
+                val line1 = pointLabels.getOrNull(sel).orEmpty()
+                val line2 = ("$valueText $unit").trim()
+                val zone = firstSeries.zones.getOrNull(sel) ?: HealthZone.GREEN
+                val statusColor = Vitals.color(zone)
+                val line3 = when (zone) {
+                    HealthZone.GREEN -> "In range"
+                    HealthZone.YELLOW -> "Borderline"
+                    HealthZone.RED -> "Out of range"
+                }
+                val bodyPaint = android.graphics.Paint().apply {
+                    color = android.graphics.Color.WHITE
+                    textSize = 11.sp.toPx()
+                    isAntiAlias = true
+                }
+                val valuePaint = android.graphics.Paint().apply {
+                    color = statusColor.toArgb()
+                    textSize = 14.sp.toPx()
+                    isAntiAlias = true
+                    isFakeBoldText = true
+                }
+                val width1 = bodyPaint.measureText(line1)
+                val width2 = valuePaint.measureText(line2)
+                val width3 = bodyPaint.measureText(line3)
+                val boxW = maxOf(width1, width2, width3) + 26f
+                val lineH = bodyPaint.textSize + 7f
+                val boxH = lineH * 3f + 16f
+                val bx = (cx - boxW / 2f).coerceIn(left, (right - boxW).coerceAtLeast(left))
+                var by = cy - boxH - 24f
+                if (by < top) by = cy + 26f
+                by = by.coerceIn(top, (bottom - boxH).coerceAtLeast(top))
+                drawRoundRect(
+                    color = Color(0xF20B2B4A.toInt()),
+                    topLeft = Offset(bx, by),
+                    size = Size(boxW, boxH),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(12f, 12f)
+                )
+                val tx = bx + 13f
+                var ty = by + 12f + bodyPaint.textSize
+                drawContext.canvas.nativeCanvas.drawText(line1, tx, ty, bodyPaint)
+                ty += lineH
+                drawContext.canvas.nativeCanvas.drawText(line2, tx, ty, valuePaint)
+                ty += lineH
+                drawContext.canvas.nativeCanvas.drawText(line3, tx, ty, bodyPaint)
             }
         }
 
