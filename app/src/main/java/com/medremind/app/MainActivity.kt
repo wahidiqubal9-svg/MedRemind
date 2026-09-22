@@ -8,17 +8,27 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.medremind.app.alarm.AlarmNotifier
+import com.medremind.app.alarm.ReminderScheduler
 import com.medremind.app.ui.AppRoot
 import com.medremind.app.ui.LocalReduceMotion
 import com.medremind.app.ui.MedRemindTheme
 import com.medremind.app.ui.SettingsViewModel
 import com.medremind.app.ui.resolveReduceMotion
+import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Safety net: create the alarm channel and re-arm every schedule on launch,
+        // so reminders survive reinstalls, updates, force-stops and time changes.
+        AlarmNotifier.ensureChannel(applicationContext)
+        lifecycleScope.launch {
+            runCatching { ReminderScheduler.rescheduleAll(applicationContext) }
+        }
         setContent {
             val settings: SettingsViewModel = viewModel()
             val context = LocalContext.current
