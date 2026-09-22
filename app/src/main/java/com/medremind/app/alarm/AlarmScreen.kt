@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -57,10 +58,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// Height of the medicine photo card on the full-screen alarm. The user can scale
-// it from 40% to 100% in Settings -> Alarm.
-fun alarmImageHeightDp(sizePercent: Int) =
-    (300f * sizePercent.coerceIn(40, 100) / 100f).dp
+// Fraction of the whole screen covered by the medicine photo on the alarm.
+// 100% = the picture takes over the entire screen; smaller values shrink it.
+fun alarmImageFraction(sizePercent: Int) = sizePercent.coerceIn(40, 100) / 100f
 
 @Composable
 fun AlarmScreen(doseEventId: Long, snoozeMinutes: Int = 5, onAction: (String) -> Unit) {
@@ -74,6 +74,7 @@ fun AlarmScreen(doseEventId: Long, snoozeMinutes: Int = 5, onAction: (String) ->
         context.getSharedPreferences("medremind_settings", android.content.Context.MODE_PRIVATE)
             .getInt("alarm_image_size", 100)
     }
+    val imageFraction = alarmImageFraction(imageSize)
 
     LaunchedEffect(doseEventId) {
         withContext(Dispatchers.IO) {
@@ -106,6 +107,44 @@ fun AlarmScreen(doseEventId: Long, snoozeMinutes: Int = 5, onAction: (String) ->
                 .fillMaxSize()
                 .background(Color(0xFF070B10))
         )
+
+        val photo = med?.photoPath
+        if (photo != null) {
+            AsyncImage(
+                model = File(photo),
+                contentDescription = med?.name,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxSize(imageFraction)
+                    .clip(RoundedCornerShape(if (imageFraction >= 0.99f) 0.dp else 28.dp)),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Rounded.Medication,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.12f),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size((260f * imageFraction).dp)
+            )
+        }
+
+        // Keeps the text readable when the picture fills the screen.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.55f),
+                            Color.Black.copy(alpha = 0.15f),
+                            Color.Black.copy(alpha = 0.80f)
+                        )
+                    )
+                )
+        )
+
         Canvas(modifier = Modifier.fillMaxSize()) {
             val center = Offset(size.width / 2f, size.height * 0.44f)
             val radius = size.minDimension * 1.05f
@@ -163,38 +202,6 @@ fun AlarmScreen(doseEventId: Long, snoozeMinutes: Int = 5, onAction: (String) ->
                     color = Color.White.copy(alpha = 0.85f),
                     textAlign = TextAlign.Center
                 )
-            }
-
-            Spacer(Modifier.height(22.dp))
-
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(alarmImageHeightDp(imageSize)),
-                shape = RoundedCornerShape(28.dp),
-                color = Color.White.copy(alpha = 0.06f),
-                shadowElevation = 0.dp
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    val photo = med?.photoPath
-                    if (photo != null) {
-                        AsyncImage(
-                            model = File(photo),
-                            contentDescription = med.name,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(10.dp),
-                            contentScale = ContentScale.Fit
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Rounded.Medication,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.size((96f * imageSize / 100f).dp)
-                        )
-                    }
-                }
             }
 
             Spacer(Modifier.weight(1f))

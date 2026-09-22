@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -57,13 +58,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medremind.app.alarm.ReminderScheduler
-import com.medremind.app.alarm.alarmImageHeightDp
+import com.medremind.app.alarm.alarmImageFraction
 import com.medremind.app.data.BackupManager
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -312,7 +315,8 @@ fun SettingsContent(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Pop-up image size", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "${settings.alarmImageSize}%  \u00b7  preview below",
+                        if (settings.alarmImageSize >= 100) "100% - the picture fills the whole screen"
+                        else "${settings.alarmImageSize}% of the screen",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -505,7 +509,7 @@ private fun SettingSwitchRow(
 
 @Composable
 private fun AlarmPopupPreview(imageSize: Int) {
-    val factor = 0.5f
+    val fraction = alarmImageFraction(imageSize)
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Surface(
             modifier = Modifier
@@ -515,63 +519,79 @@ private fun AlarmPopupPreview(imageSize: Int) {
             color = Color(0xFF070B10),
             border = BorderStroke(2.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Spacer(Modifier.weight(1f))
-                Text(
-                    "TIME TO TAKE",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.85f),
-                    letterSpacing = 1.sp
-                )
-                Text(
-                    "8:00 AM",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White
-                )
-                Text(
-                    "Medicine",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Color.White
-                )
-                Spacer(Modifier.height(10.dp))
+            Box(modifier = Modifier.fillMaxSize()) {
+                // The medicine picture, sized exactly like the real alarm screen.
                 Surface(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(alarmImageHeightDp(imageSize) * factor),
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.White.copy(alpha = 0.10f)
+                        .align(Alignment.Center)
+                        .fillMaxSize(fraction)
+                        .clip(RoundedCornerShape(if (fraction >= 0.99f) 0.dp else 14.dp)),
+                    color = Color.White.copy(alpha = 0.16f)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             Icons.Rounded.Medication,
                             contentDescription = null,
                             tint = Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.size((96f * imageSize / 100f * factor).dp)
+                            modifier = Modifier.size((120f * fraction).dp)
                         )
                     }
                 }
-                Spacer(Modifier.weight(1f))
-                Surface(
+                // Readability scrim, like the real alarm screen.
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(26.dp),
-                    shape = RoundedCornerShape(50),
-                    color = Color.White
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            "Slide to take",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF04352F)
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.Black.copy(alpha = 0.55f),
+                                    Color.Black.copy(alpha = 0.15f),
+                                    Color.Black.copy(alpha = 0.80f)
+                                )
+                            )
                         )
+                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        "TIME TO TAKE",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.85f),
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        "8:00 AM",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White
+                    )
+                    Text(
+                        "Medicine",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(26.dp),
+                        shape = RoundedCornerShape(50),
+                        color = Color.White
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                "Slide to take",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF04352F)
+                            )
+                        }
                     }
+                    Spacer(Modifier.height(6.dp))
                 }
-                Spacer(Modifier.height(6.dp))
             }
         }
     }
