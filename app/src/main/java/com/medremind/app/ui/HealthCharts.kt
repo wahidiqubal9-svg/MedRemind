@@ -208,7 +208,7 @@ fun VitalsChartCard(
                 .fillMaxWidth()
                 .height(chartHeight)
         ) {
-            val left = 68f
+            val left = 74f
             val right = size.width - 24f
             val top = 14f
             val bottom = size.height - 24f
@@ -225,6 +225,7 @@ fun VitalsChartCard(
                 color = 0xFF98A2B3.toInt()
                 textSize = 10.sp.toPx()
                 isAntiAlias = true
+                textAlign = android.graphics.Paint.Align.RIGHT
             }
             val xPaint = android.graphics.Paint().apply {
                 color = 0xFF98A2B3.toInt()
@@ -239,7 +240,7 @@ fun VitalsChartCard(
                 val gy = yFor(value)
                 drawLine(gridColor, Offset(left, gy), Offset(right, gy), strokeWidth = 1f)
                 drawContext.canvas.nativeCanvas.drawText(
-                    value.toInt().toString(), left - 6f, gy + 4f, yPaint
+                    value.toInt().toString(), left - 10f, gy + 4f, yPaint
                 )
             }
 
@@ -283,13 +284,17 @@ fun VitalsChartCard(
                 }
             }
 
-            // X-axis labels (dates).
-            val step = if (xLabels.size <= 8) 1 else (xLabels.size / 7).coerceAtLeast(1)
-            xLabels.forEachIndexed { index, label ->
-                if (index % step == 0) {
-                    drawContext.canvas.nativeCanvas.drawText(
-                        label, xFor(index, maxCount), bottom + 15f, xPaint
-                    )
+            // X-axis labels (dates), spaced out to avoid overlap.
+            if (xLabels.isNotEmpty()) {
+                val slot = 60f
+                val maxLabels = (width / slot).toInt().coerceAtLeast(1)
+                val step = ((xLabels.size + maxLabels - 1) / maxLabels).coerceAtLeast(1)
+                xLabels.forEachIndexed { index, label ->
+                    if (index % step == 0 || index == xLabels.lastIndex) {
+                        drawContext.canvas.nativeCanvas.drawText(
+                            label, xFor(index, maxCount), bottom + 15f, xPaint
+                        )
+                    }
                 }
             }
         }
@@ -330,7 +335,7 @@ fun VitalsStatCard(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier.height(102.dp),
+        modifier = modifier.height(92.dp),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(
@@ -342,20 +347,20 @@ fun VitalsStatCard(
         Column(modifier = Modifier.padding(12.dp)) {
             Text(
                 label.uppercase(),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 0.4.sp
+                letterSpacing = 0.3.sp
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(3.dp))
             Text(
                 value,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = 15.sp),
                 fontWeight = FontWeight.ExtraBold,
                 maxLines = 1
             )
             if (badgeText != null) {
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(5.dp))
                 Surface(
                     shape = RoundedCornerShape(50),
                     color = badgeTint.copy(alpha = 0.16f),
@@ -363,9 +368,9 @@ fun VitalsStatCard(
                 ) {
                     Text(
                         badgeText,
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                     )
                 }
             }
