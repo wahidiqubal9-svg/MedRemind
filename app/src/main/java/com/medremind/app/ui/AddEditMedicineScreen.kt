@@ -38,6 +38,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -625,10 +626,11 @@ private fun DetailsStep(
 private fun QuantityStepper(
     value: String,
     onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    max: Int = 30
 ) {
     val haptics = rememberMedHaptics()
-    val current = value.toIntOrNull() ?: 1
+    val current = value.toIntOrNull() ?: 0
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
@@ -652,19 +654,29 @@ private fun QuantityStepper(
                     onValueChange((current - 1).coerceAtLeast(1).toString())
                 }
             )
-            Text(
-                text = current.toString(),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            BasicTextField(
+                value = value,
+                onValueChange = { input ->
+                    onValueChange(input.filter { it.isDigit() }.take(5))
+                },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface
+                ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(
+                    MaterialTheme.colorScheme.primary
+                ),
                 modifier = Modifier.weight(1f)
             )
             StepperButton(
                 icon = Icons.Rounded.Add,
-                enabled = current < 30,
+                enabled = current < max,
                 onClick = {
                     haptics.tick()
-                    onValueChange((current + 1).coerceAtMost(30).toString())
+                    onValueChange((current + 1).coerceAtMost(max).toString())
                 }
             )
         }
@@ -1827,10 +1839,10 @@ private fun IntakeInventoryStep(
         if (trackRefill) {
             Spacer(Modifier.height(14.dp))
             FieldLabel("Pills remaining")
-            QuantityStepper(value = stockAmount, onValueChange = onStockAmount)
+            QuantityStepper(value = stockAmount, onValueChange = onStockAmount, max = 1000)
             Spacer(Modifier.height(12.dp))
             FieldLabel("Remind me when below")
-            QuantityStepper(value = refillBelow, onValueChange = onRefillBelow)
+            QuantityStepper(value = refillBelow, onValueChange = onRefillBelow, max = 1000)
         }
     }
 }
