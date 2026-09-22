@@ -57,6 +57,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+// Height of the medicine photo card on the full-screen alarm. The user can scale
+// it from 40% to 100% in Settings -> Alarm.
+fun alarmImageHeightDp(sizePercent: Int) =
+    (300f * sizePercent.coerceIn(40, 100) / 100f).dp
+
 @Composable
 fun AlarmScreen(doseEventId: Long, snoozeMinutes: Int = 5, onAction: (String) -> Unit) {
     // Block the system back gesture/button: the alarm can only be dismissed by
@@ -65,6 +70,10 @@ fun AlarmScreen(doseEventId: Long, snoozeMinutes: Int = 5, onAction: (String) ->
     val context = LocalContext.current
     var medicine by remember { mutableStateOf<Medicine?>(null) }
     var scheduledText by remember { mutableStateOf("") }
+    val imageSize = remember {
+        context.getSharedPreferences("medremind_settings", android.content.Context.MODE_PRIVATE)
+            .getInt("alarm_image_size", 100)
+    }
 
     LaunchedEffect(doseEventId) {
         withContext(Dispatchers.IO) {
@@ -161,7 +170,7 @@ fun AlarmScreen(doseEventId: Long, snoozeMinutes: Int = 5, onAction: (String) ->
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(300.dp),
+                    .height(alarmImageHeightDp(imageSize)),
                 shape = RoundedCornerShape(28.dp),
                 color = Color.White.copy(alpha = 0.06f),
                 shadowElevation = 0.dp
@@ -182,7 +191,7 @@ fun AlarmScreen(doseEventId: Long, snoozeMinutes: Int = 5, onAction: (String) ->
                             imageVector = Icons.Rounded.Medication,
                             contentDescription = null,
                             tint = Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.size(96.dp)
+                            modifier = Modifier.size((96f * imageSize / 100f).dp)
                         )
                     }
                 }

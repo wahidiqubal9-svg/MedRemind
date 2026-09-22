@@ -84,7 +84,12 @@ object AlarmNotifier {
         )
     }
 
-    fun show(context: Context, doseEventId: Long, medicineName: String? = null) {
+    fun show(
+        context: Context,
+        doseEventId: Long,
+        medicineName: String? = null,
+        silent: Boolean = false
+    ) {
         ensureChannel(context)
         val intent = Intent(context, AlarmActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -124,6 +129,9 @@ object AlarmNotifier {
             )
         if (fullScreen) {
             builder.setFullScreenIntent(pi, true)
+        }
+        if (silent) {
+            builder.setSilent(true)
         }
         val notification = builder.build()
 

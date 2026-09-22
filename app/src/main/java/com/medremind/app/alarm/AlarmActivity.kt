@@ -30,6 +30,8 @@ class AlarmActivity : ComponentActivity() {
     private var vibrator: Vibrator? = null
     private var snoozeMinutes: Int = 5
     private var acted: Boolean = false
+    private var doseEventId: Long = -1L
+    private var medicineName: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,9 +48,18 @@ class AlarmActivity : ComponentActivity() {
             )
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        val doseEventId = intent.getLongExtra("doseEventId", -1L)
+        doseEventId = intent.getLongExtra("doseEventId", -1L)
+        // Remove the status-bar notification/heads-up now that the full screen is up.
+        AlarmNotifier.cancel(applicationContext, doseEventId)
         startSoundAndVibration()
         enableEdgeToEdge()
+        lifecycleScope.launch {
+            medicineName = withContext(Dispatchers.IO) {
+                val db = AppDatabase.get(applicationContext)
+                val event = db.doseEventDao().byId(doseEventId)
+                event?.let { db.medicineDao().byId(it.medicineId)?.name }
+            }
+        }
         setContent {
             MedRemindTheme {
                 AlarmScreen(
@@ -108,13 +119,25 @@ class AlarmActivity : ComponentActivity() {
 
     private fun bringBack() {
         if (acted) return
+        // 1) Directly bring the alarm activity forward.
         runCatching {
             startActivity(
                 Intent(this, AlarmActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    .putExtra("doseEventId", intent.getLongExtra("doseEventId", -1L))
+                    .putExtra("doseEventId", doseEventId)
             )
         }
+        // 2) Fall back to the sanctioned full-screen-intent path (works even when
+        //    background activity starts are restricted). Re-posting triggers it.
+        runCatching { AlarmNotifier.show(this, doseEventId, medicineName, silent = true) }
+        Handler(Looper.getMainLooper()).postDelayed({
+            runCatching { AlarmNotifier.cancel(applicationContext, doseEventId) }
+        }, 900)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        runCatching { AlarmNotifier.cancel(applicationContext, doseEventId) }
     }
 
     // The alarm cannot be dismissed by Home or Recents; it comes back until the

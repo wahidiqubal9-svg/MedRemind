@@ -30,6 +30,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     var snoozeMinutes by mutableStateOf(prefs.getInt("snooze_minutes", 5))
         private set
 
+    var alarmImageSize by mutableStateOf(prefs.getInt("alarm_image_size", 100))
+        private set
+
+    fun updateAlarmImageSize(value: Int) {
+        alarmImageSize = value.coerceIn(40, 100)
+        prefs.edit().putInt("alarm_image_size", alarmImageSize).apply()
+    }
+
     var dynamicColor by mutableStateOf(prefs.getBoolean("dynamic_color", false))
         private set
 

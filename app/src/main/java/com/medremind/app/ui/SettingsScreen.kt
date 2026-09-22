@@ -5,12 +5,15 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,14 +23,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Animation
 import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ColorLens
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Restore
@@ -38,6 +44,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -50,10 +57,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.medremind.app.alarm.ReminderScheduler
+import com.medremind.app.alarm.alarmImageHeightDp
 import com.medremind.app.data.BackupManager
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -294,6 +304,36 @@ fun SettingsContent(
                 onSelect = { settings.updateSnoozeMinutes(listOf(5, 10, 15)[it]) },
                 modifier = Modifier.fillMaxWidth()
             )
+
+            Spacer(Modifier.height(18.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SettingIcon(Icons.Rounded.Image)
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Pop-up image size", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "${settings.alarmImageSize}%  \u00b7  preview below",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Slider(
+                value = settings.alarmImageSize.toFloat(),
+                onValueChange = { settings.updateAlarmImageSize(it.toInt()) },
+                valueRange = 40f..100f,
+                steps = 11,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(10.dp))
+            AlarmPopupPreview(imageSize = settings.alarmImageSize)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "This is how the picture looks on the full-screen alarm.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
         SectionHeader("Security")
@@ -460,5 +500,79 @@ private fun SettingSwitchRow(
         }
         Spacer(Modifier.width(12.dp))
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
+private fun AlarmPopupPreview(imageSize: Int) {
+    val factor = 0.5f
+    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Surface(
+            modifier = Modifier
+                .width(180.dp)
+                .aspectRatio(9f / 19.5f),
+            shape = RoundedCornerShape(24.dp),
+            color = Color(0xFF070B10),
+            border = BorderStroke(2.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "TIME TO TAKE",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.85f),
+                    letterSpacing = 1.sp
+                )
+                Text(
+                    "8:00 AM",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Color.White
+                )
+                Text(
+                    "Medicine",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White
+                )
+                Spacer(Modifier.height(10.dp))
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(alarmImageHeightDp(imageSize) * factor),
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color.White.copy(alpha = 0.10f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Rounded.Medication,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.8f),
+                            modifier = Modifier.size((96f * imageSize / 100f * factor).dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(26.dp),
+                    shape = RoundedCornerShape(50),
+                    color = Color.White
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            "Slide to take",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF04352F)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+        }
     }
 }
