@@ -42,9 +42,17 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
     private val activeProfile = MutableStateFlow(prefs.getLong("active_profile_id", 0L))
     val activeProfileId: StateFlow<Long> = activeProfile
 
-    fun setActiveProfile(profileId: Long) {
+    private val activeProfileNameState =
+        MutableStateFlow(prefs.getString("active_profile_name", "") ?: "")
+    val activeProfileName: StateFlow<String> = activeProfileNameState
+
+    fun setActiveProfile(profileId: Long, name: String = "") {
         activeProfile.value = profileId
-        prefs.edit().putLong("active_profile_id", profileId).apply()
+        activeProfileNameState.value = if (profileId == 0L) "" else name
+        prefs.edit()
+            .putLong("active_profile_id", profileId)
+            .putString("active_profile_name", if (profileId == 0L) "" else name)
+            .apply()
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -357,6 +365,22 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                 }
                 if (status == DoseStatus.TAKEN) {
                     consumeStock(dose)
+                    // If this dose came from a caregiver reminder, record it in the
+                    // caregiver activity feed so the caregiver can see the confirmation.
+                    eventId?.let { id ->
+                        val event = dao.byId(id)
+                        if (event != null && event.source == com.medremind.app.data.DoseSource.CAREGIVER) {
+                            db.caregiverDao().insertActivity(
+                                com.medremind.app.data.CaregiverActivity(
+                                    patientProfileId = dose.medicine.profileId,
+                                    actor = com.medremind.app.data.CaregiverActor.PATIENT,
+                                    type = com.medremind.app.data.CaregiverActivityType.DOSE_CONFIRMED,
+                                    medicineName = dose.medicine.name,
+                                    message = "${dose.medicine.name} confirmed"
+                                )
+                            )
+                        }
+                    }
                 }
             }
             refreshWidget()

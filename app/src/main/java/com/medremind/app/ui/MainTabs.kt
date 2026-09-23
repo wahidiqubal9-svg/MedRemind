@@ -2,6 +2,7 @@ package com.medremind.app.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -109,7 +110,8 @@ fun MainTabs(
     onEdit: (Medicine) -> Unit,
     onDelete: (Medicine) -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenMe: () -> Unit
+    onOpenMe: () -> Unit,
+    onOpenNotifications: () -> Unit = {}
 ) {
     val schedulesByMedicine by vm.schedulesByMedicine.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -163,6 +165,7 @@ fun MainTabs(
                     onOpenMe = onOpenMe,
                     profilePhoto = settings.profilePhoto,
                     greetingName = settings.profileName,
+                    onOpenNotifications = onOpenNotifications,
                     snackbarHostState = snackbarHostState
                 )
                 1 -> MedContent(
@@ -175,19 +178,22 @@ fun MainTabs(
                     onDelete = onDelete,
                     onAdd = onAdd,
                     onOpenMe = onOpenMe,
-                    profilePhoto = settings.profilePhoto
+                    profilePhoto = settings.profilePhoto,
+                    onOpenNotifications = onOpenNotifications
                 )
                 2 -> HistoryContent(
                     modifier = Modifier.padding(padding),
                     vm = vm,
                     onOpenMe = onOpenMe,
-                    profilePhoto = settings.profilePhoto
+                    profilePhoto = settings.profilePhoto,
+                    onOpenNotifications = onOpenNotifications
                 )
                 else -> HealthScreen(
                     modifier = Modifier.padding(padding),
                     settings = settings,
                     vm = vm,
-                    onOpenMe = onOpenMe
+                    onOpenMe = onOpenMe,
+                    onOpenNotifications = onOpenNotifications
                 )
             }
         }
@@ -197,6 +203,37 @@ fun MainTabs(
             onOpenSettings = onOpenSettings,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
+        val activeProfileId by vm.activeProfileId.collectAsState()
+        val activeProfileName by vm.activeProfileName.collectAsState()
+        AnimatedVisibility(
+            visible = activeProfileId != 0L,
+            enter = fadeIn(tween(250)),
+            exit = fadeOut(tween(200)),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 96.dp)
+        ) {
+            Surface(
+                onClick = { vm.setActiveProfile(0L) },
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shadowElevation = 8.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Rounded.Person, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Viewing as ${activeProfileName.ifBlank { "patient" }} \u00b7 Switch back",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
         }
     }
 }
@@ -310,7 +347,8 @@ private fun HealthScreen(
     modifier: Modifier = Modifier,
     settings: SettingsViewModel,
     vm: MedicineViewModel,
-    onOpenMe: () -> Unit
+    onOpenMe: () -> Unit,
+    onOpenNotifications: () -> Unit = {}
 ) {
     val metrics by vm.metrics.collectAsState()
     var showAddGlucose by remember { mutableStateOf(false) }
@@ -362,6 +400,8 @@ private fun HealthScreen(
 
     Column(modifier = modifier.fillMaxSize()) {
         ScreenHeader("Health", modifier = Modifier.padding(horizontal = 16.dp)) {
+            com.medremind.app.ui.caregiver.NotificationBell(onClick = onOpenNotifications)
+            Spacer(Modifier.width(10.dp))
             SquareIconButton(
                 icon = Icons.Rounded.Person,
                 contentDescription = "Me",

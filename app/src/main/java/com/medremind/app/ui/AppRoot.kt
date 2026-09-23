@@ -77,6 +77,7 @@ fun AppRoot(
     var showCaregiver by remember { mutableStateOf(false) }
     var showCaregiving by remember { mutableStateOf(false) }
     var showCaregiverDashboard by remember { mutableStateOf(false) }
+    var showNotifications by remember { mutableStateOf(false) }
     var caregiverProfileId by remember { mutableStateOf(0L) }
     var editingProfileId by remember { mutableStateOf(0L) }
     var editing by remember { mutableStateOf<Medicine?>(null) }
@@ -103,6 +104,7 @@ fun AppRoot(
     val screen = when {
         showEditor -> "editor"
         showCaregiverDashboard -> "caregiverDashboard"
+        showNotifications -> "notifications"
         showCaregiver -> "caregiver"
         showCaregiving -> "caregiving"
         showPermissions -> "permissions"
@@ -189,6 +191,15 @@ fun AppRoot(
                 onOpenCaregiving = { showCaregiving = true }
             )
 
+            "notifications" -> com.medremind.app.ui.caregiver.NotificationsScreen(
+                onBack = { showNotifications = false },
+                onOpenPatient = { profileId ->
+                    showNotifications = false
+                    caregiverProfileId = profileId
+                    showCaregiverDashboard = true
+                }
+            )
+
             "caregiver" -> com.medremind.app.ui.caregiver.CaregiverHomeScreen(
                 vm = caregiverVm,
                 onBack = { showCaregiver = false }
@@ -217,6 +228,10 @@ fun AppRoot(
                     editing = medicine
                     editingProfileId = caregiverProfileId
                     showEditor = true
+                },
+                onViewAs = {
+                    showCaregiverDashboard = false
+                    tab = 0
                 }
             )
 
@@ -266,7 +281,8 @@ fun AppRoot(
                     }
                 },
                 onOpenSettings = { showSettings = true },
-                onOpenMe = { showMe = true }
+                onOpenMe = { showMe = true },
+                onOpenNotifications = { showNotifications = true }
             )
             }
         }

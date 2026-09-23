@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -35,6 +36,22 @@ data class PatientDose(
     val medicine: Medicine,
     val status: String,
     val eventId: Long?
+)
+
+object NotificationType {
+    const val ACTIVITY = "ACTIVITY"
+    const val MISSED = "MISSED"
+    const val LOW_STOCK = "LOW_STOCK"
+}
+
+/** One row in the caregiver notification centre. */
+data class CaregiverNotification(
+    val at: Long,
+    val type: String,
+    val title: String,
+    val subtitle: String,
+    val patientProfileId: Long,
+    val medicineId: Long?
 )
 
 class CaregiverViewModel(application: Application) : AndroidViewModel(application) {
@@ -63,6 +80,145 @@ class CaregiverViewModel(application: Application) : AndroidViewModel(applicatio
 
     val pendingICreated: StateFlow<List<CaregiverLink>> = connectionRepo.pendingRequestsICreated()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val prefs = app.getSharedPreferences("medremind_settings", Context.MODE_PRIVATE)
+    private val seenAt = kotlinx.coroutines.flow.MutableStateFlow(
+        prefs.getLong("caregiver_seen_at", 0L)
+    )
+
+    /** Badge count: new caregiver activity since the notification centre was last opened. */
+    val unreadCount: StateFlow<Int> = caregiverRepo.activity(null)
+        .map { list -> list.count { it.at > seenAt.value } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    fun markNotificationsSeen() {
+        val now = System.currentTimeMillis()
+        seenAt.value = now
+        prefs.edit().putLong("caregiver_seen_at", now).apply()
+    }
+
+    /** A merged feed of caregiver activity, missed doses and low stock. */
+    val notifications: StateFlow<List<CaregiverNotification>> = kotlinx.coroutines.flow.combine(
+        caregiverRepo.activity(null),
+        caregiverRepo.patients(),
+        db.medicineDao().observeAll(),
+        db.scheduleDao().observeAll(),
+        db.doseEventDao().observeAll()
+    ) { activity, patients, medicines, schedules, events ->
+        buildNotifications(activity, patients, medicines, schedules, events)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private fun buildNotifications(
+        activity: List<CaregiverActivity>,
+        patients: List<Patient>,
+        medicines: List<Medicine>,
+        schedules: List<com.medremind.app.data.Schedule>,
+        events: List<com.medremind.app.data.DoseEvent>
+    ): List<CaregiverNotification> {
+        val now = System.currentTimeMillis()
+        val items = mutableListOf<CaregiverNotification>()
+        fun patientName(id: Long): String =
+            if (id == 0L) "You" else patients.firstOrNull { it.id == id }?.name ?: "Patient"
+
+        activity.forEach {
+            items.add(
+                CaregiverNotification(
+                    at = it.at,
+                    type = NotificationType.ACTIVITY,
+                    title = it.type.replace('_', ' ').lowercase()
+                        .replaceFirstChar { c -> c.uppercase() },
+                    subtitle = it.message.ifBlank { it.medicineName },
+                    patientProfileId = it.patientProfileId,
+                    medicineId = null
+                )
+            )
+        }
+
+        medicines.filter { it.quantity > 0 && it.refillThreshold > 0 && it.quantity <= it.refillThreshold }
+            .forEach {
+                items.add(
+                    CaregiverNotification(
+                        at = now,
+                        type = NotificationType.LOW_STOCK,
+                        title = "${it.name} running low",
+                        subtitle = "${patientName(it.profileId)} \u00b7 ${it.quantity} left",
+                        patientProfileId = it.profileId,
+                        medicineId = it.id
+                    )
+                )
+            }
+
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now()
+        val byId = medicines.associateBy { it.id }
+        schedules.filter { it.enabled && it.medicineId in byId }.forEach { schedule ->
+            val medicine = byId[schedule.medicineId] ?: return@forEach
+            ReminderScheduler.occurrencesOn(schedule, today)
+                .filter { it <= now }
+                .forEach { trigger ->
+                    val event = events.firstOrNull {
+                        it.medicineId == schedule.medicineId &&
+                            abs(it.scheduledAt - trigger) < 90_000L
+                    }
+                    if (event == null || event.status == DoseStatus.MISSED) {
+                        val time = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault())
+                            .format(java.util.Date(trigger))
+                        items.add(
+                            CaregiverNotification(
+                                at = trigger,
+                                type = NotificationType.MISSED,
+                                title = "Missed dose",
+                                subtitle = "${patientName(medicine.profileId)} \u00b7 ${medicine.name} \u00b7 $time",
+                                patientProfileId = medicine.profileId,
+                                medicineId = medicine.id
+                            )
+                        )
+                    }
+                }
+        }
+        return items.sortedByDescending { it.at }
+    }
+
+    data class Adherence(val taken: Int, val scheduled: Int, val missed: Int)
+
+    /** Adherence for a profile over the last [days] days (past doses only). */
+    suspend fun adherence(profileId: Long, days: Int): Adherence = withContext(Dispatchers.IO) {
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now()
+        val start = today.minusDays((days - 1).toLong())
+        val startMillis = start.atStartOfDay(zone).toInstant().toEpochMilli()
+        val endMillis = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        val medicines = db.medicineDao().getAllOnce(profileId).associateBy { it.id }
+        if (medicines.isEmpty()) return@withContext Adherence(0, 0, 0)
+        val schedules = db.scheduleDao().getAllOnce().filter { it.enabled && it.medicineId in medicines }
+        val events = db.doseEventDao().between(startMillis, endMillis)
+        val now = System.currentTimeMillis()
+        var taken = 0
+        var missed = 0
+        var scheduled = 0
+        var day = start
+        while (!day.isAfter(today)) {
+            schedules.forEach { schedule ->
+                val medicine = medicines[schedule.medicineId] ?: return@forEach
+                val createdDate = Instant.ofEpochMilli(medicine.createdAt).atZone(zone).toLocalDate()
+                if (day.isBefore(createdDate)) return@forEach
+                ReminderScheduler.occurrencesOn(schedule, day).forEach { trigger ->
+                    if (trigger > now) return@forEach
+                    scheduled++
+                    val event = events.firstOrNull {
+                        it.medicineId == schedule.medicineId && abs(it.scheduledAt - trigger) < 90_000L
+                    }
+                    when (event?.status) {
+                        DoseStatus.TAKEN -> taken++
+                        DoseStatus.SKIPPED -> {}
+                        else -> missed++
+                    }
+                }
+            }
+            day = day.plusDays(1)
+        }
+        Adherence(taken, scheduled, missed)
+    }
 
     fun medicinesFor(profileId: Long): Flow<List<Medicine>> =
         db.medicineDao().observeAll(profileId)

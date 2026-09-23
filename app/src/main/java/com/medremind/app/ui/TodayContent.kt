@@ -104,6 +104,7 @@ fun TodayContent(
     onOpenMe: () -> Unit,
     profilePhoto: String? = null,
     greetingName: String? = null,
+    onOpenNotifications: () -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -233,7 +234,8 @@ fun TodayContent(
             onToggleCalendar = { expanded = !expanded },
             onOpenMe = onOpenMe,
             profilePhoto = profilePhoto,
-            greetingName = greetingName
+            greetingName = greetingName,
+            onOpenNotifications = onOpenNotifications
         )
 
         CalendarHandle(
@@ -744,7 +746,8 @@ private fun TodayHeader(
     onToggleCalendar: () -> Unit,
     onOpenMe: () -> Unit,
     profilePhoto: String? = null,
-    greetingName: String? = null
+    greetingName: String? = null,
+    onOpenNotifications: () -> Unit = {}
 ) {
     val isToday = selectedDate == LocalDate.now()
     val greeting = when (java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)) {
@@ -779,6 +782,8 @@ private fun TodayHeader(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        com.medremind.app.ui.caregiver.NotificationBell(onClick = onOpenNotifications)
+        Spacer(Modifier.width(10.dp))
         SquareIconButton(
             icon = Icons.Rounded.CalendarMonth,
             contentDescription = if (expanded) "Hide calendar" else "Full calendar",

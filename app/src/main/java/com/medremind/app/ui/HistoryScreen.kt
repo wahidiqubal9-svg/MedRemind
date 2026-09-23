@@ -81,7 +81,8 @@ fun HistoryContent(
     modifier: Modifier = Modifier,
     vm: MedicineViewModel,
     onOpenMe: () -> Unit,
-    profilePhoto: String? = null
+    profilePhoto: String? = null,
+    onOpenNotifications: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -167,6 +168,8 @@ fun HistoryContent(
 
     Column(modifier = modifier.fillMaxSize()) {
         ScreenHeader("Progress") {
+            com.medremind.app.ui.caregiver.NotificationBell(onClick = onOpenNotifications)
+            Spacer(Modifier.width(10.dp))
             SquareIconButton(
                 icon = Icons.Rounded.Person,
                 contentDescription = "Me",

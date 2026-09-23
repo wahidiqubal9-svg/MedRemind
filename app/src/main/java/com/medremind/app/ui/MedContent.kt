@@ -111,7 +111,8 @@ fun MedContent(
     onDelete: (Medicine) -> Unit,
     onAdd: () -> Unit,
     onOpenMe: () -> Unit,
-    profilePhoto: String? = null
+    profilePhoto: String? = null,
+    onOpenNotifications: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var pendingDelete by remember { mutableStateOf<Medicine?>(null) }
@@ -155,7 +156,8 @@ fun MedContent(
         Column(modifier = Modifier.fillMaxSize()) {
             MedHeader(
                 onOpenMe = onOpenMe,
-                profilePhoto = profilePhoto
+                profilePhoto = profilePhoto,
+                onOpenNotifications = onOpenNotifications
             )
             CabinetSummaryRow(
                 allCount = medicines.size,
@@ -458,7 +460,8 @@ private fun RefillDaysDialog(
 @Composable
 private fun MedHeader(
     onOpenMe: () -> Unit,
-    profilePhoto: String?
+    profilePhoto: String?,
+    onOpenNotifications: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -481,6 +484,8 @@ private fun MedHeader(
                 fontWeight = FontWeight.Bold
             )
         }
+        com.medremind.app.ui.caregiver.NotificationBell(onClick = onOpenNotifications)
+        Spacer(Modifier.width(10.dp))
         SquareIconButton(
             icon = Icons.Rounded.Person,
             contentDescription = "Me",

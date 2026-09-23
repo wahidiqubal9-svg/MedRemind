@@ -56,14 +56,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.medremind.app.data.CaregiverLink
 import com.medremind.app.data.CaregiverPermission
 import com.medremind.app.data.CaregiverStatus
 import com.medremind.app.data.DoseStatus
+import com.medremind.app.data.IntakeInstruction
 import com.medremind.app.data.Medicine
 import com.medremind.app.data.PairingRequest
 import com.medremind.app.data.Patient
@@ -72,6 +76,7 @@ import com.medremind.app.data.ScheduleType
 import com.medremind.app.data.caregiver.QrEncoder
 import com.medremind.app.ui.GradientPillButton
 import com.medremind.app.ui.MedCard
+import com.medremind.app.ui.MedClickableCard
 import com.medremind.app.ui.MedConfirmDialog
 import com.medremind.app.ui.MedEmptyState
 import com.medremind.app.ui.MedIconSquare
@@ -80,6 +85,7 @@ import com.medremind.app.ui.ScreenHeader
 import com.medremind.app.ui.StatusChip
 import com.medremind.app.ui.MedicineViewModel
 import kotlinx.coroutines.launch
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -635,7 +641,8 @@ fun CaregiverDashboardScreen(
     profileId: Long,
     onBack: () -> Unit,
     onAddMedicine: () -> Unit,
-    onEditMedicine: (Medicine) -> Unit
+    onEditMedicine: (Medicine) -> Unit,
+    onViewAs: () -> Unit = {}
 ) {
     BackHandler { onBack() }
     val scope = rememberCoroutineScope()
@@ -653,60 +660,104 @@ fun CaregiverDashboardScreen(
     var section by remember { mutableIntStateOf(0) }
     var todayDoses by remember { mutableStateOf<List<PatientDose>>(emptyList()) }
     var progress by remember { mutableStateOf(CaregiverViewModel.Progress(0, 0, 0, 0)) }
+    var adherence by remember { mutableStateOf(CaregiverViewModel.Adherence(0, 0, 0)) }
     var reload by remember { mutableIntStateOf(0) }
     var removeMedicine by remember { mutableStateOf<Medicine?>(null) }
+    var detail by remember { mutableStateOf<Medicine?>(null) }
 
     LaunchedEffect(profileId, reload) {
         todayDoses = vm.dosesOn(profileId, java.time.LocalDate.now())
         progress = vm.todayProgress(profileId)
+        adherence = vm.adherence(profileId, 7)
     }
 
     fun remind(medicine: Medicine) {
         vm.remindNow(profileId, medicine) { message ->
             scope.launch { snackbar.showSnackbar(message) }
         }
+        reload++
     }
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0.dp),
-        snackbarHost = { SnackbarHost(snackbar) }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .navigationBarsPadding()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 40.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            ScreenHeader(patientName, onBack = onBack)
+    val now = System.currentTimeMillis()
+    val nextDose = todayDoses
+        .filter { it.status == DoseStatus.PENDING && it.scheduledAt > now }
+        .minByOrNull { it.scheduledAt }
+    val lowStock = medicines.filter {
+        it.quantity > 0 && it.refillThreshold > 0 && it.quantity <= it.refillThreshold
+    }
 
-            MedSegmentedButtons(
-                options = listOf("Today", "Medicines", "Activity"),
-                selectedIndex = section,
-                onSelect = { section = it },
-                modifier = Modifier.fillMaxWidth()
-            )
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            contentWindowInsets = WindowInsets(0.dp),
+            snackbarHost = { SnackbarHost(snackbar) }
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .verticalScroll(rememberScrollState())
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 40.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ScreenHeader(patientName, onBack = onBack) {
+                    OutlinedButton(
+                        onClick = {
+                            medicineVm.setActiveProfile(profileId, patientName)
+                            onViewAs()
+                        },
+                        shape = RoundedCornerShape(50)
+                    ) { Text("View as") }
+                }
 
-            when (section) {
-                0 -> TodaySection(
-                    progress = progress,
-                    doses = todayDoses,
-                    onRemind = { remind(it) },
-                    onRefresh = { reload++ }
+                MedSegmentedButtons(
+                    options = listOf("Today", "Medicines", "Activity"),
+                    selectedIndex = section,
+                    onSelect = { section = it },
+                    modifier = Modifier.fillMaxWidth()
                 )
-                1 -> MedicinesSection(
-                    medicines = medicines,
-                    schedules = schedules,
-                    onRemind = { remind(it) },
-                    onEdit = onEditMedicine,
-                    onDelete = { removeMedicine = it },
-                    onAdd = onAddMedicine
-                )
-                else -> ActivitySection(activity)
+
+                when (section) {
+                    0 -> TodaySection(
+                        progress = progress,
+                        doses = todayDoses,
+                        nextDose = nextDose,
+                        adherence = adherence,
+                        lowStock = lowStock,
+                        patientName = patientName,
+                        onRemind = { remind(it) },
+                        onRefresh = { reload++ }
+                    )
+                    1 -> MedicinesSection(
+                        medicines = medicines,
+                        schedules = schedules,
+                        onRemind = { remind(it) },
+                        onEdit = onEditMedicine,
+                        onDelete = { removeMedicine = it },
+                        onOpenDetail = { detail = it },
+                        onAdd = onAddMedicine
+                    )
+                    else -> ActivitySection(activity)
+                }
             }
+        }
+
+        detail?.let { medicine ->
+            CaregiverMedicineDetail(
+                medicine = medicine,
+                schedules = schedules.filter { it.medicineId == medicine.id },
+                onBack = { detail = null },
+                onRemind = { remind(medicine) },
+                onEdit = {
+                    detail = null
+                    onEditMedicine(medicine)
+                },
+                onRemove = {
+                    detail = null
+                    removeMedicine = medicine
+                }
+            )
         }
     }
 
@@ -728,12 +779,50 @@ fun CaregiverDashboardScreen(
 private fun TodaySection(
     progress: CaregiverViewModel.Progress,
     doses: List<PatientDose>,
+    nextDose: PatientDose?,
+    adherence: CaregiverViewModel.Adherence,
+    lowStock: List<Medicine>,
+    patientName: String,
     onRemind: (Medicine) -> Unit,
     onRefresh: () -> Unit
 ) {
     val attention = doses.filter {
         it.status == DoseStatus.MISSED || it.status == DoseStatus.PENDING
     }
+
+    nextDose?.let { dose ->
+        MedCard(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                "NEXT DOSE",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+            Spacer(Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MedIconSquare(
+                    label = dose.medicine.name,
+                    seed = dose.medicine.id,
+                    photoPath = dose.medicine.photoPath
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        dose.medicine.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        timeLabel(dose.scheduledAt),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+
     MedCard(modifier = Modifier.fillMaxWidth()) {
         Text("Today's medication", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(6.dp))
@@ -755,6 +844,56 @@ private fun TodaySection(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+        if (adherence.scheduled > 0) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "Last 7 days \u00b7 ${adherence.taken} of ${adherence.scheduled} taken",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .background(
+                        MaterialTheme.colorScheme.surfaceContainerHighest,
+                        RoundedCornerShape(50)
+                    )
+            ) {
+                val pct = adherence.taken * 100 / adherence.scheduled
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth((pct / 100f).coerceIn(0f, 1f))
+                        .height(8.dp)
+                        .background(Color(0xFF0A7F4F), RoundedCornerShape(50))
+                )
+            }
+        }
+    }
+
+    if (lowStock.isNotEmpty()) {
+        Text("Running low", style = MaterialTheme.typography.titleMedium)
+        lowStock.forEach { medicine ->
+            MedCard(modifier = Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    MedIconSquare(
+                        label = medicine.name,
+                        seed = medicine.id,
+                        photoPath = medicine.photoPath
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(medicine.name, fontWeight = FontWeight.Bold)
+                        Text(
+                            "${medicine.quantity} left",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFB45309)
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -818,6 +957,7 @@ private fun MedicinesSection(
     onRemind: (Medicine) -> Unit,
     onEdit: (Medicine) -> Unit,
     onDelete: (Medicine) -> Unit,
+    onOpenDetail: (Medicine) -> Unit,
     onAdd: () -> Unit
 ) {
     GradientPillButton(
@@ -842,7 +982,10 @@ private fun MedicinesSection(
         val scheduleLabel = if (isPrn) "As needed"
         else medSchedules.map { it.times }.firstOrNull()?.replace(",", " \u00b7 ") ?: ""
 
-        MedCard(modifier = Modifier.fillMaxWidth()) {
+        MedClickableCard(
+            onClick = { onOpenDetail(medicine) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 MedIconSquare(
                     label = medicine.name,
@@ -1026,3 +1169,128 @@ private fun healthOptions(): List<Pair<Int, String>> = listOf(
 
 private fun toggle(current: Int, flag: Int, on: Boolean): Int =
     if (on) current or flag else current and flag.inv()
+
+// =============================================================================
+// MEDICINE DETAIL
+// =============================================================================
+
+@Composable
+private fun CaregiverMedicineDetail(
+    medicine: Medicine,
+    schedules: List<Schedule>,
+    onBack: () -> Unit,
+    onRemind: () -> Unit,
+    onEdit: () -> Unit,
+    onRemove: () -> Unit
+) {
+    BackHandler { onBack() }
+    val isPrn = schedules.any { it.type == ScheduleType.AS_NEEDED }
+    val dose = schedules.firstOrNull()?.doseLabel.orEmpty()
+    val scheduleLabel = if (isPrn) "As needed"
+    else schedules.map { it.times }.firstOrNull()?.replace(",", " \u00b7 ") ?: ""
+    val intake = IntakeInstruction.label(medicine.intakeInstruction)
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            ScreenHeader("Medicine", onBack = onBack)
+
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(240.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    val photo = medicine.photoPath
+                    if (photo != null) {
+                        AsyncImage(
+                            model = File(photo),
+                            contentDescription = medicine.name,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(10.dp)
+                        )
+                    } else {
+                        Icon(
+                            Icons.Rounded.Medication,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(72.dp)
+                        )
+                    }
+                }
+            }
+
+            Text(
+                listOf(medicine.name, medicine.strength)
+                    .filter { it.isNotBlank() }.joinToString(" "),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold
+            )
+            if (dose.isNotBlank()) {
+                Text("Dose \u00b7 $dose", style = MaterialTheme.typography.bodyLarge)
+            }
+            if (scheduleLabel.isNotBlank()) {
+                Text("Schedule \u00b7 $scheduleLabel", style = MaterialTheme.typography.bodyLarge)
+            }
+            if (intake.isNotBlank()) {
+                Text("How to take \u00b7 $intake", style = MaterialTheme.typography.bodyLarge)
+            }
+            if (isPrn) {
+                Text(
+                    "Take only when needed.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (medicine.quantity > 0) {
+                MedCard(modifier = Modifier.fillMaxWidth()) {
+                    Text("Stock", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "${medicine.quantity} remaining",
+                        fontWeight = FontWeight.Bold,
+                        color = if (medicine.refillThreshold > 0 && medicine.quantity <= medicine.refillThreshold) {
+                            Color(0xFFB45309)
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        }
+                    )
+                }
+            }
+
+            GradientPillButton(
+                text = "Remind now",
+                icon = Icons.Rounded.NotificationsActive,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onRemind
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = onEdit,
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.weight(1f)
+                ) { Text("Edit") }
+                OutlinedButton(
+                    onClick = onRemove,
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.weight(1f)
+                ) { Text("Remove") }
+            }
+        }
+    }
+}
