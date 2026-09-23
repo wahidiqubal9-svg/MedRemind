@@ -405,7 +405,7 @@ private fun SwipeUpToTake(
     val density = LocalDensity.current
     val threshold = with(density) { 85.dp.toPx() }
     val minOffset = with(density) { (-115).dp.toPx() }
-    val bobAmplitude = with(density) { (-9).dp.toPx() }
+    val bobAmplitude = with(density) { (-18).dp.toPx() }
     val dragOffset = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     var confirmed by remember { mutableStateOf(false) }
@@ -417,7 +417,7 @@ private fun SwipeUpToTake(
     val bob = transition.animateFloat(
         initialValue = 0f,
         targetValue = bobAmplitude,
-        animationSpec = infiniteRepeatable(tween(850), RepeatMode.Reverse),
+        animationSpec = infiniteRepeatable(tween(420), RepeatMode.Reverse),
         label = "takeBob"
     )
 

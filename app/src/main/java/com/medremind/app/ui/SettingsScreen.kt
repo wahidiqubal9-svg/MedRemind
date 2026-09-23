@@ -107,8 +107,6 @@ fun SettingsContent(
     onOpenAccount: () -> Unit = {},
     onBack: () -> Unit = {}
 ) {
-    var showSetPin by remember { mutableStateOf(false) }
-    var showRemovePin by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -165,29 +163,6 @@ fun SettingsContent(
     ) {
         ScreenHeader("Settings", onBack = onBack, modifier = Modifier.padding(horizontal = 4.dp))
 
-        MedClickableCard(
-            onClick = onOpenPermissions,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                SettingIcon(Icons.Rounded.Notifications)
-                Spacer(Modifier.width(14.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Alarm permissions", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Notifications, exact alarms, full-screen alarms, battery.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Icon(
-                    Icons.Rounded.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
         SectionHeader("MedRemind Pro")
         MedCard(modifier = Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -231,30 +206,6 @@ fun SettingsContent(
                 checked = isPro,
                 onCheckedChange = { entitlement.setSimulatedPro(it) }
             )
-        }
-
-        SectionHeader("Account")
-        MedClickableCard(
-            onClick = onOpenAccount,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                SettingIcon(Icons.Rounded.Person)
-                Spacer(Modifier.width(14.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Sign in", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Back up and sync across devices (coming soon).",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Icon(
-                    Icons.Rounded.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
 
         SectionHeader("Appearance")
@@ -308,47 +259,6 @@ fun SettingsContent(
         SectionHeader("Alarm")
         MedCard(modifier = Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SettingIcon(Icons.Rounded.Notifications)
-                Spacer(Modifier.width(14.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Full-screen pop-up", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        when (settings.alarmStyle) {
-                            "fullscreen" -> "Reminder takes over the whole screen."
-                            "banner" -> "Shows a heads-up banner only."
-                            else -> "No pop-up, just the alarm sound."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            MedSegmentedButtons(
-                options = listOf("Full screen", "Banner", "Sound only"),
-                selectedIndex = listOf("fullscreen", "banner", "sound")
-                    .indexOf(settings.alarmStyle).coerceAtLeast(0),
-                onSelect = {
-                    settings.updateAlarmStyle(listOf("fullscreen", "banner", "sound")[it])
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(18.dp))
-            Text("Alarm sound", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(10.dp))
-            MedSegmentedButtons(
-                options = listOf("Alarm", "Ringtone", "Notification", "Silent"),
-                selectedIndex = listOf("alarm", "ringtone", "notification", "none")
-                    .indexOf(settings.alarmSound).coerceAtLeast(0),
-                onSelect = {
-                    settings.updateAlarmSound(listOf("alarm", "ringtone", "notification", "none")[it])
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(18.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
                 SettingIcon(Icons.Rounded.Timer)
                 Spacer(Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
@@ -367,75 +277,6 @@ fun SettingsContent(
                 onSelect = { settings.updateSnoozeMinutes(listOf(5, 10, 15)[it]) },
                 modifier = Modifier.fillMaxWidth()
             )
-
-            Spacer(Modifier.height(18.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                SettingIcon(Icons.Rounded.Image)
-                Spacer(Modifier.width(14.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Pop-up image size", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        if (settings.alarmImageSize >= 100) "100% - the picture fills the whole screen"
-                        else "${settings.alarmImageSize}% of the screen",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            Slider(
-                value = settings.alarmImageSize.toFloat(),
-                onValueChange = { settings.updateAlarmImageSize(it.toInt()) },
-                valueRange = 40f..100f,
-                steps = 11,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(10.dp))
-            AlarmPopupPreview(imageSize = settings.alarmImageSize)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "This is how the picture looks on the full-screen alarm.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        SectionHeader("Security")
-        MedCard(modifier = Modifier.fillMaxWidth()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                SettingIcon(Icons.Rounded.Lock)
-                Spacer(Modifier.width(14.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Caregiver PIN", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        if (settings.pin.isNullOrEmpty()) "Not set"
-                        else "PIN protection is enabled.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            Row(
-                modifier = Modifier.padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TextButton(onClick = { showSetPin = true }) {
-                    Text(if (settings.pin.isNullOrEmpty()) "Set PIN" else "Change PIN")
-                }
-                if (!settings.pin.isNullOrEmpty()) {
-                    TextButton(onClick = { showRemovePin = true }) { Text("Remove PIN") }
-                }
-            }
-            if (BiometricLock.canAuthenticate(context)) {
-                Divider()
-                SettingSwitchRow(
-                    icon = Icons.Rounded.Lock,
-                    title = "App lock",
-                    subtitle = "Require fingerprint or face to open the app.",
-                    checked = settings.appLock,
-                    onCheckedChange = { settings.updateAppLock(it) }
-                )
-            }
         }
 
         SectionHeader("Data")
@@ -488,29 +329,6 @@ fun SettingsContent(
         }
     }
 
-    if (showSetPin) {
-        PinDialog(
-            title = "Set PIN",
-            expected = null,
-            onDismiss = { showSetPin = false },
-            onSuccess = { value ->
-                settings.updatePin(value)
-                showSetPin = false
-            }
-        )
-    }
-
-    if (showRemovePin) {
-        PinDialog(
-            title = "Enter PIN to remove",
-            expected = settings.pin,
-            onDismiss = { showRemovePin = false },
-            onSuccess = {
-                settings.updatePin(null)
-                showRemovePin = false
-            }
-        )
-    }
 }
 
 @Composable

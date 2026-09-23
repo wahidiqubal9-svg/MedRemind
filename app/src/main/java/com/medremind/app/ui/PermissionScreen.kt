@@ -28,13 +28,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -56,12 +56,31 @@ import androidx.core.content.ContextCompat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.delay
+
+private data class PermissionStep(
+    val icon: ImageVector,
+    val title: String,
+    val description: String,
+    val actionLabel: String,
+    val granted: Boolean,
+    val action: () -> Unit
+)
 
 @Composable
 fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
     val context = LocalContext.current
     var tick by remember { mutableIntStateOf(0) }
     var upcoming by remember { mutableStateOf<List<UpcomingAlarm>>(emptyList()) }
+
+    // Poll while this screen is open so that, as soon as the user grants one
+    // permission and comes back, the next step appears automatically.
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1200)
+            tick++
+        }
+    }
 
     LaunchedEffect(tick) {
         upcoming = vm.upcomingAlarms()
@@ -91,6 +110,95 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
         ActivityResultContracts.RequestPermission()
     ) { tick++ }
 
+    val steps = listOf(
+        PermissionStep(
+            icon = Icons.Rounded.Notifications,
+            title = "Notifications",
+            description = "Shows the reminder when it's time to take medicine.",
+            actionLabel = "Allow",
+            granted = notificationsGranted,
+            action = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+        ),
+        PermissionStep(
+            icon = Icons.Rounded.Info,
+            title = "Exact alarms",
+            description = "Makes the reminder fire at the exact scheduled time.",
+            actionLabel = "Open settings",
+            granted = exactAlarmGranted,
+            action = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    runCatching {
+                        context.startActivity(
+                            Intent(
+                                Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                Uri.parse("package:" + context.packageName)
+                            )
+                        )
+                    }
+                }
+            }
+        ),
+        PermissionStep(
+            icon = Icons.Rounded.Warning,
+            title = "Full-screen alarms",
+            description = "Shows the medicine photo over the lock screen.",
+            actionLabel = "Open settings",
+            granted = fullScreenGranted,
+            action = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    runCatching {
+                        context.startActivity(
+                            Intent(
+                                Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                                Uri.parse("package:" + context.packageName)
+                            )
+                        )
+                    }
+                }
+            }
+        ),
+        PermissionStep(
+            icon = Icons.Rounded.Settings,
+            title = "Battery optimization",
+            description = "Prevents the system from delaying reminders.",
+            actionLabel = "Allow",
+            granted = batteryOptimized,
+            action = {
+                runCatching {
+                    context.startActivity(
+                        Intent(
+                            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                            Uri.parse("package:" + context.packageName)
+                        )
+                    )
+                }
+            }
+        ),
+        PermissionStep(
+            icon = Icons.Rounded.Warning,
+            title = "Display over other apps",
+            description = "Shows the full-screen reminder even while you're using the phone.",
+            actionLabel = "Open settings",
+            granted = overlayGranted,
+            action = {
+                runCatching {
+                    context.startActivity(
+                        Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:" + context.packageName)
+                        )
+                    )
+                }
+            }
+        )
+    )
+
+    val activeIndex = steps.indexOfFirst { !it.granted }
+
     BackHandler { onBack() }
 
     Scaffold(contentWindowInsets = WindowInsets(0.dp)) { padding ->
@@ -106,100 +214,67 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
         ) {
             ScreenHeader("Alarm setup", onBack = onBack, modifier = Modifier.padding(horizontal = 4.dp))
 
-            Text(
-                "For alarms to appear reliably, please allow these.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            PermissionRow(
-                icon = Icons.Rounded.Notifications,
-                title = "Notifications",
-                granted = notificationsGranted,
-                description = "Shows the reminder when it's time to take medicine.",
-                actionLabel = "Allow",
-                onAction = {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
-                }
-            )
-
-            PermissionRow(
-                icon = Icons.Rounded.Info,
-                title = "Exact alarms",
-                granted = exactAlarmGranted,
-                description = "Makes the reminder fire at the exact scheduled time.",
-                actionLabel = "Open settings",
-                onAction = {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        runCatching {
-                            context.startActivity(
-                                Intent(
-                                    Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
-                                    Uri.parse("package:" + context.packageName)
-                                )
+            if (activeIndex == -1) {
+                MedCard(modifier = Modifier.fillMaxWidth()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ) {
+                            Icon(
+                                Icons.Rounded.Check,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .padding(10.dp)
+                                    .size(20.dp)
+                            )
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("All set", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "Your reminders are ready to fire on time.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 }
-            )
+            } else {
+                Text(
+                    "Step ${activeIndex + 1} of ${steps.size}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Complete this step and the next one will appear automatically.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-            PermissionRow(
-                icon = Icons.Rounded.Warning,
-                title = "Full-screen alarms",
-                granted = fullScreenGranted,
-                description = "Shows the medicine photo over the lock screen.",
-                actionLabel = "Open settings",
-                onAction = {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                        runCatching {
-                            context.startActivity(
-                                Intent(
-                                    Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
-                                    Uri.parse("package:" + context.packageName)
-                                )
-                            )
-                        }
-                    }
+                steps.take(activeIndex).forEach { done ->
+                    PermissionDoneRow(title = done.title)
                 }
-            )
 
-            PermissionRow(
-                icon = Icons.Rounded.Settings,
-                title = "Battery optimization",
-                granted = batteryOptimized,
-                description = "Prevents the system from delaying reminders.",
-                actionLabel = "Allow",
-                onAction = {
-                    runCatching {
-                        context.startActivity(
-                            Intent(
-                                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                                Uri.parse("package:" + context.packageName)
-                            )
-                        )
-                    }
-                }
-            )
+                val step = steps[activeIndex]
+                PermissionRow(
+                    icon = step.icon,
+                    title = step.title,
+                    granted = step.granted,
+                    description = step.description,
+                    actionLabel = step.actionLabel,
+                    onAction = step.action
+                )
 
-            PermissionRow(
-                icon = Icons.Rounded.Warning,
-                title = "Display over other apps",
-                granted = overlayGranted,
-                description = "Shows the full-screen reminder even while you're using the phone.",
-                actionLabel = "Open settings",
-                onAction = {
-                    runCatching {
-                        context.startActivity(
-                            Intent(
-                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                Uri.parse("package:" + context.packageName)
-                            )
-                        )
-                    }
+                if (activeIndex + 1 < steps.size) {
+                    Text(
+                        "Next: ${steps[activeIndex + 1].title}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-            )
+            }
 
             Spacer(Modifier.height(4.dp))
             SectionHeader("Upcoming alarms")
@@ -250,14 +325,36 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            OutlinedButton(
-                onClick = { tick++ },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Refresh")
-            }
-
             Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun PermissionDoneRow(title: String) {
+    MedCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ) {
+                Icon(
+                    Icons.Rounded.Check,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .size(16.dp)
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Text(
+                "Done",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }

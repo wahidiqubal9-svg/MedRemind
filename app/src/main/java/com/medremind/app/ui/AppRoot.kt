@@ -93,7 +93,11 @@ fun AppRoot(
     val exactAlarmsOk = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         context.getSystemService(AlarmManager::class.java)?.canScheduleExactAlarms() == true
     } else true
-    val needsAlarmSetup = loaded && (!notificationsOk || !exactAlarmsOk)
+    val fullScreenOk = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        context.getSystemService(android.app.NotificationManager::class.java)
+            ?.canUseFullScreenIntent() == true
+    } else true
+    val needsAlarmSetup = loaded && (!notificationsOk || !exactAlarmsOk || !fullScreenOk)
 
     fun guarded(action: () -> Unit) {
         if (settings.pin.isNullOrEmpty()) action() else pendingAction = action
