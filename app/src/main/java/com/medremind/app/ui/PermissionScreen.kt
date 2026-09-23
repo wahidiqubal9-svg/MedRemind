@@ -131,14 +131,13 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
             granted = exactAlarmGranted,
             action = {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    runCatching {
-                        context.startActivity(
-                            Intent(
-                                Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
-                                Uri.parse("package:" + context.packageName)
-                            )
+                    openAppSettingsPage(
+                        context,
+                        Intent(
+                            Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                            Uri.parse("package:" + context.packageName)
                         )
-                    }
+                    )
                 }
             }
         ),
@@ -150,14 +149,13 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
             granted = fullScreenGranted,
             action = {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                    runCatching {
-                        context.startActivity(
-                            Intent(
-                                Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
-                                Uri.parse("package:" + context.packageName)
-                            )
+                    openAppSettingsPage(
+                        context,
+                        Intent(
+                            Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                            Uri.parse("package:" + context.packageName)
                         )
-                    }
+                    )
                 }
             }
         ),
@@ -168,14 +166,13 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
             actionLabel = "Allow",
             granted = batteryOptimized,
             action = {
-                runCatching {
-                    context.startActivity(
-                        Intent(
-                            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-                            Uri.parse("package:" + context.packageName)
-                        )
+                openAppSettingsPage(
+                    context,
+                    Intent(
+                        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        Uri.parse("package:" + context.packageName)
                     )
-                }
+                )
             }
         ),
         PermissionStep(
@@ -185,14 +182,16 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
             actionLabel = "Open settings",
             granted = overlayGranted,
             action = {
-                runCatching {
-                    context.startActivity(
-                        Intent(
-                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:" + context.packageName)
-                        )
+                // Opens the "Display over other apps" screen scoped to this app
+                // (Android highlights/scrolls to it). Falls back to the app's
+                // details page if the device doesn't support the scoped intent.
+                openAppSettingsPage(
+                    context,
+                    Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" + context.packageName)
                     )
-                }
+                )
             }
         )
     )
@@ -328,6 +327,21 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
             Spacer(Modifier.height(16.dp))
         }
     }
+}
+
+/** Opens the given settings intent, falling back to this app's details page. */
+private fun openAppSettingsPage(context: android.content.Context, intent: Intent) {
+    runCatching { context.startActivity(intent) }
+        .onFailure {
+            runCatching {
+                context.startActivity(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + context.packageName)
+                    )
+                )
+            }
+        }
 }
 
 @Composable

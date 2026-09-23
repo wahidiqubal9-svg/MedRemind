@@ -163,6 +163,29 @@ fun SettingsContent(
     ) {
         ScreenHeader("Settings", onBack = onBack, modifier = Modifier.padding(horizontal = 4.dp))
 
+        MedClickableCard(
+            onClick = onOpenPermissions,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SettingIcon(Icons.Rounded.Notifications)
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Alarm setup", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Notifications, exact alarms, full-screen, battery.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Icon(
+                    Icons.Rounded.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
         SectionHeader("MedRemind Pro")
         MedCard(modifier = Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
