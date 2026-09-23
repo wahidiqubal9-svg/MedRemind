@@ -211,7 +211,7 @@ fun MainTabs(
             exit = fadeOut(tween(200)),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 96.dp)
+                .padding(bottom = if (tab <= 1) 154.dp else 96.dp)
         ) {
             Surface(
                 onClick = { vm.setActiveProfile(0L) },
@@ -227,9 +227,10 @@ fun MainTabs(
                     Icon(Icons.Rounded.Person, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        "Viewing as ${activeProfileName.ifBlank { "patient" }} \u00b7 Switch back",
+                        "Viewing as ${activeProfileName.ifBlank { "patient" }} \u00b7 tap to switch back",
                         style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
                     )
                 }
             }

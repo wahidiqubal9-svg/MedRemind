@@ -41,8 +41,13 @@ upload_asset() { # $1=upload_url  $2=asset_name
     "$1?name=$2"
 }
 
-echo "==> Building $TAG"
-"$GRADLE" --no-daemon --console=plain assembleDebug
+if [ "${SKIP_BUILD:-0}" = "1" ]; then
+  echo "==> Skipping build (SKIP_BUILD=1); using existing APK"
+  [ -f "$ROOT/$APK" ] || { echo "No APK at $APK"; exit 1; }
+else
+  echo "==> Building $TAG"
+  "$GRADLE" --no-daemon --console=plain assembleDebug
+fi
 
 echo "==> Staging commit"
 git add -A

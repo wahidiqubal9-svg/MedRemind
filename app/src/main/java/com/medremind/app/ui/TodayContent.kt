@@ -760,6 +760,10 @@ private fun TodayHeader(
         if (selectedDate.year == LocalDate.now().year) "EEEE, MMM d" else "EEEE, MMM d, yyyy",
         Locale.getDefault()
     ).format(dateToMillis(selectedDate)) + if (isToday) " \u00b7 Today" else ""
+    val firstName = greetingName?.trim()
+        ?.split(Regex("\\s+"))
+        ?.firstOrNull()
+        ?.takeIf { it.isNotBlank() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -775,9 +779,9 @@ private fun TodayHeader(
                 fontWeight = FontWeight.Medium,
                 maxLines = 1
             )
-            if (!greetingName.isNullOrBlank()) {
+            if (!firstName.isNullOrBlank()) {
                 Text(
-                    text = greetingName,
+                    text = firstName,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1

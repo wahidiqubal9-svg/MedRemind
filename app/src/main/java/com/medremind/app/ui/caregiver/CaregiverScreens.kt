@@ -421,9 +421,13 @@ fun CaregivingHomeScreen(
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
+                            val relationLabel = patient?.relation?.takeIf { it.isNotBlank() }
                             Text(
-                                if (link.status == CaregiverStatus.ACTIVE) "Tap to open dashboard"
-                                else "Waiting for approval",
+                                when {
+                                    link.status != CaregiverStatus.ACTIVE -> "Waiting for approval"
+                                    relationLabel != null -> "$relationLabel \u00b7 Tap to open"
+                                    else -> "Tap to open dashboard"
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

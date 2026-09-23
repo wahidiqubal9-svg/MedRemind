@@ -295,7 +295,7 @@ class CaregiverViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             val id = withContext(Dispatchers.IO) {
                 com.medremind.app.data.caregiver.CaregiverDemo
-                    .connectDemoPatient(app, "Mom (demo)", myName)
+                    .connectDemoPatient(app, "Mom", myName)
             }
             onAdded(id)
         }
