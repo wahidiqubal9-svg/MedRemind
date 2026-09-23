@@ -82,4 +82,26 @@ LATEST_UPLOAD="$(grep -o '"upload_url": "[^"]*' /tmp/latest.json | sed 's/"uploa
 upload_asset "${LATEST_UPLOAD}" "medremind.apk" > /dev/null
 echo "    https://github.com/${OWNER}/${REL_REPO}/releases/download/latest/medremind.apk"
 
+# Publish the APK on an "apk" branch so Obtainium can track it with its
+# "Direct APK Link" source (a raw.githubusercontent.com URL, not github.com,
+# so it never touches GitHub's release-list API):
+#   https://raw.githubusercontent.com/<owner>/<rel_repo>/apk/medremind.apk
+echo "==> Publishing direct APK link"
+PUB_TMP="$(mktemp -d)"
+(
+  cd "$PUB_TMP"
+  git init -q
+  git checkout -q -b apk
+  cp "${ROOT}/${APK}" medremind.apk
+  printf 'MedRemind direct APK\n' > index.html
+  git add -A
+  git -c user.name="${GIT_NAME:-$OWNER}" \
+      -c user.email="${GIT_EMAIL:-$OWNER@users.noreply.github.com}" \
+      commit -q -m "Publish medremind.apk ${TAG}"
+  git -c credential.helper= push -f \
+    "https://x-access-token:${GH_TOKEN}@github.com/${OWNER}/${REL_REPO}.git" apk:apk
+)
+rm -rf "$PUB_TMP"
+echo "    https://raw.githubusercontent.com/${OWNER}/${REL_REPO}/apk/medremind.apk"
+
 echo "==> Done"
