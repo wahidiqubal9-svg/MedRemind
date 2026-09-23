@@ -532,12 +532,12 @@ private fun HealthScreen(
 
             HealthExportCard(
                 enabled = metrics.isNotEmpty(),
-                onCsv = {
+                onCsv = rememberProAction {
                     shareVitals("text/csv", "Share CSV report") {
                         ReportExporter.exportVitalsCsv(context, metrics)
                     }
                 },
-                onPdf = {
+                onPdf = rememberProAction {
                     shareVitals("application/pdf", "Share PDF report") {
                         ReportExporter.exportVitalsPdf(context, metrics)
                     }

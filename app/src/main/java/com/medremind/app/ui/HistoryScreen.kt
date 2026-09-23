@@ -236,12 +236,12 @@ fun HistoryContent(
         item(key = "export") {
             ExportCard(
                 enabled = log.isNotEmpty(),
-                onCsv = {
+                onCsv = rememberProAction {
                     shareReport("text/csv", "Share CSV report") {
                         ReportExporter.exportCsv(context, log)
                     }
                 },
-                onPdf = {
+                onPdf = rememberProAction {
                     shareReport("application/pdf", "Share PDF report") {
                         ReportExporter.exportPdf(context, log, rangeDays)
                     }

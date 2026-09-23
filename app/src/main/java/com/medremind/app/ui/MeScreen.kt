@@ -75,6 +75,8 @@ fun MeScreen(
     BackHandler { onBack() }
     val context = LocalContext.current
     var editing by remember { mutableStateOf(false) }
+    val openCaregiver = rememberProAction(onOpenCaregiver)
+    val openCaregiving = rememberProAction(onOpenCaregiving)
 
     val pickImage = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
@@ -134,7 +136,8 @@ fun MeScreen(
                 icon = Icons.Rounded.Favorite,
                 title = "Caregiver",
                 subtitle = "Someone who helps me with my medicines",
-                onClick = onOpenCaregiver
+                pro = true,
+                onClick = openCaregiver
             )
             Spacer(Modifier.height(4.dp))
             Box(
@@ -148,7 +151,8 @@ fun MeScreen(
                 icon = Icons.Rounded.Group,
                 title = "Caregiving",
                 subtitle = "People I help with their medicines",
-                onClick = onOpenCaregiving
+                pro = true,
+                onClick = openCaregiving
             )
         }
 
@@ -603,6 +607,7 @@ private fun CaregiverEntryRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     subtitle: String,
+    pro: Boolean = false,
     onClick: () -> Unit
 ) {
     Row(
@@ -636,6 +641,10 @@ private fun CaregiverEntryRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+        if (pro) {
+            ProBadge()
+            Spacer(Modifier.width(8.dp))
         }
         Icon(
             imageVector = Icons.Rounded.ChevronRight,

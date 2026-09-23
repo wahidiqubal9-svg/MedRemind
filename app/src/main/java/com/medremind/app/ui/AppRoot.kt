@@ -100,9 +100,11 @@ fun AppRoot(
     }
 
     val caregiverVm: com.medremind.app.ui.caregiver.CaregiverViewModel = viewModel()
+    val entitlementVm: com.medremind.app.ui.EntitlementViewModel = viewModel()
 
     val screen = when {
         showEditor -> "editor"
+        entitlementVm.showPaywall -> "paywall"
         showCaregiverDashboard -> "caregiverDashboard"
         showNotifications -> "notifications"
         showCaregiver -> "caregiver"
@@ -189,6 +191,10 @@ fun AppRoot(
                 onBack = { showMe = false },
                 onOpenCaregiver = { showCaregiver = true },
                 onOpenCaregiving = { showCaregiving = true }
+            )
+
+            "paywall" -> com.medremind.app.ui.PaywallScreen(
+                onBack = { entitlementVm.closePaywall() }
             )
 
             "notifications" -> com.medremind.app.ui.caregiver.NotificationsScreen(

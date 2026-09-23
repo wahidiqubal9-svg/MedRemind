@@ -29,6 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Animation
 import androidx.compose.material.icons.rounded.Backup
+import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ColorLens
 import androidx.compose.material.icons.rounded.Image
@@ -41,9 +42,11 @@ import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -51,6 +54,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -67,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medremind.app.alarm.ReminderScheduler
 import com.medremind.app.alarm.alarmImageFraction
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.medremind.app.data.BackupManager
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -138,6 +143,16 @@ fun SettingsContent(
         }
     }
 
+    val entitlement: EntitlementViewModel = viewModel()
+    val isPro by entitlement.isPro.collectAsState()
+    val backupAction = rememberProAction {
+        val name = "medremind-backup-" + SimpleDateFormat(
+            "yyyyMMdd-HHmm", Locale.getDefault()
+        ).format(Date()) + ".zip"
+        exportLauncher.launch(name)
+    }
+    val restoreAction = rememberProAction { importLauncher.launch(arrayOf("*/*")) }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -171,6 +186,51 @@ fun SettingsContent(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+
+        SectionHeader("MedRemind Pro")
+        MedCard(modifier = Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SettingIcon(Icons.Rounded.WorkspacePremium)
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("MedRemind Pro", style = MaterialTheme.typography.titleMedium)
+                        if (isPro) {
+                            Spacer(Modifier.width(8.dp))
+                            ProBadge()
+                        }
+                    }
+                    Text(
+                        if (isPro) "Active \u00b7 thanks for supporting MedRemind."
+                        else "Caregiver, reports, backup and restore.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            if (isPro) {
+                OutlinedButton(
+                    onClick = { entitlement.openPaywall() },
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Manage subscription") }
+            } else {
+                GradientPillButton(
+                    text = "Subscribe",
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { entitlement.openPaywall() }
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            SettingSwitchRow(
+                icon = Icons.Rounded.Build,
+                title = "Simulate Pro (testing)",
+                subtitle = "Preview paid features without billing.",
+                checked = isPro,
+                onCheckedChange = { entitlement.setSimulatedPro(it) }
+            )
         }
 
         SectionHeader("Account")
@@ -383,12 +443,7 @@ fun SettingsContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable {
-                        val name = "medremind-backup-" + SimpleDateFormat(
-                            "yyyyMMdd-HHmm", Locale.getDefault()
-                        ).format(Date()) + ".zip"
-                        exportLauncher.launch(name)
-                    },
+                    .clickable(onClick = backupAction),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 SettingIcon(Icons.Rounded.Backup)
@@ -411,7 +466,7 @@ fun SettingsContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { importLauncher.launch(arrayOf("*/*")) },
+                    .clickable(onClick = restoreAction),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 SettingIcon(Icons.Rounded.Restore)
