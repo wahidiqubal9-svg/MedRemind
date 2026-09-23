@@ -178,21 +178,13 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
         PermissionStep(
             icon = Icons.Rounded.Warning,
             title = "Display over other apps",
-            description = "Shows the reminder even while you're using the phone. " +
-                "On this screen tap \u201cDisplay over other apps\u201d to allow it.",
+            description = "Shows the full-screen reminder even while you're using the phone.",
             actionLabel = "Open settings",
             granted = overlayGranted,
             action = {
-                // Some devices ignore the app-scoped overlay intent and show the
-                // whole list, so open this app's own settings page (App info)
-                // instead — the user can reach the toggle from there.
                 openAppSettingsPage(
                     context,
                     Intent(
-                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                        Uri.parse("package:" + context.packageName)
-                    ),
-                    fallback = Intent(
                         Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                         Uri.parse("package:" + context.packageName)
                     )
