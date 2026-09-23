@@ -72,12 +72,8 @@ for R in $REL_REPOS; do
   fi
 
   echo "==> Uploading ${ASSET_NAME} to ${R}"
+  # Only ONE APK asset per release, otherwise update tools ask "pick an APK".
   upload_asset "$UP" "$ASSET_NAME" | grep -o '"browser_download_url": "[^"]*' | sed 's/"browser_download_url": "//'
-
-  if [ "$R" = "$PRIMARY_REL_REPO" ]; then
-    echo "==> Uploading medremind-latest.apk to ${R}"
-    upload_asset "$UP" "medremind-latest.apk" | grep -o '"browser_download_url": "[^"]*' | sed 's/"browser_download_url": "//'
-  fi
 done
 
 # ---------------------------------------------------------------------------
