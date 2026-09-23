@@ -216,9 +216,9 @@ private fun MedBottomBar(
     ) {
         Surface(
             shape = RoundedCornerShape(26.dp),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            shadowElevation = 14.dp,
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            shadowElevation = 18.dp,
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
