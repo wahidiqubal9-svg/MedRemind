@@ -13,8 +13,8 @@ android {
         applicationId = "com.medremind.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 127
-        versionName = "0.126.0"
+        versionCode = 128
+        versionName = "0.127.0"
     }
 
     buildTypes {
