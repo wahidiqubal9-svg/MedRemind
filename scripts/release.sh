@@ -2,11 +2,12 @@
 #
 # Build the debug APK and publish it so Obtainium can pick it up.
 #
-# Releases are published to BOTH the original repo (MedRemind) and a dedicated
-# release repo (MedRemind-Releases), plus a stable direct-APK URL that does not
-# depend on GitHub's release-list API:
+# Everything (code + releases + a stable direct-APK link) lives in one repo:
 #
-#   https://raw.githubusercontent.com/<owner>/MedRemind-Releases/apk/medremind.apk
+#   https://raw.githubusercontent.com/<owner>/MedRemind/apk/medremind.apk
+#
+# The stable link is on a separate "apk" branch so it always serves the newest
+# build without depending on GitHub's release-list API.
 #
 # Usage:
 #   GH_TOKEN=<token> GRADLE=/path/to/gradle ./scripts/release.sh v0.2.0 "notes"
@@ -16,9 +17,9 @@ set -euo pipefail
 OWNER="${REPO_OWNER:-wahidiqubal9-svg}"
 CODE_REPO="${CODE_REPO_NAME:-MedRemind}"
 # Space-separated list of repos that receive the versioned release.
-REL_REPOS="${REL_REPO_NAMES:-MedRemind MedRemind-Releases}"
+REL_REPOS="${REL_REPO_NAMES:-MedRemind}"
 # Repo that additionally gets the rolling "latest" release and the direct link.
-PRIMARY_REL_REPO="${REL_REPO_NAME:-MedRemind-Releases}"
+PRIMARY_REL_REPO="${REL_REPO_NAME:-MedRemind}"
 GRADLE="${GRADLE:-gradle}"
 TAG="${1:?usage: release.sh <tag, e.g. v0.2.0> [notes]}"
 NOTES="${2:-Automatic build $TAG}"
