@@ -54,4 +54,15 @@ curl -sS -X POST \
   "${UPLOAD_URL}?name=${ASSET_NAME}" > /tmp/asset.json
 
 grep -o '"browser_download_url": "[^"]*' /tmp/asset.json | sed 's/"browser_download_url": "//'
+
+# Also publish a stable-named copy so an update tool can track a single URL:
+# https://github.com/<owner>/<repo>/releases/latest/download/medremind-latest.apk
+echo "==> Uploading medremind-latest.apk"
+curl -sS -X POST \
+  -H "Authorization: Bearer ${GH_TOKEN}" \
+  -H "Content-Type: application/vnd.android.package-archive" \
+  --data-binary "@${APK}" \
+  "${UPLOAD_URL}?name=medremind-latest.apk" > /tmp/asset_latest.json
+
+grep -o '"browser_download_url": "[^"]*' /tmp/asset_latest.json | sed 's/"browser_download_url": "//'
 echo "==> Done"
