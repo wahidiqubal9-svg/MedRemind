@@ -85,5 +85,7 @@ data class Medicine(
     /** Printed batch/lot number. */
     val batchNumber: String = "",
     /** Printed expiry date, as epoch millis. */
-    val expiryDate: Long? = null
+    val expiryDate: Long? = null,
+    /** Profile (patient) this medicine belongs to. 0 = the device owner. */
+    val profileId: Long = 0L
 )

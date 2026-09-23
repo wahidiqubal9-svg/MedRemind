@@ -17,8 +17,14 @@ interface MetricDao {
     @Query("SELECT * FROM metrics ORDER BY recordedAt DESC")
     fun observeAll(): Flow<List<Metric>>
 
+    @Query("SELECT * FROM metrics WHERE profileId = :profileId ORDER BY recordedAt DESC")
+    fun observeAll(profileId: Long): Flow<List<Metric>>
+
     @Query("SELECT * FROM metrics ORDER BY recordedAt DESC")
     suspend fun getAllOnce(): List<Metric>
+
+    @Query("SELECT * FROM metrics WHERE profileId = :profileId ORDER BY recordedAt DESC")
+    suspend fun getAllOnce(profileId: Long): List<Metric>
 
     @Query("DELETE FROM metrics")
     suspend fun clear()

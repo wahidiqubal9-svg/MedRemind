@@ -50,5 +50,7 @@ data class Metric(
     val value2: Float = 0f,
     val recordedAt: Long = System.currentTimeMillis(),
     /** Meal context for glucose readings. */
-    val context: String = MetricContext.NONE
+    val context: String = MetricContext.NONE,
+    /** Profile (patient) this reading belongs to. 0 = the device owner. */
+    val profileId: Long = 0L
 )

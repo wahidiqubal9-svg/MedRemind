@@ -17,9 +17,12 @@ import com.medremind.app.data.ScheduleType
 import com.medremind.app.widget.NextDoseWidget
 import androidx.glance.appwidget.updateAll
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -33,11 +36,24 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
 
     private val app = application
     private val db = AppDatabase.get(application)
+    private val prefs = application.getSharedPreferences("medremind_settings", Context.MODE_PRIVATE)
 
-    val medicines: StateFlow<List<Medicine>> = db.medicineDao().getAll()
+    /** Which patient profile the main tabs show. 0 = the device owner. */
+    private val activeProfile = MutableStateFlow(prefs.getLong("active_profile_id", 0L))
+    val activeProfileId: StateFlow<Long> = activeProfile
+
+    fun setActiveProfile(profileId: Long) {
+        activeProfile.value = profileId
+        prefs.edit().putLong("active_profile_id", profileId).apply()
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val medicinesFlow = activeProfile.flatMapLatest { db.medicineDao().observeAll(it) }
+
+    val medicines: StateFlow<List<Medicine>> = medicinesFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val loaded: StateFlow<Boolean> = db.medicineDao().getAll()
+    val loaded: StateFlow<Boolean> = medicinesFlow
         .map { true }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
@@ -46,8 +62,9 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     /** Medicines whose schedule is "as needed" rather than fixed times. */
+    @OptIn(ExperimentalCoroutinesApi::class)
     val prnMedicines: StateFlow<List<Medicine>> = combine(
-        db.medicineDao().observeAll(),
+        activeProfile.flatMapLatest { db.medicineDao().observeAll(it) },
         db.scheduleDao().observeAll()
     ) { medicines, schedules ->
         val ids = schedules.filter { it.type == ScheduleType.AS_NEEDED }
@@ -55,7 +72,9 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         medicines.filter { it.id in ids }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val metrics: StateFlow<List<Metric>> = db.metricDao().observeAll()
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val metrics: StateFlow<List<Metric>> = activeProfile
+        .flatMapLatest { db.metricDao().observeAll(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun addMetric(
@@ -63,12 +82,19 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         value: Float,
         value2: Float = 0f,
         context: String = com.medremind.app.data.MetricContext.NONE,
+        profileId: Long = activeProfile.value,
         onDone: () -> Unit = {}
     ) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 db.metricDao().insert(
-                    Metric(type = type, value = value, value2 = value2, context = context)
+                    Metric(
+                        type = type,
+                        value = value,
+                        value2 = value2,
+                        context = context,
+                        profileId = profileId
+                    )
                 )
             }
             onDone()
@@ -95,9 +121,10 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     val history: StateFlow<List<DoseHistoryItem>> = combine(
         db.doseEventDao().observeAll(),
-        db.medicineDao().observeAll()
+        activeProfile.flatMapLatest { db.medicineDao().observeAll(it) }
     ) { events, medicines ->
         val byId = medicines.associateBy { it.id }
         events
@@ -130,7 +157,7 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         val startMillis = start.atStartOfDay(zone).toInstant().toEpochMilli()
         val endMillis = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
         val schedules = db.scheduleDao().getAllOnce().filter { it.enabled }
-        val medicinesById = db.medicineDao().getAllOnce().associateBy { it.id }
+        val medicinesById = db.medicineDao().getAllOnce(activeProfile.value).associateBy { it.id }
         // scheduleId == 0 marks the "test alarm" - exclude it.
         val events = db.doseEventDao().between(startMillis, endMillis).filter { it.scheduleId != 0L }
         val now = System.currentTimeMillis()
@@ -173,7 +200,7 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
             val zone = ZoneId.systemDefault()
             val schedules = db.scheduleDao().getAllOnce().filter { it.enabled }
             if (schedules.isEmpty()) return@withContext emptySet()
-            val medicinesById = db.medicineDao().getAllOnce().associateBy { it.id }
+            val medicinesById = db.medicineDao().getAllOnce(activeProfile.value).associateBy { it.id }
             val result = mutableSetOf<LocalDate>()
             var day = from
             while (!day.isAfter(to)) {
@@ -189,11 +216,16 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
             result
         }
 
-    fun saveMedicine(medicine: Medicine, schedules: List<Schedule>, onDone: () -> Unit) {
+    fun saveMedicine(
+        medicine: Medicine,
+        schedules: List<Schedule>,
+        profileId: Long = activeProfile.value,
+        onDone: () -> Unit
+    ) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 val medicineId = if (medicine.id == 0L) {
-                    db.medicineDao().insert(medicine)
+                    db.medicineDao().insert(medicine.copy(profileId = profileId))
                 } else {
                     db.medicineDao().update(medicine)
                     medicine.id
@@ -276,7 +308,7 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         val dayStart = date.atStartOfDay(zone).toInstant().toEpochMilli()
         val dayEnd = dayStart + 86_400_000L
         val schedules = db.scheduleDao().getAllOnce().filter { it.enabled }
-        val medicinesById = db.medicineDao().getAllOnce().associateBy { it.id }
+        val medicinesById = db.medicineDao().getAllOnce(activeProfile.value).associateBy { it.id }
         val events = db.doseEventDao().between(dayStart, dayEnd)
         val now = System.currentTimeMillis()
         val result = mutableListOf<TodayDose>()

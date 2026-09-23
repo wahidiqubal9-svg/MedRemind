@@ -74,6 +74,11 @@ fun AppRoot(
     var showMe by remember { mutableStateOf(false) }
     var showAccount by remember { mutableStateOf(false) }
     var showPermissions by remember { mutableStateOf(false) }
+    var showCaregiver by remember { mutableStateOf(false) }
+    var showCaregiving by remember { mutableStateOf(false) }
+    var showCaregiverDashboard by remember { mutableStateOf(false) }
+    var caregiverProfileId by remember { mutableStateOf(0L) }
+    var editingProfileId by remember { mutableStateOf(0L) }
     var editing by remember { mutableStateOf<Medicine?>(null) }
     var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var unlocked by remember { mutableStateOf(!settings.appLock) }
@@ -93,8 +98,13 @@ fun AppRoot(
         if (settings.pin.isNullOrEmpty()) action() else pendingAction = action
     }
 
+    val caregiverVm: com.medremind.app.ui.caregiver.CaregiverViewModel = viewModel()
+
     val screen = when {
         showEditor -> "editor"
+        showCaregiverDashboard -> "caregiverDashboard"
+        showCaregiver -> "caregiver"
+        showCaregiving -> "caregiving"
         showPermissions -> "permissions"
         showMe -> "me"
         showAccount -> "account"
@@ -159,19 +169,55 @@ fun AppRoot(
             "editor" -> AddEditMedicineScreen(
                 initial = editing,
                 vm = vm,
+                profileId = editingProfileId,
                 onCancel = {
                     showEditor = false
                     editing = null
+                    editingProfileId = 0L
                 },
                 onDone = {
                     showEditor = false
                     editing = null
+                    editingProfileId = 0L
                 }
             )
 
             "me" -> MeScreen(
                 settings = settings,
-                onBack = { showMe = false }
+                onBack = { showMe = false },
+                onOpenCaregiver = { showCaregiver = true },
+                onOpenCaregiving = { showCaregiving = true }
+            )
+
+            "caregiver" -> com.medremind.app.ui.caregiver.CaregiverHomeScreen(
+                vm = caregiverVm,
+                onBack = { showCaregiver = false }
+            )
+
+            "caregiving" -> com.medremind.app.ui.caregiver.CaregivingHomeScreen(
+                vm = caregiverVm,
+                onBack = { showCaregiving = false },
+                onOpenPatient = { profileId ->
+                    caregiverProfileId = profileId
+                    showCaregiverDashboard = true
+                }
+            )
+
+            "caregiverDashboard" -> com.medremind.app.ui.caregiver.CaregiverDashboardScreen(
+                vm = caregiverVm,
+                medicineVm = vm,
+                profileId = caregiverProfileId,
+                onBack = { showCaregiverDashboard = false },
+                onAddMedicine = {
+                    editing = null
+                    editingProfileId = caregiverProfileId
+                    showEditor = true
+                },
+                onEditMedicine = { medicine ->
+                    editing = medicine
+                    editingProfileId = caregiverProfileId
+                    showEditor = true
+                }
             )
 
             "settings" -> SettingsScreen(
@@ -203,12 +249,14 @@ fun AppRoot(
                 onAdd = {
                     guarded {
                         editing = null
+                        editingProfileId = 0L
                         showEditor = true
                     }
                 },
                 onEdit = { medicine ->
                     guarded {
                         editing = medicine
+                        editingProfileId = 0L
                         showEditor = true
                     }
                 },

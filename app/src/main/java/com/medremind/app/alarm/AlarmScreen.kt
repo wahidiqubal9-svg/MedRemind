@@ -70,6 +70,8 @@ fun AlarmScreen(doseEventId: Long, snoozeMinutes: Int = 5, onAction: (String) ->
     val context = LocalContext.current
     var medicine by remember { mutableStateOf<Medicine?>(null) }
     var scheduledText by remember { mutableStateOf("") }
+    var doseLine by remember { mutableStateOf("") }
+    var instructionLine by remember { mutableStateOf("") }
     val imageSize = remember {
         context.getSharedPreferences("medremind_settings", android.content.Context.MODE_PRIVATE)
             .getInt("alarm_image_size", 100)
@@ -82,10 +84,16 @@ fun AlarmScreen(doseEventId: Long, snoozeMinutes: Int = 5, onAction: (String) ->
             val event = db.doseEventDao().byId(doseEventId)
             if (event != null) {
                 val med = db.medicineDao().byId(event.medicineId)
+                val schedule = if (event.scheduleId > 0L) {
+                    db.scheduleDao().byId(event.scheduleId)
+                } else null
                 val text = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(event.scheduledAt))
                 withContext(Dispatchers.Main) {
                     medicine = med
                     scheduledText = text
+                    doseLine = schedule?.doseLabel.orEmpty()
+                    instructionLine = com.medremind.app.data.IntakeInstruction
+                        .label(med?.intakeInstruction.orEmpty())
                 }
             }
         }
@@ -200,6 +208,25 @@ fun AlarmScreen(doseEventId: Long, snoozeMinutes: Int = 5, onAction: (String) ->
                     text = med?.strength ?: "",
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White.copy(alpha = 0.85f),
+                    textAlign = TextAlign.Center
+                )
+            }
+            if (doseLine.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = doseLine,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center
+                )
+            }
+            if (instructionLine.isNotBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = instructionLine,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White.copy(alpha = 0.9f),
                     textAlign = TextAlign.Center
                 )
             }

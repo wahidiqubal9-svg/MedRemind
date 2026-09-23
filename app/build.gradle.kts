@@ -13,8 +13,8 @@ android {
         applicationId = "com.medremind.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 118
-        versionName = "0.117.0"
+        versionCode = 119
+        versionName = "0.118.0"
     }
 
     buildTypes {
@@ -72,6 +72,8 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.glance:glance-appwidget:1.1.0")
+    // QR generation only (no camera, no scanning, no OCR) for caregiver pairing.
+    implementation("com.google.zxing:core:3.5.3")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

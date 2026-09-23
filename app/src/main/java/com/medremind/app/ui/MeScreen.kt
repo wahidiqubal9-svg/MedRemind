@@ -28,8 +28,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material3.DropdownMenu
@@ -65,7 +68,9 @@ private val sexOptions = listOf("Female", "Male", "Other")
 fun MeScreen(
     modifier: Modifier = Modifier,
     settings: SettingsViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenCaregiver: () -> Unit = {},
+    onOpenCaregiving: () -> Unit = {}
 ) {
     BackHandler { onBack() }
     val context = LocalContext.current
@@ -123,6 +128,29 @@ fun MeScreen(
         }
 
         Spacer(Modifier.height(6.dp))
+
+        MedCard(modifier = Modifier.fillMaxWidth()) {
+            CaregiverEntryRow(
+                icon = Icons.Rounded.Favorite,
+                title = "Caregiver",
+                subtitle = "Someone who helps me with my medicines",
+                onClick = onOpenCaregiver
+            )
+            Spacer(Modifier.height(4.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant)
+            )
+            Spacer(Modifier.height(4.dp))
+            CaregiverEntryRow(
+                icon = Icons.Rounded.Group,
+                title = "Caregiving",
+                subtitle = "People I help with their medicines",
+                onClick = onOpenCaregiving
+            )
+        }
 
         if (!editing && hasProfile) {
             ProfileCard(
@@ -567,6 +595,54 @@ private fun ProfileAvatar(
                     .size(16.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun CaregiverEntryRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.primaryContainer
+        ) {
+            Box(
+                modifier = Modifier.size(42.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Icon(
+            imageVector = Icons.Rounded.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp)
+        )
     }
 }
 

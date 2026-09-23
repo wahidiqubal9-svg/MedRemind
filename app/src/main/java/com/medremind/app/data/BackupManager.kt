@@ -28,8 +28,12 @@ object BackupManager {
         val events = db.doseEventDao().getAllOnce()
         val metrics = db.metricDao().getAllOnce()
 
+        val patients = db.caregiverDao().patientsForBackup()
+        val links = db.caregiverDao().linksForBackup()
+        val activity = db.caregiverDao().activityForBackup()
+
         val json = JSONObject().apply {
-            put("version", 3)
+            put("version", 4)
             put("exportedAt", System.currentTimeMillis())
             put("medicines", JSONArray().apply {
                 medicines.forEach { m ->
@@ -51,6 +55,7 @@ object BackupManager {
                         put("autoRefillDate", m.autoRefillDate ?: JSONObject.NULL)
                         put("batchNumber", m.batchNumber)
                         put("expiryDate", m.expiryDate ?: JSONObject.NULL)
+                        put("profileId", m.profileId)
                         put("photoName", m.photoPath?.let { File(it).name })
                     })
                 }
@@ -85,6 +90,7 @@ object BackupManager {
                         put("status", e.status)
                         put("actedAt", e.actedAt ?: JSONObject.NULL)
                         put("snoozeCount", e.snoozeCount)
+                        put("source", e.source)
                     })
                 }
             })
@@ -97,6 +103,49 @@ object BackupManager {
                         put("value2", m.value2.toDouble())
                         put("recordedAt", m.recordedAt)
                         put("context", m.context)
+                        put("profileId", m.profileId)
+                    })
+                }
+            })
+            put("patients", JSONArray().apply {
+                patients.forEach { p ->
+                    put(JSONObject().apply {
+                        put("id", p.id)
+                        put("name", p.name)
+                        put("relation", p.relation)
+                        put("isSelf", p.isSelf)
+                        put("avatarPath", p.avatarPath ?: JSONObject.NULL)
+                        put("createdAt", p.createdAt)
+                        put("sortOrder", p.sortOrder)
+                    })
+                }
+            })
+            put("caregiverLinks", JSONArray().apply {
+                links.forEach { l ->
+                    put(JSONObject().apply {
+                        put("id", l.id)
+                        put("patientProfileId", l.patientProfileId)
+                        put("caregiverName", l.caregiverName)
+                        put("direction", l.direction)
+                        put("status", l.status)
+                        put("permissions", l.permissions)
+                        put("pairingId", l.pairingId)
+                        put("createdAt", l.createdAt)
+                        put("updatedAt", l.updatedAt)
+                    })
+                }
+            })
+            put("caregiverActivity", JSONArray().apply {
+                activity.forEach { a ->
+                    put(JSONObject().apply {
+                        put("id", a.id)
+                        put("linkId", a.linkId)
+                        put("patientProfileId", a.patientProfileId)
+                        put("actor", a.actor)
+                        put("type", a.type)
+                        put("medicineName", a.medicineName)
+                        put("message", a.message)
+                        put("at", a.at)
                     })
                 }
             })
@@ -175,7 +224,8 @@ object BackupManager {
                     packSize = o.optInt("packSize", 0),
                     autoRefillDate = if (o.isNull("autoRefillDate")) null else o.optLong("autoRefillDate"),
                     batchNumber = o.optString("batchNumber", ""),
-                    expiryDate = if (o.isNull("expiryDate")) null else o.optLong("expiryDate")
+                    expiryDate = if (o.isNull("expiryDate")) null else o.optLong("expiryDate"),
+                    profileId = o.optLong("profileId", 0)
                 )
             )
         }
@@ -216,7 +266,8 @@ object BackupManager {
                     scheduledAt = o.optLong("scheduledAt"),
                     status = o.optString("status", DoseStatus.PENDING),
                     actedAt = if (o.isNull("actedAt")) null else o.optLong("actedAt"),
-                    snoozeCount = o.optInt("snoozeCount", 0)
+                    snoozeCount = o.optInt("snoozeCount", 0),
+                    source = o.optString("source", DoseSource.SCHEDULED)
                 )
             )
         }
@@ -232,7 +283,62 @@ object BackupManager {
                     value = o.optDouble("value", 0.0).toFloat(),
                     value2 = o.optDouble("value2", 0.0).toFloat(),
                     recordedAt = o.optLong("recordedAt", System.currentTimeMillis()),
-                    context = o.optString("context", "")
+                    context = o.optString("context", ""),
+                    profileId = o.optLong("profileId", 0)
+                )
+            )
+        }
+
+        val patients = mutableListOf<Patient>()
+        val pats = json.optJSONArray("patients") ?: JSONArray()
+        for (i in 0 until pats.length()) {
+            val o = pats.getJSONObject(i)
+            patients.add(
+                Patient(
+                    id = o.optLong("id"),
+                    name = o.optString("name"),
+                    relation = o.optString("relation", ""),
+                    isSelf = o.optBoolean("isSelf", false),
+                    avatarPath = if (o.isNull("avatarPath")) null else o.optString("avatarPath"),
+                    createdAt = o.optLong("createdAt", System.currentTimeMillis()),
+                    sortOrder = o.optInt("sortOrder", 0)
+                )
+            )
+        }
+
+        val links = mutableListOf<CaregiverLink>()
+        val lks = json.optJSONArray("caregiverLinks") ?: JSONArray()
+        for (i in 0 until lks.length()) {
+            val o = lks.getJSONObject(i)
+            links.add(
+                CaregiverLink(
+                    id = o.optLong("id"),
+                    patientProfileId = o.optLong("patientProfileId", 0),
+                    caregiverName = o.optString("caregiverName", ""),
+                    direction = o.optString("direction", CaregiverDirection.INCOMING),
+                    status = o.optString("status", CaregiverStatus.PENDING),
+                    permissions = o.optInt("permissions", CaregiverPermission.DEFAULT_MEDICATION),
+                    pairingId = o.optLong("pairingId", 0),
+                    createdAt = o.optLong("createdAt", System.currentTimeMillis()),
+                    updatedAt = o.optLong("updatedAt", System.currentTimeMillis())
+                )
+            )
+        }
+
+        val activity = mutableListOf<CaregiverActivity>()
+        val acts = json.optJSONArray("caregiverActivity") ?: JSONArray()
+        for (i in 0 until acts.length()) {
+            val o = acts.getJSONObject(i)
+            activity.add(
+                CaregiverActivity(
+                    id = o.optLong("id"),
+                    linkId = o.optLong("linkId", 0),
+                    patientProfileId = o.optLong("patientProfileId", 0),
+                    actor = o.optString("actor", CaregiverActor.CAREGIVER),
+                    type = o.optString("type", ""),
+                    medicineName = o.optString("medicineName", ""),
+                    message = o.optString("message", ""),
+                    at = o.optLong("at", System.currentTimeMillis())
                 )
             )
         }
@@ -242,10 +348,16 @@ object BackupManager {
         db.scheduleDao().clear()
         db.medicineDao().clear()
         db.metricDao().clear()
+        db.caregiverDao().clearActivity()
+        db.caregiverDao().clearLinks()
+        db.caregiverDao().clearPatients()
         db.medicineDao().insertAll(medicines)
         db.scheduleDao().insertAll(schedules)
         db.doseEventDao().insertAll(events)
         db.metricDao().insertAll(metrics)
+        db.caregiverDao().insertPatients(patients)
+        db.caregiverDao().insertLinks(links)
+        db.caregiverDao().insertActivity(activity)
 
         return Summary(medicines.size, schedules.size, events.size, photoPaths.size)
     }
