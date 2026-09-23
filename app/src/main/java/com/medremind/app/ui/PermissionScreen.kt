@@ -178,16 +178,21 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
         PermissionStep(
             icon = Icons.Rounded.Warning,
             title = "Display over other apps",
-            description = "Shows the full-screen reminder even while you're using the phone.",
+            description = "Shows the reminder even while you're using the phone. " +
+                "On this screen tap \u201cDisplay over other apps\u201d to allow it.",
             actionLabel = "Open settings",
             granted = overlayGranted,
             action = {
-                // Opens the "Display over other apps" screen scoped to this app
-                // (Android highlights/scrolls to it). Falls back to the app's
-                // details page if the device doesn't support the scoped intent.
+                // Some devices ignore the app-scoped overlay intent and show the
+                // whole list, so open this app's own settings page (App info)
+                // instead — the user can reach the toggle from there.
                 openAppSettingsPage(
                     context,
                     Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + context.packageName)
+                    ),
+                    fallback = Intent(
                         Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                         Uri.parse("package:" + context.packageName)
                     )
@@ -329,19 +334,19 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
     }
 }
 
-/** Opens the given settings intent, falling back to this app's details page. */
-private fun openAppSettingsPage(context: android.content.Context, intent: Intent) {
-    runCatching { context.startActivity(intent) }
-        .onFailure {
-            runCatching {
-                context.startActivity(
-                    Intent(
-                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                        Uri.parse("package:" + context.packageName)
-                    )
-                )
-            }
-        }
+/** Opens the given settings intent, falling back to another or this app's page. */
+private fun openAppSettingsPage(
+    context: android.content.Context,
+    intent: Intent,
+    fallback: Intent? = null
+) {
+    val fallbackIntent = fallback ?: Intent(
+        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+        Uri.parse("package:" + context.packageName)
+    )
+    if (runCatching { context.startActivity(intent) }.isFailure) {
+        runCatching { context.startActivity(fallbackIntent) }
+    }
 }
 
 @Composable
