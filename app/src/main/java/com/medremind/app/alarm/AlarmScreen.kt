@@ -196,16 +196,16 @@ fun AlarmScreen(doseEventId: Long, snoozeMinutes: Int = 5, onAction: (String) ->
 
             Text(
                 text = "TIME FOR\nYOUR MEDICINE",
-                fontSize = 34.sp,
-                lineHeight = 34.sp,
-                letterSpacing = (-1.4).sp,
+                fontSize = 26.sp,
+                lineHeight = 28.sp,
+                letterSpacing = (-0.8).sp,
                 fontWeight = FontWeight.Black,
                 color = Color.White,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(10.dp))
 
             Surface(
                 shape = RoundedCornerShape(24.dp),
@@ -287,7 +287,7 @@ fun AlarmScreen(doseEventId: Long, snoozeMinutes: Int = 5, onAction: (String) ->
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .padding(top = 12.dp, bottom = 12.dp),
+                    .padding(top = 10.dp),
                 contentAlignment = Alignment.Center
             ) {
                 val photo = med?.photoPath
@@ -322,6 +322,10 @@ fun AlarmScreen(doseEventId: Long, snoozeMinutes: Int = 5, onAction: (String) ->
                     }
                 }
             }
+
+            // Reserve room for the floating "swipe up" hint so the photo and the
+            // action cards don't look cramped together.
+            Spacer(Modifier.height(58.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
