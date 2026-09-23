@@ -225,6 +225,17 @@ fun CaregiverHomeScreen(vm: CaregiverViewModel, onBack: () -> Unit) {
                         }
                     }
                 )
+                OutlinedButton(
+                    onClick = { vm.demoConnectCaregiver() },
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Demo: simulate a caregiver (testing)") }
+                Text(
+                    "For testing without a cloud connection \u2014 connects instantly on this device.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
             }
 
             if (activity.isNotEmpty()) {
@@ -432,6 +443,17 @@ fun CaregivingHomeScreen(
                 shape = RoundedCornerShape(50),
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Add someone manually") }
+            OutlinedButton(
+                onClick = { vm.demoConnectPatient() },
+                shape = RoundedCornerShape(50),
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Demo: simulate a patient (testing)") }
+            Text(
+                "Creates a sample patient with a few medicines so you can test Remind now.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
         }
     }
 

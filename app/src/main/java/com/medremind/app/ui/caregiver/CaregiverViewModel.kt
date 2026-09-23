@@ -121,6 +121,30 @@ class CaregiverViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch(Dispatchers.IO) { caregiverRepo.updatePermissions(link.id, permissions) }
     }
 
+    // ---- Local demo (no cloud) ----------------------------------------------
+
+    /** Instantly connects a demo caregiver for testing on this device. */
+    fun demoConnectCaregiver(onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                com.medremind.app.data.caregiver.CaregiverDemo
+                    .connectCaregiverForMe(app, "Wahid (demo)")
+            }
+            onDone()
+        }
+    }
+
+    /** Instantly adds a demo patient (with sample medicines) for testing. */
+    fun demoConnectPatient(onAdded: (Long) -> Unit = {}) {
+        viewModelScope.launch {
+            val id = withContext(Dispatchers.IO) {
+                com.medremind.app.data.caregiver.CaregiverDemo
+                    .connectDemoPatient(app, "Mom (demo)", myName)
+            }
+            onAdded(id)
+        }
+    }
+
     fun addPatient(name: String, relation: String, onAdded: (Long) -> Unit) {
         viewModelScope.launch {
             val id = withContext(Dispatchers.IO) { caregiverRepo.addPatient(name, relation) }
