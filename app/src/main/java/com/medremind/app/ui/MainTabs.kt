@@ -37,7 +37,9 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.MonitorHeart
+import androidx.compose.material.icons.rounded.MonitorWeight
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.WaterDrop
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.AlertDialog
@@ -354,6 +356,7 @@ private fun HealthScreen(
     val metrics by vm.metrics.collectAsState()
     var showAddGlucose by remember { mutableStateOf(false) }
     var showAddBp by remember { mutableStateOf(false) }
+    var showAddWeight by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -419,6 +422,14 @@ private fun HealthScreen(
                 .padding(bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            MedCard(modifier = Modifier.fillMaxWidth()) {
+                Text("Add a reading", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(4.dp))
+                AddReadingRow(Icons.Rounded.MonitorHeart, "Blood pressure") { showAddBp = true }
+                AddReadingRow(Icons.Rounded.WaterDrop, "Blood glucose") { showAddGlucose = true }
+                AddReadingRow(Icons.Rounded.MonitorWeight, "Weight") { showAddWeight = true }
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 VitalsStatCard(
                     label = "BP in control",
@@ -564,6 +575,75 @@ private fun HealthScreen(
             }
         )
     }
+    if (showAddWeight) {
+        AddWeightDialog(
+            onDismiss = { showAddWeight = false },
+            onSave = { kg ->
+                vm.addMetric(MetricType.WEIGHT, kg)
+                showAddWeight = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun AddReadingRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Icon(
+            Icons.Rounded.Add,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+@Composable
+private fun AddWeightDialog(
+    onDismiss: () -> Unit,
+    onSave: (kg: Float) -> Unit
+) {
+    var value by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add weight") },
+        text = {
+            OutlinedTextField(
+                value = value,
+                onValueChange = { value = it.filter { c -> c.isDigit() || c == '.' }.take(6) },
+                label = { Text("Weight") },
+                suffix = { Text("kg") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(
+                enabled = value.toFloatOrNull() != null,
+                onClick = { onSave(value.toFloatOrNull() ?: 0f) }
+            ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable

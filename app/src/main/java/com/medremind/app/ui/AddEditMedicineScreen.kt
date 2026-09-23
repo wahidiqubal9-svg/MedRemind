@@ -282,12 +282,12 @@ fun AddEditMedicineScreen(
                     .padding(start = 4.dp, end = 16.dp, top = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { if (step > 0) step-- else onCancel() }) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                        contentDescription = "Back"
-                    )
-                }
+                GlassIconButton(
+                    icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = "Back",
+                    onClick = { if (step > 0) step-- else onCancel() }
+                )
+                Spacer(Modifier.width(8.dp))
                 Surface(
                     shape = RoundedCornerShape(50),
                     color = MaterialTheme.colorScheme.primaryContainer,

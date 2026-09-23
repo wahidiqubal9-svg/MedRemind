@@ -123,13 +123,12 @@ fun ScreenHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (onBack != null) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = "Back"
-                )
-            }
-            Spacer(Modifier.width(4.dp))
+            GlassIconButton(
+                icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                contentDescription = "Back",
+                onClick = onBack
+            )
+            Spacer(Modifier.width(12.dp))
         }
         Text(
             text = title,
