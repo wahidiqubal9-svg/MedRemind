@@ -32,7 +32,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.NoMeals
 import androidx.compose.material.icons.rounded.Restaurant
@@ -54,7 +53,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -323,9 +321,9 @@ fun AlarmScreen(doseEventId: Long, snoozeMinutes: Int = 5, onAction: (String) ->
                 }
             }
 
-            // Reserve room for the floating "swipe up" hint so the photo and the
-            // action cards don't look cramped together.
-            Spacer(Modifier.height(58.dp))
+            // Breathing room so the medicine photo and the action cards don't look
+            // cramped together.
+            Spacer(Modifier.height(20.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -407,121 +405,96 @@ private fun SwipeUpToTake(
     val density = LocalDensity.current
     val threshold = with(density) { 85.dp.toPx() }
     val minOffset = with(density) { (-115).dp.toPx() }
-    val offset = remember { Animatable(0f) }
+    val bobAmplitude = with(density) { (-9).dp.toPx() }
+    val dragOffset = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     var confirmed by remember { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
 
-    val transition = rememberInfiniteTransition(label = "takePulse")
-    val pulse by transition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.025f,
-        animationSpec = infiniteRepeatable(tween(1800), RepeatMode.Reverse),
-        label = "takePulse"
+    // The button gently rises and falls to hint that it should be swiped up —
+    // no text needed.
+    val transition = rememberInfiniteTransition(label = "takeHint")
+    val bob = transition.animateFloat(
+        initialValue = 0f,
+        targetValue = bobAmplitude,
+        animationSpec = infiniteRepeatable(tween(850), RepeatMode.Reverse),
+        label = "takeBob"
     )
-    val scale = if (dragging || confirmed) 1f else pulse
 
-    Box(modifier = modifier.height(92.dp)) {
-        Surface(
-            color = if (confirmed) TakeGreenDark else TakeGreen,
-            contentColor = Color.White,
-            shape = RoundedCornerShape(23.dp),
-            shadowElevation = 10.dp,
-            modifier = Modifier
-                .fillMaxSize()
-                .offset { IntOffset(0, offset.value.roundToInt()) }
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
-                .pointerInput(Unit) {
-                    detectVerticalDragGestures(
-                        onDragStart = { dragging = true },
-                        onVerticalDrag = { change, dragAmount ->
-                            change.consume()
-                            scope.launch {
-                                offset.snapTo((offset.value + dragAmount).coerceIn(minOffset, 0f))
-                            }
-                        },
-                        onDragEnd = {
-                            dragging = false
-                            if (-offset.value >= threshold) {
-                                confirmed = true
-                                onConfirm()
-                            } else {
-                                scope.launch {
-                                    offset.animateTo(
-                                        0f,
-                                        spring(
-                                            dampingRatio = 0.5f,
-                                            stiffness = Spring.StiffnessMediumLow
-                                        )
-                                    )
-                                }
-                            }
-                        },
-                        onDragCancel = {
-                            dragging = false
-                            scope.launch { offset.animateTo(0f, spring()) }
+    val resting = !dragging && !confirmed
+
+    Surface(
+        color = if (confirmed) TakeGreenDark else TakeGreen,
+        contentColor = Color.White,
+        shape = RoundedCornerShape(23.dp),
+        shadowElevation = 10.dp,
+        modifier = modifier
+            .height(92.dp)
+            .offset {
+                IntOffset(0, (if (resting) bob.value else dragOffset.value).roundToInt())
+            }
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragStart = {
+                        dragging = true
+                        scope.launch { dragOffset.snapTo(bob.value) }
+                    },
+                    onVerticalDrag = { change, dragAmount ->
+                        change.consume()
+                        scope.launch {
+                            dragOffset.snapTo(
+                                (dragOffset.value + dragAmount).coerceIn(minOffset, 0f)
+                            )
                         }
-                    )
-                }
-        ) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(35.dp)
-                        .clip(CircleShape)
-                        .background(Color.White),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Rounded.Check,
-                        contentDescription = null,
-                        tint = Color(0xFF299E4E),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Spacer(Modifier.height(7.dp))
-                Text(
-                    if (confirmed) "Taken" else text,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    },
+                    onDragEnd = {
+                        dragging = false
+                        if (-dragOffset.value >= threshold) {
+                            confirmed = true
+                            onConfirm()
+                        } else {
+                            scope.launch {
+                                dragOffset.animateTo(
+                                    0f,
+                                    spring(
+                                        dampingRatio = 0.5f,
+                                        stiffness = Spring.StiffnessMediumLow
+                                    )
+                                )
+                            }
+                        }
+                    },
+                    onDragCancel = {
+                        dragging = false
+                        scope.launch { dragOffset.animateTo(0f, spring()) }
+                    }
                 )
             }
-        }
-
+    ) {
         Column(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = (-58).dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Box(
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(35.dp)
                     .clip(CircleShape)
                     .background(Color.White),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Rounded.KeyboardArrowUp,
+                    Icons.Rounded.Check,
                     contentDescription = null,
-                    tint = TakeGreenDark,
-                    modifier = Modifier.size(24.dp)
+                    tint = Color(0xFF299E4E),
+                    modifier = Modifier.size(20.dp)
                 )
             }
-            Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(7.dp))
             Text(
-                "Swipe up to confirm",
-                color = Color(0xFFBFFFD0),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.ExtraBold,
-                textAlign = TextAlign.Center
+                if (confirmed) "Taken" else text,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.ExtraBold
             )
         }
     }
