@@ -17,11 +17,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Favorite
@@ -74,6 +76,7 @@ import com.medremind.app.data.Patient
 import com.medremind.app.data.Schedule
 import com.medremind.app.data.ScheduleType
 import com.medremind.app.data.caregiver.QrEncoder
+import com.medremind.app.ui.GlassIconButton
 import com.medremind.app.ui.GradientPillButton
 import com.medremind.app.ui.MedCard
 import com.medremind.app.ui.MedClickableCard
@@ -659,7 +662,11 @@ fun CaregiverDashboardScreen(
         .collectAsState(initial = emptyList())
     val patient by remember(profileId) { vm.patients }
         .collectAsState(initial = emptyList())
-    val patientName = patient.firstOrNull { it.id == profileId }?.name ?: "Patient"
+    val patientObj = patient.firstOrNull { it.id == profileId }
+    val patientName = patientObj?.name ?: "Patient"
+    val relation = patientObj?.relation?.takeIf { it.isNotBlank() }
+    val patientTitle = if (relation != null) "$patientName ($relation)" else patientName
+    val todayLabel = SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(Date())
 
     var section by remember { mutableIntStateOf(0) }
     var todayDoses by remember { mutableStateOf<List<PatientDose>>(emptyList()) }
@@ -705,14 +712,43 @@ fun CaregiverDashboardScreen(
                     .padding(bottom = 40.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                ScreenHeader(patientName, onBack = onBack) {
-                    OutlinedButton(
-                        onClick = {
-                            medicineVm.setActiveProfile(profileId, patientName)
-                            onViewAs()
-                        },
-                        shape = RoundedCornerShape(50)
-                    ) { Text("View as") }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(top = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        GlassIconButton(
+                            icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = "Back",
+                            onClick = onBack
+                        )
+                        Spacer(Modifier.weight(1f))
+                        OutlinedButton(
+                            onClick = {
+                                medicineVm.setActiveProfile(profileId, patientName)
+                                onViewAs()
+                            },
+                            shape = RoundedCornerShape(50)
+                        ) { Text("View as") }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        text = patientTitle,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = todayLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
 
                 MedSegmentedButtons(
