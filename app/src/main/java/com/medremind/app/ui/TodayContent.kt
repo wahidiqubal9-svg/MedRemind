@@ -756,7 +756,6 @@ private fun TodayHeader(
         in 17..20 -> "Good evening"
         else -> "Good night"
     }
-    val title = if (greetingName.isNullOrBlank()) greeting else "$greeting, $greetingName"
     val dateLabel = SimpleDateFormat(
         if (selectedDate.year == LocalDate.now().year) "EEEE, MMM d" else "EEEE, MMM d, yyyy",
         Locale.getDefault()
@@ -770,11 +769,20 @@ private fun TodayHeader(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = title,
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
+                text = greeting,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1
             )
+            if (!greetingName.isNullOrBlank()) {
+                Text(
+                    text = greetingName,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+            }
             Spacer(Modifier.height(2.dp))
             Text(
                 text = dateLabel,
