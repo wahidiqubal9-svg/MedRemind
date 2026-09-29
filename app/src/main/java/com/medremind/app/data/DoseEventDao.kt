@@ -23,6 +23,9 @@ interface DoseEventDao {
     @Query("SELECT * FROM dose_events WHERE scheduledAt >= :from AND scheduledAt < :to ORDER BY scheduledAt ASC")
     suspend fun between(from: Long, to: Long): List<DoseEvent>
 
+    @Query("SELECT * FROM dose_events WHERE status = 'PENDING' AND scheduleId != 0 AND scheduledAt >= :from AND scheduledAt <= :to ORDER BY scheduledAt ASC, id ASC")
+    suspend fun pendingBetween(from: Long, to: Long): List<DoseEvent>
+
     @Query("UPDATE dose_events SET status = 'MISSED' WHERE status = 'PENDING' AND scheduledAt < :cutoff")
     suspend fun markMissedBefore(cutoff: Long): Int
 

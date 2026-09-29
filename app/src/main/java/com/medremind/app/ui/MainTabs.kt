@@ -215,38 +215,6 @@ fun MainTabs(
             onTabChange = onTabChange,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
-        val activeProfileId by vm.activeProfileId.collectAsState()
-        val activeProfileName by vm.activeProfileName.collectAsState()
-        AnimatedVisibility(
-            visible = activeProfileId != 0L,
-            enter = fadeIn(tween(250)),
-            exit = fadeOut(tween(200)),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = if (tab == 1) 154.dp else 96.dp)
-        ) {
-            Surface(
-                onClick = { vm.setActiveProfile(0L) },
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shadowElevation = 8.dp
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Rounded.Person, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "Viewing as ${activeProfileName.ifBlank { "patient" }} \u00b7 tap to switch back",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
         }
     }
 }

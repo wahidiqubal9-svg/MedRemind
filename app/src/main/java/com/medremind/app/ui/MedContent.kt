@@ -133,6 +133,7 @@ fun MedContent(
     }
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableIntStateOf(0) }
+    var lowStockOnly by remember { mutableStateOf(false) }
     var showPharmacyDialog by remember { mutableStateOf(false) }
     var bannerDismissed by remember { mutableStateOf(false) }
     var refillMedicine by remember { mutableStateOf<Medicine?>(null) }
@@ -142,7 +143,7 @@ fun MedContent(
     val lowMedicines = remember(medicines) {
         medicines.filter { it.quantity > 0 && it.quantity <= it.refillThreshold }
     }
-    val filteredMedicines = remember(medicines, query, filter, schedulesByMedicine) {
+    val filteredMedicines = remember(medicines, query, filter, schedulesByMedicine, lowStockOnly) {
         medicines.filter { medicine ->
             val matchesQuery = query.isBlank() || medicine.name.contains(query, ignoreCase = true)
             val schedules = schedulesByMedicine[medicine.id].orEmpty()
@@ -152,7 +153,9 @@ fun MedContent(
                 3 -> schedules.any { it.type == ScheduleType.COURSE }
                 else -> true
             }
-            matchesQuery && matchesFilter
+            val matchesStock = !lowStockOnly ||
+                (medicine.quantity > 0 && medicine.quantity <= medicine.refillThreshold)
+            matchesQuery && matchesFilter && matchesStock
         }
     }
 
@@ -165,7 +168,10 @@ fun MedContent(
             )
             CabinetSummaryRow(
                 allCount = medicines.size,
-                lowCount = lowMedicines.size
+                lowCount = lowMedicines.size,
+                lowStockOnly = lowStockOnly,
+                onAll = { lowStockOnly = false },
+                onLow = { lowStockOnly = true }
             )
             LazyColumn(
                 modifier = Modifier
@@ -190,7 +196,7 @@ fun MedContent(
                         onSelect = { filter = it }
                     )
                 }
-                if (lowMedicines.isNotEmpty() && !bannerDismissed) {
+                if (lowMedicines.isNotEmpty() && !bannerDismissed && !lowStockOnly) {
                     item(key = "low_supply") {
                         val index = refillIndex.coerceIn(0, lowMedicines.lastIndex)
                         val low = lowMedicines[index]
@@ -224,14 +230,31 @@ fun MedContent(
                     }
                 } else if (filteredMedicines.isEmpty()) {
                     item(key = "no_results") {
-                        MedEmptyState(
-                            icon = Icons.Outlined.Medication,
-                            title = "No matches",
-                            message = "No medicines match your search or filter.",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 24.dp)
-                        )
+                        if (lowStockOnly) {
+                            MedEmptyState(
+                                icon = Icons.Rounded.Warning,
+                                title = "Nothing is low on stock",
+                                message = "You're all stocked up.",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 24.dp),
+                                action = {
+                                    GradientPillButton(
+                                        text = "Show all medicines",
+                                        onClick = { lowStockOnly = false }
+                                    )
+                                }
+                            )
+                        } else {
+                            MedEmptyState(
+                                icon = Icons.Outlined.Medication,
+                                title = "No matches",
+                                message = "No medicines match your search or filter.",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 24.dp)
+                            )
+                        }
                     }
                 } else {
                     items(filteredMedicines, key = { it.id }) { medicine ->
@@ -326,7 +349,7 @@ fun MedContent(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StockRefillSheet(
+fun StockRefillSheet(
     medicine: Medicine,
     onDismiss: () -> Unit,
     onSave: (Int) -> Unit
@@ -694,7 +717,13 @@ private fun MedicineCard(
 }
 
 @Composable
-private fun CabinetSummaryRow(allCount: Int, lowCount: Int) {
+private fun CabinetSummaryRow(
+    allCount: Int,
+    lowCount: Int,
+    lowStockOnly: Boolean,
+    onAll: () -> Unit,
+    onLow: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -706,6 +735,8 @@ private fun CabinetSummaryRow(allCount: Int, lowCount: Int) {
             label = "All medicines",
             value = allCount,
             tint = MaterialTheme.colorScheme.primary,
+            selected = !lowStockOnly,
+            onClick = onAll,
             modifier = Modifier.weight(1f)
         )
         SummaryBox(
@@ -713,6 +744,8 @@ private fun CabinetSummaryRow(allCount: Int, lowCount: Int) {
             label = "Low stock",
             value = lowCount,
             tint = MaterialTheme.colorScheme.error,
+            selected = lowStockOnly,
+            onClick = onLow,
             modifier = Modifier.weight(1f)
         )
     }
@@ -724,17 +757,20 @@ private fun SummaryBox(
     label: String,
     value: Int,
     tint: Color,
+    selected: Boolean,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
+        onClick = onClick,
         modifier = modifier,
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface,
+        color = if (selected) tint.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant
+            if (selected) 1.6.dp else 1.dp,
+            if (selected) tint else MaterialTheme.colorScheme.outlineVariant
         ),
-        shadowElevation = MedElevation.card
+        shadowElevation = if (selected) MedElevation.raised else MedElevation.card
     ) {
         Row(
             modifier = Modifier.padding(14.dp),

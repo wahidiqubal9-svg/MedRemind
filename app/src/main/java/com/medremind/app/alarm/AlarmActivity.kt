@@ -16,6 +16,8 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.lifecycleScope
 import com.medremind.app.data.AppDatabase
 import com.medremind.app.data.DoseStatus
@@ -30,7 +32,7 @@ class AlarmActivity : ComponentActivity() {
     private var vibrator: Vibrator? = null
     private var snoozeMinutes: Int = 5
     private var acted: Boolean = false
-    private var doseEventId: Long = -1L
+    private val currentDoseEventId = mutableStateOf(-1L)
     private var medicineName: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,25 +50,31 @@ class AlarmActivity : ComponentActivity() {
             )
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        doseEventId = intent.getLongExtra("doseEventId", -1L)
+        currentDoseEventId.value = intent.getLongExtra("doseEventId", -1L)
         // Remove the status-bar notification/heads-up now that the full screen is up.
-        AlarmNotifier.cancel(applicationContext, doseEventId)
+        AlarmNotifier.cancel(applicationContext, currentDoseEventId.value)
         startSoundAndVibration()
         enableEdgeToEdge()
+        loadMedicineName(currentDoseEventId.value)
+        setContent {
+            MedRemindTheme {
+                key(currentDoseEventId.value) {
+                    AlarmScreen(
+                        doseEventId = currentDoseEventId.value,
+                        snoozeMinutes = snoozeMinutes,
+                        onAction = { action -> handleAction(currentDoseEventId.value, action) }
+                    )
+                }
+            }
+        }
+    }
+
+    private fun loadMedicineName(id: Long) {
         lifecycleScope.launch {
             medicineName = withContext(Dispatchers.IO) {
                 val db = AppDatabase.get(applicationContext)
-                val event = db.doseEventDao().byId(doseEventId)
+                val event = db.doseEventDao().byId(id)
                 event?.let { db.medicineDao().byId(it.medicineId)?.name }
-            }
-        }
-        setContent {
-            MedRemindTheme {
-                AlarmScreen(
-                    doseEventId = doseEventId,
-                    snoozeMinutes = snoozeMinutes,
-                    onAction = { action -> handleAction(doseEventId, action) }
-                )
             }
         }
     }
@@ -119,25 +127,26 @@ class AlarmActivity : ComponentActivity() {
 
     private fun bringBack() {
         if (acted) return
+        val id = currentDoseEventId.value
         // 1) Directly bring the alarm activity forward.
         runCatching {
             startActivity(
                 Intent(this, AlarmActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    .putExtra("doseEventId", doseEventId)
+                    .putExtra("doseEventId", id)
             )
         }
         // 2) Fall back to the sanctioned full-screen-intent path (works even when
         //    background activity starts are restricted). Re-posting triggers it.
-        runCatching { AlarmNotifier.show(this, doseEventId, medicineName, silent = true) }
+        runCatching { AlarmNotifier.show(this, id, medicineName, silent = true) }
         Handler(Looper.getMainLooper()).postDelayed({
-            runCatching { AlarmNotifier.cancel(applicationContext, doseEventId) }
+            runCatching { AlarmNotifier.cancel(applicationContext, id) }
         }, 900)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        runCatching { AlarmNotifier.cancel(applicationContext, doseEventId) }
+        runCatching { AlarmNotifier.cancel(applicationContext, currentDoseEventId.value) }
     }
 
     // The alarm cannot be dismissed by Home or Recents; it comes back until the
@@ -158,8 +167,10 @@ class AlarmActivity : ComponentActivity() {
         acted = true
         val appContext = applicationContext
         lifecycleScope.launch {
+            var nextId: Long? = null
             withContext(Dispatchers.IO) {
-                val dao = AppDatabase.get(appContext).doseEventDao()
+                val db = AppDatabase.get(appContext)
+                val dao = db.doseEventDao()
                 val event = dao.byId(doseEventId)
                 when (action) {
                     "TAKEN" -> event?.let {
@@ -173,10 +184,28 @@ class AlarmActivity : ComponentActivity() {
                         scheduleSnooze(appContext, doseEventId)
                     }
                 }
+                // If other medicines were scheduled for the same time, line them up
+                // so the patient is prompted for each one in turn.
+                if (event != null && event.scheduleId != 0L) {
+                    val profileId = db.medicineDao().byId(event.medicineId)?.profileId ?: 0L
+                    nextId = dao.pendingBetween(event.scheduledAt - 60_000L, event.scheduledAt + 60_000L)
+                        .firstOrNull { candidate ->
+                            candidate.id != event.id &&
+                                (db.medicineDao().byId(candidate.medicineId)?.profileId ?: 0L) == profileId
+                        }?.id
+                }
             }
             AlarmNotifier.cancel(appContext, doseEventId)
-            stopSoundAndVibration()
-            finish()
+            val next = nextId
+            if (next != null) {
+                AlarmNotifier.cancel(appContext, next)
+                currentDoseEventId.value = next
+                loadMedicineName(next)
+                acted = false
+            } else {
+                stopSoundAndVibration()
+                finish()
+            }
         }
     }
 

@@ -70,6 +70,14 @@ fun AppRoot(
         }
     }
     var tab by remember { mutableIntStateOf(0) }
+    var startTabDecided by remember { mutableStateOf(false) }
+    LaunchedEffect(loaded, medicines) {
+        if (loaded && !startTabDecided) {
+            // No medicines yet -> open the Medicines page so it's obvious how to start.
+            tab = if (medicines.isEmpty()) 1 else 0
+            startTabDecided = true
+        }
+    }
     var showEditor by remember { mutableStateOf(false) }
     var showMe by remember { mutableStateOf(false) }
     var showAccount by remember { mutableStateOf(false) }
@@ -237,10 +245,6 @@ fun AppRoot(
                     editing = medicine
                     editingProfileId = caregiverProfileId
                     showEditor = true
-                },
-                onViewAs = {
-                    showCaregiverDashboard = false
-                    tab = 0
                 }
             )
 

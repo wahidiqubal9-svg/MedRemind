@@ -29,7 +29,7 @@ import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Sms
+import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Medication
@@ -665,8 +665,7 @@ fun CaregiverDashboardScreen(
     profileId: Long,
     onBack: () -> Unit,
     onAddMedicine: () -> Unit,
-    onEditMedicine: (Medicine) -> Unit,
-    onViewAs: () -> Unit = {}
+    onEditMedicine: (Medicine) -> Unit
 ) {
     BackHandler { onBack() }
     val scope = rememberCoroutineScope()
@@ -693,6 +692,8 @@ fun CaregiverDashboardScreen(
     var removeMedicine by remember { mutableStateOf<Medicine?>(null) }
     var detail by remember { mutableStateOf<Medicine?>(null) }
     var showRemind by remember { mutableStateOf(false) }
+    var showRefill by remember { mutableStateOf(false) }
+    var refillTarget by remember { mutableStateOf<Medicine?>(null) }
     var editPatient by remember { mutableStateOf(false) }
     var week by remember { mutableStateOf<List<CaregiverViewModel.DayAdherence>>(emptyList()) }
     val context = LocalContext.current
@@ -749,14 +750,6 @@ fun CaregiverDashboardScreen(
                         contentDescription = "Back",
                         onClick = onBack
                     )
-                    Spacer(Modifier.weight(1f))
-                    OutlinedButton(
-                        onClick = {
-                            medicineVm.setActiveProfile(profileId, patientName)
-                            onViewAs()
-                        },
-                        shape = RoundedCornerShape(50)
-                    ) { Text("View as") }
                 }
 
                 Spacer(Modifier.height(12.dp))
@@ -771,8 +764,8 @@ fun CaregiverDashboardScreen(
                     attentionCount = attentionCount,
                     canContact = phone.isNotBlank(),
                     onRemind = { showRemind = true },
+                    onRefill = { showRefill = true },
                     onCall = { callNumber(context, phone) },
-                    onMessage = { messageNumber(context, phone, patientName) },
                     onEdit = { editPatient = true }
                 )
 
@@ -848,6 +841,29 @@ fun CaregiverDashboardScreen(
             onRemind = { medicine ->
                 showRemind = false
                 remind(medicine)
+            }
+        )
+    }
+
+    if (showRefill) {
+        RefillPickerSheet(
+            patientName = patientName,
+            medicines = medicines,
+            onDismiss = { showRefill = false },
+            onPick = { medicine ->
+                showRefill = false
+                refillTarget = medicine
+            }
+        )
+    }
+
+    refillTarget?.let { medicine ->
+        com.medremind.app.ui.StockRefillSheet(
+            medicine = medicine,
+            onDismiss = { refillTarget = null },
+            onSave = { amount ->
+                medicineVm.refillStock(medicine, amount) { reload++ }
+                refillTarget = null
             }
         )
     }
@@ -936,6 +952,83 @@ private fun RemindPickerSheet(
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun RefillPickerSheet(
+    patientName: String,
+    medicines: List<Medicine>,
+    onDismiss: () -> Unit,
+    onPick: (Medicine) -> Unit
+) {
+    val sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    androidx.compose.material3.ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 28.dp)
+        ) {
+            Text("Refill stock", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Choose a medicine to add pills to its stock for $patientName.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(12.dp))
+            if (medicines.isEmpty()) {
+                Text(
+                    "No medicines yet. Add one first.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    medicines.forEach { medicine ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onPick(medicine) }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            MedIconSquare(
+                                label = medicine.name,
+                                seed = medicine.id,
+                                photoPath = medicine.photoPath
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    listOf(medicine.name, medicine.strength)
+                                        .filter { it.isNotBlank() }.joinToString(" "),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    if (medicine.quantity > 0) "In stock: ${medicine.quantity}"
+                                    else "No stock tracking",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Icon(
+                                Icons.Rounded.Inventory2,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun EditPatientDialog(
     patient: Patient,
@@ -997,14 +1090,6 @@ private fun callNumber(context: android.content.Context, phone: String) {
     }
 }
 
-private fun messageNumber(context: android.content.Context, phone: String, name: String) {
-    if (phone.isBlank()) return
-    runCatching {
-        val intent = Intent(Intent.ACTION_SENDTO, android.net.Uri.parse("smsto:" + phone.trim()))
-        intent.putExtra("sms_body", "Hi $name, just checking in. How are you feeling?")
-        context.startActivity(intent)
-    }
-}
 
 @Composable
 private fun CaregiverPatientCard(
@@ -1017,8 +1102,8 @@ private fun CaregiverPatientCard(
     attentionCount: Int,
     canContact: Boolean,
     onRemind: () -> Unit,
+    onRefill: () -> Unit,
     onCall: () -> Unit,
-    onMessage: () -> Unit,
     onEdit: () -> Unit
 ) {
     val percent = if (progress.total == 0) 0 else progress.confirmed * 100 / progress.total
@@ -1105,19 +1190,19 @@ private fun CaregiverPatientCard(
                     modifier = Modifier.weight(1f)
                 )
                 QuickAction(
+                    label = "Refill",
+                    icon = Icons.Rounded.Inventory2,
+                    tint = Color(0xFF2563EB),
+                    enabled = true,
+                    onClick = onRefill,
+                    modifier = Modifier.weight(1f)
+                )
+                QuickAction(
                     label = "Call",
                     icon = Icons.Rounded.Call,
                     tint = Color(0xFF12B76A),
                     enabled = canContact,
                     onClick = onCall,
-                    modifier = Modifier.weight(1f)
-                )
-                QuickAction(
-                    label = "Message",
-                    icon = Icons.Rounded.Sms,
-                    tint = Color(0xFF2563EB),
-                    enabled = canContact,
-                    onClick = onMessage,
                     modifier = Modifier.weight(1f)
                 )
                 QuickAction(
