@@ -251,10 +251,15 @@ fun VitalsChartCard(
             val height = (bottom - top).coerceAtLeast(1f)
             val span = (yMax - yMin).coerceAtLeast(1f)
 
+            // Inset the points so the first marker never touches the Y axis (and
+            // the last stays off the right edge), which keeps the chart readable.
+            val pointInset = 30f
+            val dataWidth = (width - pointInset * 2f).coerceAtLeast(1f)
+
             fun yFor(v: Float): Float = bottom - ((v - yMin) / span) * height
             fun xFor(i: Int, n: Int): Float =
                 if (n <= 1) left + width / 2f
-                else left + width * i / (n - 1).toFloat()
+                else (left + pointInset) + dataWidth * i / (n - 1).toFloat()
 
             val yPaint = android.graphics.Paint().apply {
                 color = 0xFF98A2B3.toInt()
@@ -329,7 +334,7 @@ fun VitalsChartCard(
 
             // X-axis labels (dates), spaced out to avoid overlap.
             if (xLabels.isNotEmpty()) {
-                val gapPerPoint = if (maxCount > 1) width / (maxCount - 1) else width
+                val gapPerPoint = if (maxCount > 1) dataWidth / (maxCount - 1) else width
                 val step = kotlin.math.ceil(60f / gapPerPoint).toInt().coerceAtLeast(1)
                 xLabels.forEachIndexed { index, label ->
                     if (index % step == 0 || index == xLabels.lastIndex) {

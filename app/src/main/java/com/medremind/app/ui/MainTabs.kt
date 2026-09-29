@@ -128,8 +128,9 @@ fun MainTabs(
             }
         },
         floatingActionButton = {
+            // The "Add medicine" button belongs to the Medicines page only.
             when (tab) {
-                0, 1 -> Box(modifier = Modifier.padding(bottom = 96.dp)) {
+                1 -> Box(modifier = Modifier.padding(bottom = 96.dp)) {
                     GradientPillButton(
                         text = "Add medicine",
                         icon = Icons.Rounded.Add,
@@ -213,7 +214,7 @@ fun MainTabs(
             exit = fadeOut(tween(200)),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = if (tab <= 1) 154.dp else 96.dp)
+                .padding(bottom = if (tab == 1) 154.dp else 96.dp)
         ) {
             Surface(
                 onClick = { vm.setActiveProfile(0L) },
