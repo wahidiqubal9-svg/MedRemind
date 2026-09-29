@@ -1978,8 +1978,8 @@ private fun IntakeOptionCard(
                 .padding(vertical = 14.dp, horizontal = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            MealMascot(icon = icon, selected = selected, accentColor = accent)
-            Spacer(Modifier.height(8.dp))
+            IntakeIconBadge(icon = icon, selected = selected, accent = accent)
+            Spacer(Modifier.height(9.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
@@ -1991,56 +1991,19 @@ private fun IntakeOptionCard(
 }
 
 @Composable
-private fun MealMascot(
+private fun IntakeIconBadge(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     selected: Boolean,
-    accentColor: Color
+    accent: Color
 ) {
-    val accent = if (selected) accentColor
-    else MaterialTheme.colorScheme.onSurfaceVariant
-    val face = if (selected) Color.White
-    else MaterialTheme.colorScheme.onSurface
-    Box(modifier = Modifier.size(60.dp), contentAlignment = Alignment.Center) {
-        Canvas(modifier = Modifier.size(56.dp)) {
-            val w = size.width
-            val h = size.height
-            // Capsule body.
-            drawRoundRect(
-                color = accent,
-                topLeft = Offset(w * 0.08f, h * 0.26f),
-                size = androidx.compose.ui.geometry.Size(w * 0.84f, h * 0.44f),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(h * 0.22f, h * 0.22f)
-            )
-            // Eyes.
-            drawCircle(face, radius = w * 0.045f, center = Offset(w * 0.36f, h * 0.46f))
-            drawCircle(face, radius = w * 0.045f, center = Offset(w * 0.64f, h * 0.46f))
-            // Smile.
-            drawArc(
-                color = face,
-                startAngle = 20f,
-                sweepAngle = 140f,
-                useCenter = false,
-                topLeft = Offset(w * 0.40f, h * 0.40f),
-                size = androidx.compose.ui.geometry.Size(w * 0.20f, h * 0.16f),
-                style = androidx.compose.ui.graphics.drawscope.Stroke(
-                    width = w * 0.03f,
-                    cap = androidx.compose.ui.graphics.StrokeCap.Round
-                )
-            )
-        }
-        Surface(
-            shape = CircleShape,
-            color = if (selected) accentColor
-            else MaterialTheme.colorScheme.surfaceContainerHigh,
-            contentColor = if (selected) Color.White
-            else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .size(24.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(13.dp))
-            }
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = if (selected) accent else accent.copy(alpha = 0.12f),
+        contentColor = if (selected) Color.White else accent,
+        modifier = Modifier.size(46.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
         }
     }
 }

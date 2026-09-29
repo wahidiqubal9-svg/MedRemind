@@ -358,6 +358,8 @@ private fun HealthScreen(
     var showAddGlucose by remember { mutableStateOf(false) }
     var showAddBp by remember { mutableStateOf(false) }
     var showAddWeight by remember { mutableStateOf(false) }
+    var pendingDeleteMetric by remember { mutableStateOf<Metric?>(null) }
+    var exportFormat by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -536,7 +538,7 @@ private fun HealthScreen(
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         metrics.take(10).forEach { metric ->
-                            MetricRow(metric = metric, onDelete = { vm.deleteMetric(metric) })
+                            MetricRow(metric = metric, onDelete = { pendingDeleteMetric = metric })
                         }
                     }
                 }
@@ -544,16 +546,8 @@ private fun HealthScreen(
 
             HealthExportCard(
                 enabled = metrics.isNotEmpty(),
-                onCsv = rememberProAction {
-                    shareVitals("text/csv", "Share CSV report") {
-                        ReportExporter.exportVitalsCsv(context, metrics)
-                    }
-                },
-                onPdf = rememberProAction {
-                    shareVitals("application/pdf", "Share PDF report") {
-                        ReportExporter.exportVitalsPdf(context, metrics)
-                    }
-                }
+                onCsv = rememberProAction { exportFormat = "csv" },
+                onPdf = rememberProAction { exportFormat = "pdf" }
             )
         }
     }
@@ -582,6 +576,39 @@ private fun HealthScreen(
             onSave = { kg ->
                 vm.addMetric(MetricType.WEIGHT, kg)
                 showAddWeight = false
+            }
+        )
+    }
+
+    pendingDeleteMetric?.let { metric ->
+        MedConfirmDialog(
+            title = "Delete reading?",
+            message = "${MetricType.label(metric.type)} reading (${formatMetric(metric)}) will be removed.",
+            confirmText = "Delete",
+            onConfirm = {
+                vm.deleteMetric(metric)
+                pendingDeleteMetric = null
+            },
+            onDismiss = { pendingDeleteMetric = null }
+        )
+    }
+
+    exportFormat?.let { format ->
+        ExportRangeSheet(
+            title = "Export report",
+            onDismiss = { exportFormat = null },
+            onSelect = { days ->
+                exportFormat = null
+                val cutoff = if (days == 0) 0L
+                else System.currentTimeMillis() - days * 86_400_000L
+                val data = metrics.filter { it.recordedAt >= cutoff }
+                shareVitals(
+                    if (format == "csv") "text/csv" else "application/pdf",
+                    if (format == "csv") "Share CSV report" else "Share PDF report"
+                ) {
+                    if (format == "csv") ReportExporter.exportVitalsCsv(context, data)
+                    else ReportExporter.exportVitalsPdf(context, data)
+                }
             }
         )
     }

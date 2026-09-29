@@ -90,6 +90,7 @@ fun HistoryContent(
     var log by remember { mutableStateOf<List<DoseLogEntry>>(emptyList()) }
     var previous by remember { mutableStateOf<List<DoseLogEntry>>(emptyList()) }
     var logLoaded by remember { mutableStateOf(false) }
+    var exportFormat by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) { vm.markOverdueAsMissed() }
 
@@ -166,6 +167,31 @@ fun HistoryContent(
         }
     }
 
+    exportFormat?.let { format ->
+        ExportRangeSheet(
+            title = "Doctor visit report",
+            onDismiss = { exportFormat = null },
+            onSelect = { days ->
+                exportFormat = null
+                val mime = if (format == "csv") "text/csv" else "application/pdf"
+                val chooser = if (format == "csv") "Share CSV report" else "Share PDF report"
+                val range = if (days == 0) 3650 else days
+                scope.launch {
+                    val data = withContext(Dispatchers.IO) {
+                        vm.doseLogForRange(range).filter {
+                            it.status == DoseStatus.TAKEN || it.status == DoseStatus.MISSED ||
+                                it.status == DoseStatus.SKIPPED
+                        }
+                    }
+                    shareReport(mime, chooser) {
+                        if (format == "csv") ReportExporter.exportCsv(context, data)
+                        else ReportExporter.exportPdf(context, data, range)
+                    }
+                }
+            }
+        )
+    }
+
     Column(modifier = modifier.fillMaxSize()) {
         ScreenHeader("Progress") {
             com.medremind.app.ui.caregiver.NotificationBell(onClick = onOpenNotifications)
@@ -236,16 +262,8 @@ fun HistoryContent(
         item(key = "export") {
             ExportCard(
                 enabled = log.isNotEmpty(),
-                onCsv = rememberProAction {
-                    shareReport("text/csv", "Share CSV report") {
-                        ReportExporter.exportCsv(context, log)
-                    }
-                },
-                onPdf = rememberProAction {
-                    shareReport("application/pdf", "Share PDF report") {
-                        ReportExporter.exportPdf(context, log, rangeDays)
-                    }
-                }
+                onCsv = rememberProAction { exportFormat = "csv" },
+                onPdf = rememberProAction { exportFormat = "pdf" }
             )
         }
 
