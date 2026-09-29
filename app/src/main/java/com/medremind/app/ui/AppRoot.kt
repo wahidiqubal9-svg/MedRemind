@@ -71,7 +71,6 @@ fun AppRoot(
     }
     var tab by remember { mutableIntStateOf(0) }
     var showEditor by remember { mutableStateOf(false) }
-    var showSettings by remember { mutableStateOf(false) }
     var showMe by remember { mutableStateOf(false) }
     var showAccount by remember { mutableStateOf(false) }
     var showPermissions by remember { mutableStateOf(false) }
@@ -117,7 +116,6 @@ fun AppRoot(
         showPermissions -> "permissions"
         showMe -> "me"
         showAccount -> "account"
-        showSettings -> "settings"
         else -> "main"
     }
 
@@ -246,19 +244,6 @@ fun AppRoot(
                 }
             )
 
-            "settings" -> SettingsScreen(
-                settings = settings,
-                onBack = { showSettings = false },
-                onOpenPermissions = {
-                    showSettings = false
-                    showPermissions = true
-                },
-                onOpenAccount = {
-                    showSettings = false
-                    showAccount = true
-                }
-            )
-
             "account" -> AccountScreen(onBack = { showAccount = false })
 
             "permissions" -> PermissionScreen(
@@ -291,7 +276,7 @@ fun AppRoot(
                         vm.deleteMedicine(medicine) {}
                     }
                 },
-                onOpenSettings = { showSettings = true },
+                onOpenPermissions = { showPermissions = true },
                 onOpenMe = { showMe = true },
                 onOpenNotifications = { showNotifications = true }
             )

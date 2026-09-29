@@ -111,7 +111,7 @@ fun MainTabs(
     onAdd: () -> Unit,
     onEdit: (Medicine) -> Unit,
     onDelete: (Medicine) -> Unit,
-    onOpenSettings: () -> Unit,
+    onOpenPermissions: () -> Unit = {},
     onOpenMe: () -> Unit,
     onOpenNotifications: () -> Unit = {}
 ) {
@@ -191,19 +191,25 @@ fun MainTabs(
                     profilePhoto = settings.profilePhoto,
                     onOpenNotifications = onOpenNotifications
                 )
-                else -> HealthScreen(
+                3 -> HealthScreen(
                     modifier = Modifier.padding(padding),
                     settings = settings,
                     vm = vm,
                     onOpenMe = onOpenMe,
                     onOpenNotifications = onOpenNotifications
                 )
+                else -> SettingsContent(
+                    modifier = Modifier.padding(padding),
+                    settings = settings,
+                    vm = vm,
+                    onOpenPermissions = onOpenPermissions,
+                    onOpenMe = onOpenMe
+                )
             }
         }
         MedBottomBar(
             tab = tab,
             onTabChange = onTabChange,
-            onOpenSettings = onOpenSettings,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
         val activeProfileId by vm.activeProfileId.collectAsState()
@@ -246,7 +252,6 @@ fun MainTabs(
 private fun MedBottomBar(
     tab: Int,
     onTabChange: (Int) -> Unit,
-    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -284,14 +289,15 @@ private fun MedBottomBar(
                     }
                 }
                 BottomNavCell(
-                    selected = false,
+                    selected = tab == 4,
                     label = "Settings",
-                    onClick = onOpenSettings
+                    onClick = { onTabChange(4) }
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Settings,
                         contentDescription = "Settings",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = if (tab == 4) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(25.dp)
                     )
                 }

@@ -299,6 +299,26 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    /** Erases every medicine, schedule, dose, health reading and caregiver link. */
+    fun wipeAllData(onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                db.scheduleDao().getAllOnce().forEach { ReminderScheduler.cancel(app, it.id) }
+                db.medicineDao().getAllOnce().forEach { PhotoStorage.delete(it.photoPath) }
+                db.doseEventDao().clear()
+                db.scheduleDao().clear()
+                db.medicineDao().clear()
+                db.metricDao().clear()
+                db.caregiverDao().clearActivity()
+                db.caregiverDao().clearLinks()
+                db.caregiverDao().clearPatients()
+            }
+            setActiveProfile(0L)
+            refreshWidget()
+            onDone()
+        }
+    }
+
     suspend fun upcomingAlarms(): List<UpcomingAlarm> = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
         db.scheduleDao().getAllOnce()
