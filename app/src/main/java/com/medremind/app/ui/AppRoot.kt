@@ -64,7 +64,8 @@ fun AppRoot(
     var splashDone by remember { mutableStateOf(false) }
     LaunchedEffect(loaded) {
         if (loaded) {
-            delay(1000)
+            // Brief fade only — don't keep the user waiting once data is ready.
+            delay(250)
             splashDone = true
         }
     }

@@ -21,22 +21,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     var highContrast by mutableStateOf(prefs.getBoolean("high_contrast", false))
         private set
 
-    var alarmStyle by mutableStateOf(prefs.getString("alarm_style", "fullscreen") ?: "fullscreen")
-        private set
-
-    var alarmSound by mutableStateOf(prefs.getString("alarm_sound", "alarm") ?: "alarm")
-        private set
-
     var snoozeMinutes by mutableStateOf(prefs.getInt("snooze_minutes", 5))
         private set
-
-    var alarmImageSize by mutableStateOf(prefs.getInt("alarm_image_size", 100))
-        private set
-
-    fun updateAlarmImageSize(value: Int) {
-        alarmImageSize = value.coerceIn(40, 100)
-        prefs.edit().putInt("alarm_image_size", alarmImageSize).apply()
-    }
 
     var dynamicColor by mutableStateOf(prefs.getBoolean("dynamic_color", false))
         private set
@@ -110,15 +96,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         prefs.edit().putBoolean("reduce_motion", value).apply()
     }
 
-    fun updateAlarmStyle(value: String) {
-        alarmStyle = value
-        prefs.edit().putString("alarm_style", value).apply()
-    }
 
-    fun updateAlarmSound(value: String) {
-        alarmSound = value
-        prefs.edit().putString("alarm_sound", value).apply()
-    }
 
     var profileName by mutableStateOf(prefs.getString("profile_name", "") ?: "")
         private set

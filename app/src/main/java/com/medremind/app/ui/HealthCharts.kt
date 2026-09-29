@@ -209,6 +209,25 @@ fun VitalsChartCard(
             label = "vitalsProgress"
         )
 
+        // Create these once instead of on every animation frame.
+        val chartDensity = androidx.compose.ui.platform.LocalDensity.current
+        val yPaint = remember(chartDensity) {
+            android.graphics.Paint().apply {
+                color = 0xFF98A2B3.toInt()
+                textSize = with(chartDensity) { 10.sp.toPx() }
+                isAntiAlias = true
+                textAlign = android.graphics.Paint.Align.RIGHT
+            }
+        }
+        val xPaint = remember(chartDensity) {
+            android.graphics.Paint().apply {
+                color = 0xFF98A2B3.toInt()
+                textSize = with(chartDensity) { 9.sp.toPx() }
+                isAntiAlias = true
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+        }
+
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
@@ -223,8 +242,11 @@ fun VitalsChartCard(
                         val h = (b - t).coerceAtLeast(1f)
                         val sp = (yMax - yMin).coerceAtLeast(1f)
                         val count = series.maxOfOrNull { it.values.size } ?: 0
+                        val inset = 30f
+                        val dw = (w - inset * 2f).coerceAtLeast(1f)
                         fun px(i: Int): Float =
-                            if (count <= 1) l + w / 2f else l + w * i / (count - 1).toFloat()
+                            if (count <= 1) l + w / 2f
+                            else (l + inset) + dw * i / (count - 1).toFloat()
                         fun py(v: Float): Float = b - ((v - yMin) / sp) * h
                         var best = -1
                         var bestDist = Float.MAX_VALUE
@@ -260,19 +282,6 @@ fun VitalsChartCard(
             fun xFor(i: Int, n: Int): Float =
                 if (n <= 1) left + width / 2f
                 else (left + pointInset) + dataWidth * i / (n - 1).toFloat()
-
-            val yPaint = android.graphics.Paint().apply {
-                color = 0xFF98A2B3.toInt()
-                textSize = 10.sp.toPx()
-                isAntiAlias = true
-                textAlign = android.graphics.Paint.Align.RIGHT
-            }
-            val xPaint = android.graphics.Paint().apply {
-                color = 0xFF98A2B3.toInt()
-                textSize = 9.sp.toPx()
-                isAntiAlias = true
-                textAlign = android.graphics.Paint.Align.CENTER
-            }
 
             val gridColor = Color.Gray.copy(alpha = 0.16f)
             for (i in 0..4) {

@@ -23,12 +23,8 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // Safety net: create the alarm channel and re-arm every schedule on launch,
-        // so reminders survive reinstalls, updates, force-stops and time changes.
-        AlarmNotifier.ensureChannel(applicationContext)
-        lifecycleScope.launch {
-            runCatching { ReminderScheduler.rescheduleAll(applicationContext) }
-        }
+        // Alarm channel + schedule re-arming already happens once in
+        // MedRemindApp.onCreate, so we don't repeat it here on every launch.
         setContent {
             val settings: SettingsViewModel = viewModel()
             val context = LocalContext.current

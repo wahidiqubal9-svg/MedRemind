@@ -139,17 +139,21 @@ fun MedContent(
     var stockMedicine by remember { mutableStateOf<Medicine?>(null) }
     val filterOptions = listOf("All", "Daily", "Weekly", "Course")
 
-    val lowMedicines = medicines.filter { it.quantity > 0 && it.quantity <= it.refillThreshold }
-    val filteredMedicines = medicines.filter { medicine ->
-        val matchesQuery = query.isBlank() || medicine.name.contains(query, ignoreCase = true)
-        val schedules = schedulesByMedicine[medicine.id].orEmpty()
-        val matchesFilter = when (filter) {
-            1 -> schedules.any { it.type == ScheduleType.DAILY }
-            2 -> schedules.any { it.type == ScheduleType.WEEKDAYS }
-            3 -> schedules.any { it.type == ScheduleType.COURSE }
-            else -> true
+    val lowMedicines = remember(medicines) {
+        medicines.filter { it.quantity > 0 && it.quantity <= it.refillThreshold }
+    }
+    val filteredMedicines = remember(medicines, query, filter, schedulesByMedicine) {
+        medicines.filter { medicine ->
+            val matchesQuery = query.isBlank() || medicine.name.contains(query, ignoreCase = true)
+            val schedules = schedulesByMedicine[medicine.id].orEmpty()
+            val matchesFilter = when (filter) {
+                1 -> schedules.any { it.type == ScheduleType.DAILY }
+                2 -> schedules.any { it.type == ScheduleType.WEEKDAYS }
+                3 -> schedules.any { it.type == ScheduleType.COURSE }
+                else -> true
+            }
+            matchesQuery && matchesFilter
         }
-        matchesQuery && matchesFilter
     }
 
     Box(modifier = modifier.fillMaxSize()) {
