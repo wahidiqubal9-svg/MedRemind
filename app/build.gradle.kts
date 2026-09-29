@@ -17,14 +17,34 @@ android {
         versionName = "0.135.0"
     }
 
+    signingConfigs {
+        // Signed with the same debug keystore so the optimized release build can
+        // update over the test (debug) install without uninstalling.
+        create("deviceDebug") {
+            storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("deviceDebug")
             proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
+                getDefaultProguardFile("proguard-android.txt"),
                 "proguard-rules.pro"
             )
         }
+    }
+
+    lint {
+        // The bundled lint crashes on some Compose files; it isn't needed for
+        // building the APK, so don't let it block release builds.
+        checkReleaseBuilds = false
+        abortOnError = false
     }
 
     compileOptions {
