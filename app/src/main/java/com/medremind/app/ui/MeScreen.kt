@@ -52,7 +52,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -129,32 +131,7 @@ fun MeScreen(
             }
         }
 
-        Spacer(Modifier.height(6.dp))
-
-        MedCard(modifier = Modifier.fillMaxWidth()) {
-            CaregiverEntryRow(
-                icon = Icons.Rounded.Favorite,
-                title = "Caregiver",
-                subtitle = "Someone who helps me with my medicines",
-                pro = true,
-                onClick = openCaregiver
-            )
-            Spacer(Modifier.height(4.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(MaterialTheme.colorScheme.outlineVariant)
-            )
-            Spacer(Modifier.height(4.dp))
-            CaregiverEntryRow(
-                icon = Icons.Rounded.Group,
-                title = "Caregiving",
-                subtitle = "People I help with their medicines",
-                pro = true,
-                onClick = openCaregiving
-            )
-        }
+        Spacer(Modifier.height(10.dp))
 
         if (!editing && hasProfile) {
             ProfileCard(
@@ -174,6 +151,35 @@ fun MeScreen(
                 onCancel = { editing = false }
             )
         }
+
+        Spacer(Modifier.height(22.dp))
+        SectionHeader("Caregiving", modifier = Modifier.padding(start = 4.dp))
+        Spacer(Modifier.height(10.dp))
+        MedCard(modifier = Modifier.fillMaxWidth()) {
+            CaregiverEntryRow(
+                icon = Icons.Rounded.Favorite,
+                title = "Caregiver",
+                subtitle = "Someone who helps me with my medicines",
+                pro = true,
+                onClick = openCaregiver
+            )
+            Spacer(Modifier.height(6.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant)
+            )
+            Spacer(Modifier.height(6.dp))
+            CaregiverEntryRow(
+                icon = Icons.Rounded.Group,
+                title = "Caregiving",
+                subtitle = "People I help with their medicines",
+                pro = true,
+                onClick = openCaregiving
+            )
+        }
+        Spacer(Modifier.height(20.dp))
     }
 }
 
@@ -182,26 +188,53 @@ private fun ProfileCard(
     settings: SettingsViewModel,
     onEdit: () -> Unit
 ) {
+    val conditions = settings.profileDiseases
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 22.dp),
+            .padding(top = 4.dp),
         shape = RoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 8.dp
+        shadowElevation = 10.dp
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(92.dp)
+                    .height(126.dp)
                     .background(MedGradients.heroHorizontal())
             )
+            Surface(
+                onClick = onEdit,
+                shape = RoundedCornerShape(50),
+                color = Color.White.copy(alpha = 0.22f),
+                contentColor = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Rounded.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "Edit",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 44.dp),
+                    .padding(top = 80.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 AvatarWithBadge(settings = settings, onClick = onEdit, showCamera = false)
@@ -211,84 +244,37 @@ private fun ProfileCard(
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.ExtraBold
                 )
-                Spacer(Modifier.height(20.dp))
-                Column(modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        StatBox(
-                            label = "Age",
-                            value = settings.profileAge.ifBlank { "—" },
-                            modifier = Modifier.weight(1f)
-                        )
-                        StatBox(
-                            label = "Sex",
-                            value = settings.profileSex.ifBlank { "—" },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        StatBox(
-                            label = "Weight",
-                            value = settings.profileWeight.let { if (it.isBlank()) "—" else "$it kg" },
-                            modifier = Modifier.weight(1f)
-                        )
-                        StatBox(
-                            label = "Height",
-                            value = settings.profileHeight.let { if (it.isBlank()) "—" else "$it cm" },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-                if (settings.profileDiseases.isNotEmpty()) {
-                    Spacer(Modifier.height(16.dp))
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp)
-                    ) {
-                        Text(
-                            "CONDITIONS",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            settings.profileDiseases.joinToString(" \u00b7 "),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = if (conditions.isNotEmpty()) conditions.joinToString(" \u00b7 ")
+                    else "Keep your details up to date",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
                 Spacer(Modifier.height(18.dp))
-                Surface(
-                    onClick = onEdit,
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    border = BorderStroke(
-                        1.5.dp,
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-                    ),
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(vertical = 14.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Edit,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StatBox("Age", settings.profileAge.ifBlank { "—" }, Modifier.weight(1f))
+                        StatBox("Sex", settings.profileSex.ifBlank { "—" }, Modifier.weight(1f))
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StatBox(
+                            "Weight",
+                            settings.profileWeight.let { if (it.isBlank()) "—" else "$it kg" },
+                            Modifier.weight(1f)
                         )
-                        Spacer(Modifier.width(8.dp))
-                        Text("Edit profile", fontWeight = FontWeight.ExtraBold)
+                        StatBox(
+                            "Height",
+                            settings.profileHeight.let { if (it.isBlank()) "—" else "$it cm" },
+                            Modifier.weight(1f)
+                        )
                     }
                 }
                 Spacer(Modifier.height(20.dp))

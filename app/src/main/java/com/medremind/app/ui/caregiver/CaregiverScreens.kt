@@ -696,6 +696,9 @@ fun CaregiverDashboardScreen(
     val lowStock = medicines.filter {
         it.quantity > 0 && it.refillThreshold > 0 && it.quantity <= it.refillThreshold
     }
+    val attentionCount = todayDoses.count {
+        it.status == DoseStatus.MISSED || it.status == DoseStatus.PENDING
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -712,44 +715,38 @@ fun CaregiverDashboardScreen(
                     .padding(bottom = 40.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(top = 8.dp)
+                        .padding(top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        GlassIconButton(
-                            icon = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "Back",
-                            onClick = onBack
-                        )
-                        Spacer(Modifier.weight(1f))
-                        OutlinedButton(
-                            onClick = {
-                                medicineVm.setActiveProfile(profileId, patientName)
-                                onViewAs()
-                            },
-                            shape = RoundedCornerShape(50)
-                        ) { Text("View as") }
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        text = patientTitle,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        maxLines = 1
+                    GlassIconButton(
+                        icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = "Back",
+                        onClick = onBack
                     )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = todayLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Spacer(Modifier.weight(1f))
+                    OutlinedButton(
+                        onClick = {
+                            medicineVm.setActiveProfile(profileId, patientName)
+                            onViewAs()
+                        },
+                        shape = RoundedCornerShape(50)
+                    ) { Text("View as") }
                 }
+
+                Spacer(Modifier.height(12.dp))
+                CaregiverPatientCard(
+                    patientName = patientName,
+                    patientTitle = patientTitle,
+                    todayLabel = todayLabel,
+                    avatarPath = patientObj?.avatarPath,
+                    profileId = profileId,
+                    progress = progress,
+                    attentionCount = attentionCount
+                )
 
                 MedSegmentedButtons(
                     options = listOf("Today", "Medicines", "Activity"),
@@ -812,6 +809,72 @@ fun CaregiverDashboardScreen(
             },
             onDismiss = { removeMedicine = null }
         )
+    }
+}
+
+@Composable
+private fun CaregiverPatientCard(
+    patientName: String,
+    patientTitle: String,
+    todayLabel: String,
+    avatarPath: String?,
+    profileId: Long,
+    progress: CaregiverViewModel.Progress,
+    attentionCount: Int
+) {
+    val (statusLabel, statusTint) = when {
+        progress.total == 0 -> "No doses today" to MaterialTheme.colorScheme.onSurfaceVariant
+        attentionCount > 0 -> "$attentionCount need attention" to Color(0xFFD97706)
+        else -> "On track today" to Color(0xFF0A7F4F)
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(26.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant
+        ),
+        shadowElevation = 8.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            MedIconSquare(
+                label = patientName,
+                seed = profileId,
+                size = 58.dp,
+                photoPath = avatarPath
+            )
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    patientTitle,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1
+                )
+                Text(
+                    todayLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = statusTint.copy(alpha = 0.14f),
+                    contentColor = statusTint
+                ) {
+                    Text(
+                        statusLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+            }
+        }
     }
 }
 

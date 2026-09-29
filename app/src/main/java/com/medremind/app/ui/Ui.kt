@@ -697,10 +697,10 @@ fun SplashScreen() {
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_nav_med),
+                    imageVector = Icons.Rounded.Medication,
                     contentDescription = null,
-                    tint = Color.Unspecified,
-                    modifier = Modifier.size(72.dp)
+                    tint = Color.White,
+                    modifier = Modifier.size(64.dp)
                 )
             }
             Spacer(Modifier.height(22.dp))

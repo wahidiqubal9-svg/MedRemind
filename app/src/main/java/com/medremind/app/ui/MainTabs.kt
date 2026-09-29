@@ -36,9 +36,12 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.FileDownload
+import androidx.compose.material.icons.rounded.Insights
+import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.MonitorHeart
 import androidx.compose.material.icons.rounded.MonitorWeight
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Today
 import androidx.compose.material.icons.rounded.WaterDrop
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.Settings
@@ -91,14 +94,14 @@ import java.util.Locale
 
 private data class NavSpec(
     val label: String,
-    val icon: Int
+    val icon: androidx.compose.ui.graphics.vector.ImageVector
 )
 
 private val navSpecs = listOf(
-    NavSpec("Today", R.drawable.ic_nav_today),
-    NavSpec("Med", R.drawable.ic_nav_med),
-    NavSpec("Progress", R.drawable.ic_nav_progress),
-    NavSpec("Health", R.drawable.ic_nav_health)
+    NavSpec("Today", Icons.Rounded.Today),
+    NavSpec("Med", Icons.Rounded.Medication),
+    NavSpec("Progress", Icons.Rounded.Insights),
+    NavSpec("Health", Icons.Rounded.MonitorHeart)
 )
 
 @Composable
@@ -261,10 +264,10 @@ private fun MedBottomBar(
             .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
         Surface(
-            shape = RoundedCornerShape(26.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            shadowElevation = 18.dp,
+            shape = RoundedCornerShape(28.dp),
+            color = Color(0xFF0F172A),
+            border = BorderStroke(1.dp, Color(0xFF2A3446)),
+            shadowElevation = 22.dp,
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
@@ -281,10 +284,10 @@ private fun MedBottomBar(
                         onClick = { onTabChange(index) }
                     ) {
                         Icon(
-                            painter = painterResource(spec.icon),
+                            imageVector = spec.icon,
                             contentDescription = spec.label,
-                            tint = Color.Unspecified,
-                            modifier = Modifier.size(if (selected) 28.dp else 25.dp)
+                            tint = if (selected) Color.White else Color(0xFF94A3B8),
+                            modifier = Modifier.size(if (selected) 24.dp else 22.dp)
                         )
                     }
                 }
@@ -296,9 +299,8 @@ private fun MedBottomBar(
                     Icon(
                         imageVector = Icons.Rounded.Settings,
                         contentDescription = "Settings",
-                        tint = if (tab == 4) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(25.dp)
+                        tint = if (tab == 4) Color.White else Color(0xFF94A3B8),
+                        modifier = Modifier.size(23.dp)
                     )
                 }
             }
@@ -331,7 +333,7 @@ private fun RowScope.BottomNavCell(
                 .clip(RoundedCornerShape(50))
                 .then(
                     if (selected) {
-                        Modifier.background(MaterialTheme.colorScheme.primaryContainer)
+                        Modifier.background(MaterialTheme.colorScheme.primary)
                     } else Modifier
                 ),
             contentAlignment = Alignment.Center
@@ -345,8 +347,7 @@ private fun RowScope.BottomNavCell(
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Clip,
-            color = if (selected) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (selected) Color.White else Color(0xFF94A3B8),
             fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold
         )
     }
