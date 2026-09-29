@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 #
-# Build the debug APK and publish it so Obtainium can pick it up.
+# Build the optimized RELEASE APK and publish it so Obtainium can pick it up.
 #
-# Everything (code + releases + a stable direct-APK link) lives in one repo:
+# The release build is minified (R8) + resource-shrunk and signed with the
+# device key, so it is much smaller/faster and still updates over the existing
+# install. Everything (code + releases + a stable direct-APK link) lives in one
+# repo:
 #
 #   https://raw.githubusercontent.com/<owner>/MedRemind/apk/medremind.apk
 #
@@ -29,7 +32,7 @@ NOTES="${2:-Automatic build $TAG}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-APK="app/build/outputs/apk/debug/app-debug.apk"
+APK="app/build/outputs/apk/release/app-release.apk"
 AUTH=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json")
 
 api() { echo "https://api.github.com/repos/${OWNER}/$1"; }
@@ -45,8 +48,8 @@ if [ "${SKIP_BUILD:-0}" = "1" ]; then
   echo "==> Skipping build (SKIP_BUILD=1); using existing APK"
   [ -f "$ROOT/$APK" ] || { echo "No APK at $APK"; exit 1; }
 else
-  echo "==> Building $TAG"
-  "$GRADLE" --no-daemon --console=plain assembleDebug
+  echo "==> Building $TAG (optimized release)"
+  "$GRADLE" --no-daemon --console=plain assembleRelease
 fi
 
 echo "==> Staging commit"
@@ -58,7 +61,7 @@ if ! git diff --cached --quiet; then
 fi
 git -c credential.helper= push "https://x-access-token:${GH_TOKEN}@github.com/${OWNER}/${CODE_REPO}.git" HEAD:main
 
-ASSET_NAME="medremind-${TAG}-debug.apk"
+ASSET_NAME="medremind-${TAG}.apk"
 
 for R in $REL_REPOS; do
   echo "==> Creating release $TAG in ${OWNER}/${R}"
