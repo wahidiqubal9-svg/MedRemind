@@ -15,6 +15,8 @@ data class Patient(
     @PrimaryKey(autoGenerate = true) val id: Long = 0L,
     val name: String,
     val relation: String = "",
+    /** Phone number the caregiver can call/message. */
+    val phone: String = "",
     val isSelf: Boolean = false,
     val avatarPath: String? = null,
     val createdAt: Long = System.currentTimeMillis(),

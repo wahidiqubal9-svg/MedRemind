@@ -113,6 +113,7 @@ object BackupManager {
                         put("id", p.id)
                         put("name", p.name)
                         put("relation", p.relation)
+                        put("phone", p.phone)
                         put("isSelf", p.isSelf)
                         put("avatarPath", p.avatarPath ?: JSONObject.NULL)
                         put("createdAt", p.createdAt)
@@ -298,6 +299,7 @@ object BackupManager {
                     id = o.optLong("id"),
                     name = o.optString("name"),
                     relation = o.optString("relation", ""),
+                    phone = o.optString("phone", ""),
                     isSelf = o.optBoolean("isSelf", false),
                     avatarPath = if (o.isNull("avatarPath")) null else o.optString("avatarPath"),
                     createdAt = o.optLong("createdAt", System.currentTimeMillis()),

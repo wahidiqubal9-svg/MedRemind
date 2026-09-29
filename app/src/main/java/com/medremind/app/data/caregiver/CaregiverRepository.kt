@@ -27,7 +27,9 @@ interface CaregiverRepository {
 
     suspend fun link(id: Long): CaregiverLink?
 
-    suspend fun addPatient(name: String, relation: String): Long
+    suspend fun addPatient(name: String, relation: String, phone: String = ""): Long
+
+    suspend fun updatePatient(patient: Patient)
 
     /** Removes a patient, their medicines, schedules and photos. */
     suspend fun removePatient(profileId: Long)

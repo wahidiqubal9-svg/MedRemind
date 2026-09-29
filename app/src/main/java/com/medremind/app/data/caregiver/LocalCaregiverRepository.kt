@@ -30,15 +30,20 @@ class LocalCaregiverRepository(private val context: Context) : CaregiverReposito
 
     override suspend fun link(id: Long): CaregiverLink? = dao.link(id)
 
-    override suspend fun addPatient(name: String, relation: String): Long {
+    override suspend fun addPatient(name: String, relation: String, phone: String): Long {
         val existing = dao.patientsOnce()
         return dao.insertPatient(
             Patient(
                 name = name.trim(),
                 relation = relation.trim(),
+                phone = phone.trim(),
                 sortOrder = existing.size
             )
         )
+    }
+
+    override suspend fun updatePatient(patient: Patient) {
+        dao.updatePatient(patient)
     }
 
     override suspend fun removePatient(profileId: Long) {

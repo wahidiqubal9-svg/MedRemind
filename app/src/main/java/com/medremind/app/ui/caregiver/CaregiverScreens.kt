@@ -21,11 +21,15 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Sms
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Medication
@@ -57,10 +61,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -87,6 +93,7 @@ import com.medremind.app.ui.MedSegmentedButtons
 import com.medremind.app.ui.ScreenHeader
 import com.medremind.app.ui.StatusChip
 import com.medremind.app.ui.MedicineViewModel
+import com.medremind.app.ui.ProgressRing
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
@@ -479,8 +486,8 @@ fun CaregivingHomeScreen(
     if (showAddPatient) {
         AddPatientDialog(
             onDismiss = { showAddPatient = false },
-            onAdd = { name, relation ->
-                vm.addPatient(name, relation) { }
+            onAdd = { name, relation, phone ->
+                vm.addPatient(name, relation, phone) { }
                 showAddPatient = false
             }
         )
@@ -601,10 +608,11 @@ private fun OptionRow(
 @Composable
 private fun AddPatientDialog(
     onDismiss: () -> Unit,
-    onAdd: (String, String) -> Unit
+    onAdd: (String, String, String) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var relation by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Add someone") },
@@ -625,12 +633,21 @@ private fun AddPatientDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it.filter { c -> c.isDigit() || c == '+' || c == ' ' } },
+                    label = { Text("Phone (optional)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         },
         confirmButton = {
             TextButton(
                 enabled = name.isNotBlank(),
-                onClick = { onAdd(name, relation) }
+                onClick = { onAdd(name, relation, phone) }
             ) { Text("Add") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
@@ -675,11 +692,16 @@ fun CaregiverDashboardScreen(
     var reload by remember { mutableIntStateOf(0) }
     var removeMedicine by remember { mutableStateOf<Medicine?>(null) }
     var detail by remember { mutableStateOf<Medicine?>(null) }
+    var showRemind by remember { mutableStateOf(false) }
+    var editPatient by remember { mutableStateOf(false) }
+    var week by remember { mutableStateOf<List<CaregiverViewModel.DayAdherence>>(emptyList()) }
+    val context = LocalContext.current
 
     LaunchedEffect(profileId, reload) {
         todayDoses = vm.dosesOn(profileId, java.time.LocalDate.now())
         progress = vm.todayProgress(profileId)
         adherence = vm.adherence(profileId, 7)
+        week = vm.weekAdherence(profileId)
     }
 
     fun remind(medicine: Medicine) {
@@ -738,6 +760,7 @@ fun CaregiverDashboardScreen(
                 }
 
                 Spacer(Modifier.height(12.dp))
+                val phone = patientObj?.phone.orEmpty()
                 CaregiverPatientCard(
                     patientName = patientName,
                     patientTitle = patientTitle,
@@ -745,7 +768,12 @@ fun CaregiverDashboardScreen(
                     avatarPath = patientObj?.avatarPath,
                     profileId = profileId,
                     progress = progress,
-                    attentionCount = attentionCount
+                    attentionCount = attentionCount,
+                    canContact = phone.isNotBlank(),
+                    onRemind = { showRemind = true },
+                    onCall = { callNumber(context, phone) },
+                    onMessage = { messageNumber(context, phone, patientName) },
+                    onEdit = { editPatient = true }
                 )
 
                 MedSegmentedButtons(
@@ -761,6 +789,7 @@ fun CaregiverDashboardScreen(
                         doses = todayDoses,
                         nextDose = nextDose,
                         adherence = adherence,
+                        week = week,
                         lowStock = lowStock,
                         patientName = patientName,
                         onRemind = { remind(it) },
@@ -810,6 +839,171 @@ fun CaregiverDashboardScreen(
             onDismiss = { removeMedicine = null }
         )
     }
+
+    if (showRemind) {
+        RemindPickerSheet(
+            patientName = patientName,
+            medicines = medicines,
+            onDismiss = { showRemind = false },
+            onRemind = { medicine ->
+                showRemind = false
+                remind(medicine)
+            }
+        )
+    }
+
+    if (editPatient) {
+        patientObj?.let { p ->
+            EditPatientDialog(
+                patient = p,
+                onDismiss = { editPatient = false },
+                onSave = { updated ->
+                    vm.updatePatient(updated)
+                    editPatient = false
+                }
+            )
+        }
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun RemindPickerSheet(
+    patientName: String,
+    medicines: List<Medicine>,
+    onDismiss: () -> Unit,
+    onRemind: (Medicine) -> Unit
+) {
+    val sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    androidx.compose.material3.ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 28.dp)
+        ) {
+            Text("Remind now", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Choose the medicine to remind $patientName about.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(12.dp))
+            if (medicines.isEmpty()) {
+                Text(
+                    "No medicines yet. Add one first.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    medicines.forEach { medicine ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onRemind(medicine) }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            MedIconSquare(
+                                label = medicine.name,
+                                seed = medicine.id,
+                                photoPath = medicine.photoPath
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                listOf(medicine.name, medicine.strength)
+                                    .filter { it.isNotBlank() }.joinToString(" "),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Icon(
+                                Icons.Rounded.NotificationsActive,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditPatientDialog(
+    patient: Patient,
+    onDismiss: () -> Unit,
+    onSave: (Patient) -> Unit
+) {
+    var name by remember { mutableStateOf(patient.name) }
+    var relation by remember { mutableStateOf(patient.relation) }
+    var phone by remember { mutableStateOf(patient.phone) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit person") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = relation,
+                    onValueChange = { relation = it },
+                    label = { Text("Relation (e.g. Mom)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it.filter { c -> c.isDigit() || c == '+' || c == ' ' } },
+                    label = { Text("Phone (optional)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = name.isNotBlank(),
+                onClick = {
+                    onSave(patient.copy(name = name.trim(), relation = relation.trim(), phone = phone.trim()))
+                }
+            ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
+private fun callNumber(context: android.content.Context, phone: String) {
+    if (phone.isBlank()) return
+    runCatching {
+        context.startActivity(
+            Intent(Intent.ACTION_DIAL, android.net.Uri.parse("tel:" + phone.trim()))
+        )
+    }
+}
+
+private fun messageNumber(context: android.content.Context, phone: String, name: String) {
+    if (phone.isBlank()) return
+    runCatching {
+        val intent = Intent(Intent.ACTION_SENDTO, android.net.Uri.parse("smsto:" + phone.trim()))
+        intent.putExtra("sms_body", "Hi $name, just checking in. How are you feeling?")
+        context.startActivity(intent)
+    }
 }
 
 @Composable
@@ -820,8 +1014,14 @@ private fun CaregiverPatientCard(
     avatarPath: String?,
     profileId: Long,
     progress: CaregiverViewModel.Progress,
-    attentionCount: Int
+    attentionCount: Int,
+    canContact: Boolean,
+    onRemind: () -> Unit,
+    onCall: () -> Unit,
+    onMessage: () -> Unit,
+    onEdit: () -> Unit
 ) {
+    val percent = if (progress.total == 0) 0 else progress.confirmed * 100 / progress.total
     val (statusLabel, statusTint) = when {
         progress.total == 0 -> "No doses today" to MaterialTheme.colorScheme.onSurfaceVariant
         attentionCount > 0 -> "$attentionCount need attention" to Color(0xFFD97706)
@@ -837,43 +1037,132 @@ private fun CaregiverPatientCard(
         ),
         shadowElevation = 8.dp
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            MedIconSquare(
-                label = patientName,
-                seed = profileId,
-                size = 58.dp,
-                photoPath = avatarPath
-            )
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    patientTitle,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MedIconSquare(
+                    label = patientName,
+                    seed = profileId,
+                    size = 58.dp,
+                    photoPath = avatarPath
                 )
-                Text(
-                    todayLabel,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(8.dp))
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = statusTint.copy(alpha = 0.14f),
-                    contentColor = statusTint
-                ) {
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
                     Text(
-                        statusLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        patientTitle,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1
                     )
+                    Text(
+                        todayLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = statusTint.copy(alpha = 0.14f),
+                        contentColor = statusTint
+                    ) {
+                        Text(
+                            statusLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
+                ProgressRing(
+                    percent = percent,
+                    modifier = Modifier.size(66.dp),
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    progressColor = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 7.dp
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            "${progress.confirmed}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            "of ${progress.total}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
+            Spacer(Modifier.height(14.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                QuickAction(
+                    label = "Remind",
+                    icon = Icons.Rounded.NotificationsActive,
+                    tint = MaterialTheme.colorScheme.primary,
+                    enabled = true,
+                    onClick = onRemind,
+                    modifier = Modifier.weight(1f)
+                )
+                QuickAction(
+                    label = "Call",
+                    icon = Icons.Rounded.Call,
+                    tint = Color(0xFF12B76A),
+                    enabled = canContact,
+                    onClick = onCall,
+                    modifier = Modifier.weight(1f)
+                )
+                QuickAction(
+                    label = "Message",
+                    icon = Icons.Rounded.Sms,
+                    tint = Color(0xFF2563EB),
+                    enabled = canContact,
+                    onClick = onMessage,
+                    modifier = Modifier.weight(1f)
+                )
+                QuickAction(
+                    label = "Edit",
+                    icon = Icons.Rounded.Edit,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    enabled = true,
+                    onClick = onEdit,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickAction(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: Color,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = { if (enabled) onClick() },
+        enabled = enabled,
+        shape = RoundedCornerShape(16.dp),
+        color = tint.copy(alpha = if (enabled) 0.14f else 0.06f),
+        contentColor = if (enabled) tint else tint.copy(alpha = 0.4f),
+        modifier = modifier.height(62.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.height(4.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
         }
     }
 }
@@ -884,6 +1173,7 @@ private fun TodaySection(
     doses: List<PatientDose>,
     nextDose: PatientDose?,
     adherence: CaregiverViewModel.Adherence,
+    week: List<CaregiverViewModel.DayAdherence>,
     lowStock: List<Medicine>,
     patientName: String,
     onRemind: (Medicine) -> Unit,
@@ -976,6 +1266,8 @@ private fun TodaySection(
         }
     }
 
+    WeekStrip(week)
+
     if (lowStock.isNotEmpty()) {
         Text("Running low", style = MaterialTheme.typography.titleMedium)
         lowStock.forEach { medicine ->
@@ -1035,6 +1327,57 @@ private fun TodaySection(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { onRemind(dose.medicine) }
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeekStrip(week: List<CaregiverViewModel.DayAdherence>) {
+    if (week.isEmpty()) return
+    val letters = listOf("M", "T", "W", "T", "F", "S", "S")
+    MedCard(modifier = Modifier.fillMaxWidth()) {
+        Text("Last 7 days", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            week.forEach { day ->
+                val fraction = if (day.total == 0) 0f else day.taken.toFloat() / day.total
+                val barColor = when {
+                    day.total == 0 -> MaterialTheme.colorScheme.surfaceContainerHighest
+                    fraction >= 0.7f -> Color(0xFF0A7F4F)
+                    fraction >= 0.4f -> Color(0xFFD97706)
+                    else -> Color(0xFFD53862)
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                        contentAlignment = Alignment.BottomCenter
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height((56f * fraction).coerceAtLeast(6f).dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(barColor)
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        letters.getOrElse(day.dow - 1) { "?" },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

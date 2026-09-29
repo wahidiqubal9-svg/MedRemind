@@ -301,12 +301,34 @@ class CaregiverViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun addPatient(name: String, relation: String, onAdded: (Long) -> Unit) {
+    fun addPatient(name: String, relation: String, phone: String, onAdded: (Long) -> Unit) {
         viewModelScope.launch {
-            val id = withContext(Dispatchers.IO) { caregiverRepo.addPatient(name, relation) }
+            val id = withContext(Dispatchers.IO) { caregiverRepo.addPatient(name, relation, phone) }
             onAdded(id)
         }
     }
+
+    fun updatePatient(patient: Patient) {
+        viewModelScope.launch(Dispatchers.IO) { caregiverRepo.updatePatient(patient) }
+    }
+
+    /** [dow] is the day of week (1 = Monday .. 7 = Sunday). */
+    data class DayAdherence(val dow: Int, val taken: Int, val total: Int)
+
+    /** Per-day adherence for the last [days] days (oldest first). */
+    suspend fun weekAdherence(profileId: Long, days: Int = 7): List<DayAdherence> =
+        withContext(Dispatchers.IO) {
+            val today = LocalDate.now()
+            (days - 1 downTo 0).map { offset ->
+                val date = today.minusDays(offset.toLong())
+                val doses = dosesOn(profileId, date)
+                DayAdherence(
+                    dow = date.dayOfWeek.value,
+                    taken = doses.count { it.status == DoseStatus.TAKEN },
+                    total = doses.size
+                )
+            }
+        }
 
     // ---- Remind now ----------------------------------------------------------
 
