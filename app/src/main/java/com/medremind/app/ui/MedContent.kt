@@ -9,6 +9,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -761,9 +762,13 @@ private fun SummaryBox(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interaction = remember { MutableInteractionSource() }
     Surface(
-        onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.clickable(
+            interactionSource = interaction,
+            indication = null,
+            onClick = onClick
+        ),
         shape = MaterialTheme.shapes.large,
         color = if (selected) tint.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(
