@@ -282,7 +282,12 @@ fun AppRoot(
                 },
                 onOpenPermissions = { showPermissions = true },
                 onOpenMe = { showMe = true },
-                onOpenNotifications = { showNotifications = true }
+                onOpenNotifications = { showNotifications = true },
+                onOpenPatient = { profileId ->
+                    caregiverProfileId = profileId
+                    showCaregiverDashboard = true
+                },
+                onOpenCaregiving = { showCaregiving = true }
             )
             }
         }

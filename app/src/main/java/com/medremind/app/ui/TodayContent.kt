@@ -39,6 +39,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronLeft
@@ -105,6 +106,7 @@ fun TodayContent(
     profilePhoto: String? = null,
     greetingName: String? = null,
     onOpenNotifications: () -> Unit = {},
+    onOpenPeople: () -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -235,7 +237,8 @@ fun TodayContent(
             onOpenMe = onOpenMe,
             profilePhoto = profilePhoto,
             greetingName = greetingName,
-            onOpenNotifications = onOpenNotifications
+            onOpenNotifications = onOpenNotifications,
+            onOpenPeople = onOpenPeople
         )
 
         CalendarHandle(
@@ -747,7 +750,8 @@ private fun TodayHeader(
     onOpenMe: () -> Unit,
     profilePhoto: String? = null,
     greetingName: String? = null,
-    onOpenNotifications: () -> Unit = {}
+    onOpenNotifications: () -> Unit = {},
+    onOpenPeople: () -> Unit = {}
 ) {
     val isToday = selectedDate == LocalDate.now()
     val greeting = when (java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)) {
@@ -779,12 +783,25 @@ private fun TodayHeader(
                 fontWeight = FontWeight.Medium,
                 maxLines = 1
             )
-            if (!firstName.isNullOrBlank()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onOpenPeople)
+                    .padding(end = 6.dp)
+            ) {
                 Text(
-                    text = firstName,
+                    text = firstName ?: "Add people",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1
+                )
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = "People I care for",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
                 )
             }
             Spacer(Modifier.height(2.dp))

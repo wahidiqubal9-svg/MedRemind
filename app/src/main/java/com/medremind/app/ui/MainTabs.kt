@@ -84,6 +84,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.medremind.app.R
 import com.medremind.app.data.Medicine
 import com.medremind.app.data.Metric
@@ -116,10 +117,16 @@ fun MainTabs(
     onDelete: (Medicine) -> Unit,
     onOpenPermissions: () -> Unit = {},
     onOpenMe: () -> Unit,
-    onOpenNotifications: () -> Unit = {}
+    onOpenNotifications: () -> Unit = {},
+    onOpenPatient: (Long) -> Unit = {},
+    onOpenCaregiving: () -> Unit = {}
 ) {
     val schedulesByMedicine by vm.schedulesByMedicine.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val caregiverVm: com.medremind.app.ui.caregiver.CaregiverViewModel = viewModel()
+    val people by caregiverVm.patients.collectAsState()
+    var showPeople by remember { mutableStateOf(false) }
+    val openConnect = rememberProAction(onOpenCaregiving)
 
     BackHandler(enabled = tab != 0) { onTabChange(0) }
 
@@ -172,6 +179,7 @@ fun MainTabs(
                     profilePhoto = settings.profilePhoto,
                     greetingName = settings.profileName,
                     onOpenNotifications = onOpenNotifications,
+                    onOpenPeople = { showPeople = true },
                     snackbarHostState = snackbarHostState
                 )
                 1 -> MedContent(
@@ -215,6 +223,20 @@ fun MainTabs(
             onTabChange = onTabChange,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
+        if (showPeople) {
+            com.medremind.app.ui.caregiver.PeopleSheet(
+                patients = people,
+                onDismiss = { showPeople = false },
+                onOpenPatient = { pid ->
+                    showPeople = false
+                    onOpenPatient(pid)
+                },
+                onConnect = {
+                    showPeople = false
+                    openConnect()
+                }
+            )
+        }
         }
     }
 }
