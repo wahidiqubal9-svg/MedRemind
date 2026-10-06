@@ -237,7 +237,7 @@ private fun ProfileCard(
                     .padding(top = 80.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                AvatarWithBadge(settings = settings, onClick = onEdit, showCamera = false)
+                AvatarWithBadge(settings = settings)
                 Spacer(Modifier.height(12.dp))
                 Text(
                     text = settings.profileName.ifBlank { "Your profile" },
@@ -284,14 +284,9 @@ private fun ProfileCard(
 }
 
 @Composable
-private fun AvatarWithBadge(
-    settings: SettingsViewModel,
-    onClick: () -> Unit,
-    showCamera: Boolean = true
-) {
+private fun AvatarWithBadge(settings: SettingsViewModel) {
     Box(modifier = Modifier.size(96.dp)) {
         Surface(
-            onClick = onClick,
             modifier = Modifier.size(96.dp),
             shape = CircleShape,
             color = MaterialTheme.colorScheme.primaryContainer,
@@ -315,26 +310,6 @@ private fun AvatarWithBadge(
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(52.dp)
-                    )
-                }
-            }
-        }
-        if (showCamera) {
-            Surface(
-                onClick = onClick,
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                border = BorderStroke(3.dp, MaterialTheme.colorScheme.surface),
-                modifier = Modifier
-                    .size(32.dp)
-                    .align(Alignment.BottomEnd)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Rounded.PhotoCamera,
-                        contentDescription = "Change photo",
-                        modifier = Modifier.size(14.dp)
                     )
                 }
             }

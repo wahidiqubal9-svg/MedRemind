@@ -238,13 +238,7 @@ fun MedContent(
                                 message = "You're all stocked up.",
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 24.dp),
-                                action = {
-                                    GradientPillButton(
-                                        text = "Show all medicines",
-                                        onClick = { lowStockOnly = false }
-                                    )
-                                }
+                                    .padding(vertical = 24.dp)
                             )
                         } else {
                             MedEmptyState(
