@@ -763,6 +763,11 @@ private fun SummaryBox(
     modifier: Modifier = Modifier
 ) {
     val interaction = remember { MutableInteractionSource() }
+    val valueColor = if (selected) Color.White else tint
+    val labelColor = if (selected) Color.White.copy(alpha = 0.9f)
+    else MaterialTheme.colorScheme.onSurfaceVariant
+    val tileBg = if (selected) Color.White.copy(alpha = 0.22f) else tint.copy(alpha = 0.14f)
+    val iconTint = if (selected) Color.White else tint
     Surface(
         modifier = modifier.clickable(
             interactionSource = interaction,
@@ -770,7 +775,7 @@ private fun SummaryBox(
             onClick = onClick
         ),
         shape = MaterialTheme.shapes.large,
-        color = if (selected) tint.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
+        color = if (selected) tint else MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(
             if (selected) 1.6.dp else 1.dp,
             if (selected) tint else MaterialTheme.colorScheme.outlineVariant
@@ -785,13 +790,13 @@ private fun SummaryBox(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(13.dp))
-                    .background(tint.copy(alpha = 0.14f)),
+                    .background(tileBg),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = tint,
+                    tint = iconTint,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -801,12 +806,12 @@ private fun SummaryBox(
                     value.toString(),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.ExtraBold,
-                    color = tint
+                    color = valueColor
                 )
                 Text(
                     label,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = labelColor
                 )
             }
         }
