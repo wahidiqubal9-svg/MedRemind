@@ -17,8 +17,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Medication
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -44,7 +48,8 @@ import kotlinx.coroutines.launch
 private data class OnboardPage(
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
     val title: String,
-    val message: String
+    val message: String,
+    val accent: Color
 )
 
 @Composable
@@ -52,18 +57,39 @@ fun OnboardingScreen(onDone: () -> Unit) {
     val pages = listOf(
         OnboardPage(
             Icons.Rounded.Medication,
-            "Never miss a dose",
-            "Exact alarms and full-screen reminders for every medicine, even when the phone is locked."
+            "Welcome to MedRemind",
+            "The right medicine, shown to the right person, at the right time \u2014 with help from someone you trust.",
+            Color(0xFF6366F1)
         ),
         OnboardPage(
-            Icons.Rounded.CheckCircle,
-            "See your progress",
-            "Track daily doses and adherence over 7, 30 or 90 days, and share a report with your doctor."
+            Icons.Rounded.WbSunny,
+            "Today",
+            "Your day at a glance. See every dose and its time \u2014 then slide to take, snooze, or skip.",
+            Color(0xFFF59E0B)
         ),
         OnboardPage(
-            Icons.Rounded.Lock,
-            "Private by design",
-            "Everything stays on your device. Back up, restore or export whenever you like."
+            Icons.Rounded.Medication,
+            "Your medicine cabinet",
+            "Add medicines with a photo, set smart schedules (daily, weekly, as\u2011needed), and track your stock.",
+            Color(0xFF10B981)
+        ),
+        OnboardPage(
+            Icons.Rounded.Insights,
+            "Progress & Health",
+            "Watch your adherence over time, and log blood pressure, glucose and weight \u2014 export a report anytime.",
+            Color(0xFF0EA5E9)
+        ),
+        OnboardPage(
+            Icons.Rounded.Favorite,
+            "Caregiver",
+            "Connect someone you trust. They can add medicines, send reminders and see confirmations \u2014 with your approval.",
+            Color(0xFFE11D48)
+        ),
+        OnboardPage(
+            Icons.Rounded.NotificationsActive,
+            "Reliable alarms",
+            "Full\u2011screen reminders with the medicine photo, working even when your phone is locked.",
+            Color(0xFF8B5CF6)
         )
     )
     val pager = rememberPagerState(pageCount = { pages.size })
@@ -84,11 +110,11 @@ fun OnboardingScreen(onDone: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+                Surface(shape = CircleShape, color = item.accent.copy(alpha = 0.16f)) {
                     Icon(
                         imageVector = item.icon,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        tint = item.accent,
                         modifier = Modifier
                             .padding(28.dp)
                             .size(56.dp)

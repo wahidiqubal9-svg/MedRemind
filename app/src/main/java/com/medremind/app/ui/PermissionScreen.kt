@@ -12,7 +12,9 @@ import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -200,6 +203,14 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel, firstRun: Boolea
     BackHandler { onBack() }
 
     Scaffold(contentWindowInsets = WindowInsets(0.dp)) { padding ->
+        if (firstRun) {
+            FirstRunAlarmSetup(
+                steps = steps,
+                activeIndex = activeIndex,
+                onDone = onBack,
+                modifier = Modifier.padding(padding)
+            )
+        } else {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -278,24 +289,8 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel, firstRun: Boolea
                 }
             }
 
-            if (firstRun) {
-                Spacer(Modifier.height(6.dp))
-                if (activeIndex == -1) {
-                    GradientPillButton(
-                        text = "Continue",
-                        onClick = onBack,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                } else {
-                    OutlinedButton(
-                        onClick = onBack,
-                        shape = RoundedCornerShape(50),
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("Skip for now") }
-                }
-            } else {
-                Spacer(Modifier.height(4.dp))
-                SectionHeader("Upcoming alarms")
+            Spacer(Modifier.height(4.dp))
+            SectionHeader("Upcoming alarms")
                 MedCard(modifier = Modifier.fillMaxWidth()) {
                     if (upcoming.isEmpty()) {
                         Text(
@@ -342,9 +337,107 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel, firstRun: Boolea
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
 
             Spacer(Modifier.height(16.dp))
+        }
+        }
+    }
+}
+
+@Composable
+private fun FirstRunAlarmSetup(
+    steps: List<PermissionStep>,
+    activeIndex: Int,
+    onDone: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .navigationBarsPadding()
+            .padding(28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(Modifier.weight(1f))
+        if (activeIndex == -1) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+                Icon(
+                    Icons.Rounded.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier
+                        .padding(28.dp)
+                        .size(56.dp)
+                )
+            }
+            Spacer(Modifier.height(24.dp))
+            Text(
+                "All set",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Your reminders will now fire on time, with the full-screen alarm.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                repeat(steps.size) { i ->
+                    Box(
+                        modifier = Modifier
+                            .size(width = if (i == activeIndex) 22.dp else 8.dp, height = 8.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(
+                                if (i <= activeIndex) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.surfaceContainerHighest
+                            )
+                    )
+                }
+            }
+            Spacer(Modifier.height(34.dp))
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+                Icon(
+                    imageVector = steps[activeIndex].icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier
+                        .padding(28.dp)
+                        .size(52.dp)
+                )
+            }
+            Spacer(Modifier.height(24.dp))
+            Text(
+                steps[activeIndex].title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                steps[activeIndex].description,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
+        Spacer(Modifier.weight(1f))
+        if (activeIndex == -1) {
+            GradientPillButton(
+                text = "Continue",
+                onClick = onDone,
+                modifier = Modifier.fillMaxWidth()
+            )
+        } else {
+            GradientPillButton(
+                text = steps[activeIndex].actionLabel,
+                onClick = steps[activeIndex].action,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(8.dp))
+            TextButton(onClick = onDone) { Text("Skip for now") }
         }
     }
 }
