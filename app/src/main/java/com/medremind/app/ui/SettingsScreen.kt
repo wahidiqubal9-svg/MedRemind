@@ -35,6 +35,7 @@ import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ColorLens
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.HelpOutline
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Person
@@ -351,6 +352,16 @@ fun SettingsContent(
                 title = "Delete all data",
                 subtitle = "Erase all medicines, history and profile from this device.",
                 onClick = { confirmWipe = true }
+            )
+        }
+
+        SettingsGroup("Help") {
+            SettingRow(
+                icon = Icons.Rounded.HelpOutline,
+                tint = Color(0xFF6366F1),
+                title = "Show the app tour",
+                subtitle = "Walk through the main features again.",
+                onClick = { settings.replayTour() }
             )
         }
     }

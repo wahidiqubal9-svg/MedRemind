@@ -786,6 +786,7 @@ private fun TodayHeader(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
+                    .tourAnchor("people")
                     .clip(RoundedCornerShape(12.dp))
                     .clickable(onClick = onOpenPeople)
                     .padding(end = 6.dp)

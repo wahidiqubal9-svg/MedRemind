@@ -95,14 +95,15 @@ import java.util.Locale
 
 private data class NavSpec(
     val label: String,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val tourId: String
 )
 
 private val navSpecs = listOf(
-    NavSpec("Today", Icons.Rounded.Today),
-    NavSpec("Med", Icons.Rounded.Medication),
-    NavSpec("Progress", Icons.Rounded.Insights),
-    NavSpec("Health", Icons.Rounded.MonitorHeart)
+    NavSpec("Today", Icons.Rounded.Today, "nav_today"),
+    NavSpec("Med", Icons.Rounded.Medication, "nav_med"),
+    NavSpec("Progress", Icons.Rounded.Insights, "nav_progress"),
+    NavSpec("Health", Icons.Rounded.MonitorHeart, "nav_health")
 )
 
 @Composable
@@ -140,7 +141,7 @@ fun MainTabs(
         floatingActionButton = {
             // The "Add medicine" button belongs to the Medicines page only.
             when (tab) {
-                1 -> Box(modifier = Modifier.padding(bottom = 96.dp)) {
+                1 -> Box(modifier = Modifier.padding(bottom = 96.dp).tourAnchor("fab_add")) {
                     GradientPillButton(
                         text = "Add medicine",
                         icon = Icons.Rounded.Add,
@@ -271,6 +272,7 @@ private fun MedBottomBar(
                     BottomNavCell(
                         selected = selected,
                         label = spec.label,
+                        tourId = spec.tourId,
                         onClick = { onTabChange(index) }
                     ) {
                         Icon(
@@ -284,6 +286,7 @@ private fun MedBottomBar(
                 BottomNavCell(
                     selected = tab == 4,
                     label = "Settings",
+                    tourId = "nav_settings",
                     onClick = { onTabChange(4) }
                 ) {
                     Icon(
@@ -303,12 +306,14 @@ private fun RowScope.BottomNavCell(
     selected: Boolean,
     label: String,
     onClick: () -> Unit,
+    tourId: String? = null,
     icon: @Composable () -> Unit
 ) {
     val haptics = rememberMedHaptics()
     Column(
         modifier = Modifier
             .weight(1f)
+            .then(if (tourId != null) Modifier.tourAnchor(tourId) else Modifier)
             .clip(RoundedCornerShape(18.dp))
             .clickable {
                 haptics.tap()

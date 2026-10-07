@@ -34,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -155,32 +156,26 @@ fun AppRoot(
             )
         }
         if (!settings.onboardingDone) {
-            OnboardingScreen(onDone = { settings.finishOnboarding() })
-        } else if (!settings.choiceDone) {
             if (showAccount) {
                 AccountScreen(
                     onBack = { showAccount = false },
                     onSignedIn = {
-                        settings.finishChoice()
+                        settings.finishOnboarding()
                         showAccount = false
                     }
                 )
             } else {
                 StartChoiceScreen(
-                    onContinueWithoutAccount = { settings.finishChoice() },
+                    onContinueWithoutAccount = { settings.finishOnboarding() },
                     onSignIn = { showAccount = true },
                     onCreateAccount = { showAccount = true }
                 )
             }
-        } else if (!settings.alarmSetupSeen) {
-            PermissionScreen(
-                onBack = { settings.finishAlarmSetup() },
-                vm = vm,
-                firstRun = true
-            )
-        } else if (settings.appLock && !unlocked) {
-            AppLockScreen(pin = settings.pin, onUnlocked = { unlocked = true })
         } else {
+        val tourController = remember(settings.tourDone) { TourController() }
+        CompositionLocalProvider(
+            LocalTour provides if (!settings.tourDone) tourController else null
+        ) {
         AnimatedContent(
             targetState = screen,
             transitionSpec = {
@@ -315,6 +310,22 @@ fun AppRoot(
                 onOpenCaregiving = { showCaregiving = true }
             )
             }
+        }
+        if (!settings.tourDone) {
+            TourOverlay(
+                controller = tourController,
+                onTabChange = { tab = it },
+                onFinish = { settings.finishTour() }
+            )
+        } else if (!settings.alarmSetupSeen) {
+            PermissionScreen(
+                onBack = { settings.finishAlarmSetup() },
+                vm = vm,
+                firstRun = true
+            )
+        } else if (settings.appLock && !unlocked) {
+            AppLockScreen(pin = settings.pin, onUnlocked = { unlocked = true })
+        }
         }
         }
         AnimatedVisibility(

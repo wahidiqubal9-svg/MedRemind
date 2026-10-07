@@ -41,6 +41,7 @@ import com.medremind.app.ui.MedClickableCard
 import com.medremind.app.ui.MedEmptyState
 import com.medremind.app.ui.ScreenHeader
 import com.medremind.app.ui.SquareIconButton
+import com.medremind.app.ui.tourAnchor
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -50,7 +51,7 @@ import java.util.Locale
 fun NotificationBell(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val vm: CaregiverViewModel = viewModel()
     val unread by vm.unreadCount.collectAsState()
-    Box(modifier = modifier) {
+    Box(modifier = modifier.tourAnchor("bell")) {
         SquareIconButton(
             icon = Icons.Rounded.Notifications,
             contentDescription = "Notifications",

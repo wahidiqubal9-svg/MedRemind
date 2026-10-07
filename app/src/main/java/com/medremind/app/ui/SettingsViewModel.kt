@@ -67,6 +67,20 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     var alarmSetupSeen by mutableStateOf(prefs.getBoolean("alarm_setup_seen", false))
         private set
 
+    var tourDone by mutableStateOf(prefs.getBoolean("tour_done", false))
+        private set
+
+    fun finishTour() {
+        tourDone = true
+        prefs.edit().putBoolean("tour_done", true).apply()
+    }
+
+    /** Re-run the guided tour (e.g. from Me). */
+    fun replayTour() {
+        tourDone = false
+        prefs.edit().putBoolean("tour_done", false).apply()
+    }
+
     fun finishChoice() {
         choiceDone = true
         prefs.edit().putBoolean("choice_done", true).apply()
