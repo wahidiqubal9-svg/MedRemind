@@ -6,4 +6,11 @@
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
     </style>
+
+    <!-- Official Android 12+ splash screen so there is no white/black flash. -->
+    <style name="Theme.MedRemind.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#6366F1</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.MedRemind</item>
+    </style>
 </resources>

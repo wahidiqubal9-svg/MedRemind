@@ -47,7 +47,7 @@ import androidx.compose.ui.unit.dp
  * later will light this up without any UI rework.
  */
 @Composable
-fun AccountScreen(onBack: () -> Unit) {
+fun AccountScreen(onBack: () -> Unit, onSignedIn: () -> Unit = {}) {
     BackHandler { onBack() }
     var mode by remember { mutableIntStateOf(0) }
     var email by remember { mutableStateOf("") }

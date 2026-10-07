@@ -61,6 +61,22 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     var onboardingDone by mutableStateOf(prefs.getBoolean("onboarding_done", false))
         private set
 
+    var choiceDone by mutableStateOf(prefs.getBoolean("choice_done", false))
+        private set
+
+    var alarmSetupSeen by mutableStateOf(prefs.getBoolean("alarm_setup_seen", false))
+        private set
+
+    fun finishChoice() {
+        choiceDone = true
+        prefs.edit().putBoolean("choice_done", true).apply()
+    }
+
+    fun finishAlarmSetup() {
+        alarmSetupSeen = true
+        prefs.edit().putBoolean("alarm_setup_seen", true).apply()
+    }
+
     init {
         HapticPrefs.enabled = hapticsEnabled
     }

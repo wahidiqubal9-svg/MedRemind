@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Lock
@@ -142,6 +143,95 @@ fun OnboardingScreen(onDone: () -> Unit) {
             modifier = Modifier.align(Alignment.CenterHorizontally)
         ) {
             Text("Skip")
+        }
+    }
+}
+
+/** Shown once after the welcome slides: account is optional for the core app. */
+@Composable
+fun StartChoiceScreen(
+    onContinueWithoutAccount: () -> Unit,
+    onSignIn: () -> Unit,
+    onCreateAccount: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MedGradients.hero()),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = Color.White.copy(alpha = 0.18f)
+            ) {
+                Icon(
+                    Icons.Rounded.Medication,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier
+                        .padding(20.dp)
+                        .size(44.dp)
+                )
+            }
+            Spacer(Modifier.size(20.dp))
+            Text(
+                "Welcome to MedRemind",
+                style = MaterialTheme.typography.headlineSmall,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.size(10.dp))
+            Text(
+                "An account is only needed to help someone else (caregiver) or " +
+                    "keep two phones in sync. The app is free without one.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.88f),
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.size(28.dp))
+            Surface(
+                onClick = onContinueWithoutAccount,
+                shape = RoundedCornerShape(50),
+                color = Color.White,
+                contentColor = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(Modifier.padding(vertical = 15.dp), contentAlignment = Alignment.Center) {
+                    Text("Continue without an account", fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(Modifier.size(10.dp))
+            Surface(
+                onClick = onSignIn,
+                shape = RoundedCornerShape(50),
+                color = Color.White.copy(alpha = 0.16f),
+                contentColor = Color.White,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(Modifier.padding(vertical = 15.dp), contentAlignment = Alignment.Center) {
+                    Text("Sign in", fontWeight = FontWeight.SemiBold)
+                }
+            }
+            Spacer(Modifier.size(10.dp))
+            Surface(
+                onClick = onCreateAccount,
+                shape = RoundedCornerShape(50),
+                color = Color.White.copy(alpha = 0.16f),
+                contentColor = Color.White,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(Modifier.padding(vertical = 15.dp), contentAlignment = Alignment.Center) {
+                    Text("Create account", fontWeight = FontWeight.SemiBold)
+                }
+            }
         }
     }
 }

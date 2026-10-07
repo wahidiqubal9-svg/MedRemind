@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -68,7 +70,7 @@ private data class PermissionStep(
 )
 
 @Composable
-fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
+fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel, firstRun: Boolean = false) {
     val context = LocalContext.current
     var tick by remember { mutableIntStateOf(0) }
     var upcoming by remember { mutableStateOf<List<UpcomingAlarm>>(emptyList()) }
@@ -208,7 +210,11 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
                 .padding(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            ScreenHeader("Alarm setup", onBack = onBack, modifier = Modifier.padding(horizontal = 4.dp))
+            ScreenHeader(
+                if (firstRun) "Set up reminders" else "Alarm setup",
+                onBack = onBack,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
 
             if (activeIndex == -1) {
                 MedCard(modifier = Modifier.fillMaxWidth()) {
@@ -272,54 +278,71 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel) {
                 }
             }
 
-            Spacer(Modifier.height(4.dp))
-            SectionHeader("Upcoming alarms")
-            MedCard(modifier = Modifier.fillMaxWidth()) {
-                if (upcoming.isEmpty()) {
-                    Text(
-                        "No upcoming alarms yet. Add a reminder to a medicine.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+            if (firstRun) {
+                Spacer(Modifier.height(6.dp))
+                if (activeIndex == -1) {
+                    GradientPillButton(
+                        text = "Continue",
+                        onClick = onBack,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 } else {
-                    val format = SimpleDateFormat("EEE d MMM, h:mm a", Locale.getDefault())
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        upcoming.take(6).forEach { item ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.primary
-                                ) {
-                                    Icon(
-                                        Icons.Rounded.Notifications,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier
-                                            .padding(8.dp)
-                                            .size(14.dp)
+                    OutlinedButton(
+                        onClick = onBack,
+                        shape = RoundedCornerShape(50),
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Skip for now") }
+                }
+            } else {
+                Spacer(Modifier.height(4.dp))
+                SectionHeader("Upcoming alarms")
+                MedCard(modifier = Modifier.fillMaxWidth()) {
+                    if (upcoming.isEmpty()) {
+                        Text(
+                            "No upcoming alarms yet. Add a reminder to a medicine.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        val format = SimpleDateFormat("EEE d MMM, h:mm a", Locale.getDefault())
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            upcoming.take(6).forEach { item ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.primary
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.Notifications,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier
+                                                .padding(8.dp)
+                                                .size(14.dp)
+                                        )
+                                    }
+                                    Spacer(Modifier.width(12.dp))
+                                    Text(
+                                        "${item.medicineName} \u00b7 ${format.format(Date(item.triggerAt))}",
+                                        style = MaterialTheme.typography.bodyMedium
                                     )
                                 }
-                                Spacer(Modifier.width(12.dp))
-                                Text(
-                                    "${item.medicineName} \u00b7 ${format.format(Date(item.triggerAt))}",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
                             }
                         }
                     }
                 }
-            }
 
-            GradientPillButton(
-                text = "Test alarm in 10 seconds",
-                onClick = { vm.triggerTestAlarm() },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Text(
-                "Lock the screen after tapping to check the full-screen alarm.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+                GradientPillButton(
+                    text = "Test alarm in 10 seconds",
+                    onClick = { vm.triggerTestAlarm() },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    "Lock the screen after tapping to check the full-screen alarm.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             Spacer(Modifier.height(16.dp))
         }

@@ -156,6 +156,28 @@ fun AppRoot(
         }
         if (!settings.onboardingDone) {
             OnboardingScreen(onDone = { settings.finishOnboarding() })
+        } else if (!settings.choiceDone) {
+            if (showAccount) {
+                AccountScreen(
+                    onBack = { showAccount = false },
+                    onSignedIn = {
+                        settings.finishChoice()
+                        showAccount = false
+                    }
+                )
+            } else {
+                StartChoiceScreen(
+                    onContinueWithoutAccount = { settings.finishChoice() },
+                    onSignIn = { showAccount = true },
+                    onCreateAccount = { showAccount = true }
+                )
+            }
+        } else if (!settings.alarmSetupSeen) {
+            PermissionScreen(
+                onBack = { settings.finishAlarmSetup() },
+                vm = vm,
+                firstRun = true
+            )
         } else if (settings.appLock && !unlocked) {
             AppLockScreen(pin = settings.pin, onUnlocked = { unlocked = true })
         } else {
@@ -248,7 +270,10 @@ fun AppRoot(
                 }
             )
 
-            "account" -> AccountScreen(onBack = { showAccount = false })
+            "account" -> AccountScreen(
+                onBack = { showAccount = false },
+                onSignedIn = { showAccount = false }
+            )
 
             "permissions" -> PermissionScreen(
                 onBack = { showPermissions = false },
