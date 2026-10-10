@@ -87,5 +87,10 @@ data class Medicine(
     /** Printed expiry date, as epoch millis. */
     val expiryDate: Long? = null,
     /** Profile (patient) this medicine belongs to. 0 = the device owner. */
-    val profileId: Long = 0L
+    val profileId: Long = 0L,
+    /**
+     * Name of the caregiver who added/edited this medicine (blank = the owner
+     * added it themselves). Shown as a small "Added by ..." footnote for transparency.
+     */
+    val addedBy: String = ""
 )

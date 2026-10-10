@@ -202,6 +202,7 @@ fun AppRoot(
                 initial = editing,
                 vm = vm,
                 profileId = editingProfileId,
+                actor = if (editingProfileId != 0L) caregiverVm.myName else "",
                 onCancel = {
                     showEditor = false
                     editing = null

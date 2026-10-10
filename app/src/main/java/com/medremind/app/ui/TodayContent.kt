@@ -1228,6 +1228,16 @@ private fun DoseRow(
                     maxLines = 1
                 )
             }
+            if (dose.source == com.medremind.app.data.DoseSource.CAREGIVER &&
+                dose.actorName.isNotBlank()
+            ) {
+                Text(
+                    text = "Reminder from ${dose.actorName}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1
+                )
+            }
         }
         Spacer(Modifier.width(8.dp))
         RoundStatusIcon(status = dose.status)

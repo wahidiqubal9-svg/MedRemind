@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The system splash (Android 12+) uses the same brand mark as the in-app splash
+  so launching never flashes two different logos. Tinted white to match the
+  Compose splash's white pill on the indigo background.
+-->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/ic_nav_med"
+    android:tint="#FFFFFF" />

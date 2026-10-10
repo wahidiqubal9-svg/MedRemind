@@ -10,6 +10,7 @@ import com.medremind.app.data.AppDatabase
 import com.medremind.app.data.Medicine
 import com.medremind.app.data.Metric
 import com.medremind.app.data.DoseEvent
+import com.medremind.app.data.DoseSource
 import com.medremind.app.data.DoseStatus
 import com.medremind.app.data.PhotoStorage
 import com.medremind.app.data.Schedule
@@ -91,6 +92,7 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         value2: Float = 0f,
         context: String = com.medremind.app.data.MetricContext.NONE,
         profileId: Long = activeProfile.value,
+        actor: String = "",
         onDone: () -> Unit = {}
     ) {
         viewModelScope.launch {
@@ -101,7 +103,8 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                         value = value,
                         value2 = value2,
                         context = context,
-                        profileId = profileId
+                        profileId = profileId,
+                        loggedBy = actor
                     )
                 )
             }
@@ -176,13 +179,16 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                 val medicine = medicinesById[schedule.medicineId] ?: return@forEach
                 val createdDate = Instant.ofEpochMilli(medicine.createdAt).atZone(zone).toLocalDate()
                 if (date.isBefore(createdDate)) return@forEach
+                val startRef = doseStartRef(medicine.createdAt, schedule.startDate)
                 ReminderScheduler.occurrencesOn(schedule, date).forEach { trigger ->
-                    val status = if (date.isAfter(today)) {
+                    val future = date.isAfter(today)
+                    val event = if (future) null else events.firstOrNull {
+                        it.medicineId == schedule.medicineId && abs(it.scheduledAt - trigger) < 90_000L
+                    }
+                    if (trigger < startRef && event == null) return@forEach
+                    val status = if (future) {
                         FUTURE_STATUS
                     } else {
-                        val event = events.firstOrNull {
-                            it.medicineId == schedule.medicineId && abs(it.scheduledAt - trigger) < 90_000L
-                        }
                         when {
                             event != null -> event.status
                             trigger >= now -> DoseStatus.PENDING
@@ -209,14 +215,22 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
             val schedules = db.scheduleDao().getAllOnce().filter { it.enabled }
             if (schedules.isEmpty()) return@withContext emptySet()
             val medicinesById = db.medicineDao().getAllOnce(activeProfile.value).associateBy { it.id }
+            val rangeStart = from.atStartOfDay(zone).toInstant().toEpochMilli()
+            val rangeEnd = to.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+            val eventsOnDay = db.doseEventDao().between(rangeStart, rangeEnd)
+                .filter { it.scheduleId != 0L }
+                .map { it.medicineId to Instant.ofEpochMilli(it.scheduledAt).atZone(zone).toLocalDate() }
+                .toSet()
             val result = mutableSetOf<LocalDate>()
             var day = from
             while (!day.isAfter(to)) {
                 val hasDose = schedules.any { schedule ->
                     val medicine = medicinesById[schedule.medicineId] ?: return@any false
                     val createdDate = Instant.ofEpochMilli(medicine.createdAt).atZone(zone).toLocalDate()
-                    !day.isBefore(createdDate) &&
-                        ReminderScheduler.occurrencesOn(schedule, day).isNotEmpty()
+                    if (day.isBefore(createdDate)) return@any false
+                    val startRef = doseStartRef(medicine.createdAt, schedule.startDate)
+                    ReminderScheduler.occurrencesOn(schedule, day).any { it >= startRef } ||
+                        (schedule.medicineId to day) in eventsOnDay
                 }
                 if (hasDose) result.add(day)
                 day = day.plusDays(1)
@@ -228,15 +242,19 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         medicine: Medicine,
         schedules: List<Schedule>,
         profileId: Long = activeProfile.value,
+        actor: String = "",
         onDone: () -> Unit
     ) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                val medicineId = if (medicine.id == 0L) {
-                    db.medicineDao().insert(medicine.copy(profileId = profileId))
+                // A blank actor means the owner is saving it themselves; a named
+                // actor marks a caregiver's change so we can show "Added by ...".
+                val withActor = if (actor.isNotBlank()) medicine.copy(addedBy = actor) else medicine
+                val medicineId = if (withActor.id == 0L) {
+                    db.medicineDao().insert(withActor.copy(profileId = profileId))
                 } else {
-                    db.medicineDao().update(medicine)
-                    medicine.id
+                    db.medicineDao().update(withActor)
+                    withActor.id
                 }
 
                 val existing = db.scheduleDao().forMedicine(medicineId)
@@ -344,12 +362,28 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
             val medicine = medicinesById[schedule.medicineId] ?: return@forEach
             val createdDate = Instant.ofEpochMilli(medicine.createdAt).atZone(zone).toLocalDate()
             if (date.isBefore(createdDate)) return@forEach
+            // A dose time that already passed before the medicine/schedule was set up
+            // never existed, so it must not be counted (e.g. added 11am with an 8am time).
+            val startRef = doseStartRef(medicine.createdAt, schedule.startDate)
             ReminderScheduler.occurrencesOn(schedule, date).forEach { trigger ->
                 val event = events.firstOrNull {
                     it.medicineId == schedule.medicineId && abs(it.scheduledAt - trigger) < 90_000L
                 }
+                // Occurrences before the schedule was set up didn't exist yet, so
+                // they're not "missed" - unless a dose was actually recorded for them.
+                if (trigger < startRef && event == null) return@forEach
                 val status = event?.status ?: if (trigger < now) DoseStatus.MISSED else DoseStatus.PENDING
-                result.add(TodayDose(trigger, medicine, status, schedule, event?.id))
+                result.add(
+                    TodayDose(
+                        timeMillis = trigger,
+                        medicine = medicine,
+                        status = status,
+                        schedule = schedule,
+                        eventId = event?.id,
+                        source = event?.source ?: DoseSource.SCHEDULED,
+                        actorName = event?.actorName.orEmpty()
+                    )
+                )
             }
         }
         result.sortedBy { it.timeMillis }
@@ -508,8 +542,18 @@ data class TodayDose(
     val medicine: Medicine,
     val status: String,
     val schedule: Schedule,
-    val eventId: Long? = null
+    val eventId: Long? = null,
+    val source: String = DoseSource.SCHEDULED,
+    val actorName: String = ""
 )
+
+/**
+ * The moment a medicine/schedule started being tracked. Dose times that fall before
+ * this point never really existed (e.g. a medicine added at 11:00 with an 08:00 time),
+ * so they shouldn't be counted as missed.
+ */
+internal fun doseStartRef(createdAt: Long, scheduleStart: Long): Long =
+    if (scheduleStart > 0L) maxOf(createdAt, scheduleStart) else createdAt
 
 private const val MISSED_AFTER_MILLIS = 2 * 60 * 60 * 1000L
 const val FUTURE_STATUS = "FUTURE"

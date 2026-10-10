@@ -33,7 +33,7 @@ object BackupManager {
         val activity = db.caregiverDao().activityForBackup()
 
         val json = JSONObject().apply {
-            put("version", 4)
+            put("version", 5)
             put("exportedAt", System.currentTimeMillis())
             put("medicines", JSONArray().apply {
                 medicines.forEach { m ->
@@ -56,6 +56,7 @@ object BackupManager {
                         put("batchNumber", m.batchNumber)
                         put("expiryDate", m.expiryDate ?: JSONObject.NULL)
                         put("profileId", m.profileId)
+                        put("addedBy", m.addedBy)
                         put("photoName", m.photoPath?.let { File(it).name })
                     })
                 }
@@ -91,6 +92,7 @@ object BackupManager {
                         put("actedAt", e.actedAt ?: JSONObject.NULL)
                         put("snoozeCount", e.snoozeCount)
                         put("source", e.source)
+                        put("actorName", e.actorName)
                     })
                 }
             })
@@ -104,6 +106,7 @@ object BackupManager {
                         put("recordedAt", m.recordedAt)
                         put("context", m.context)
                         put("profileId", m.profileId)
+                        put("loggedBy", m.loggedBy)
                     })
                 }
             })
@@ -226,7 +229,8 @@ object BackupManager {
                     autoRefillDate = if (o.isNull("autoRefillDate")) null else o.optLong("autoRefillDate"),
                     batchNumber = o.optString("batchNumber", ""),
                     expiryDate = if (o.isNull("expiryDate")) null else o.optLong("expiryDate"),
-                    profileId = o.optLong("profileId", 0)
+                    profileId = o.optLong("profileId", 0),
+                    addedBy = o.optString("addedBy", "")
                 )
             )
         }
@@ -268,7 +272,8 @@ object BackupManager {
                     status = o.optString("status", DoseStatus.PENDING),
                     actedAt = if (o.isNull("actedAt")) null else o.optLong("actedAt"),
                     snoozeCount = o.optInt("snoozeCount", 0),
-                    source = o.optString("source", DoseSource.SCHEDULED)
+                    source = o.optString("source", DoseSource.SCHEDULED),
+                    actorName = o.optString("actorName", "")
                 )
             )
         }
@@ -285,7 +290,8 @@ object BackupManager {
                     value2 = o.optDouble("value2", 0.0).toFloat(),
                     recordedAt = o.optLong("recordedAt", System.currentTimeMillis()),
                     context = o.optString("context", ""),
-                    profileId = o.optLong("profileId", 0)
+                    profileId = o.optLong("profileId", 0),
+                    loggedBy = o.optString("loggedBy", "")
                 )
             )
         }

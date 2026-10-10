@@ -160,6 +160,9 @@ class CaregiverViewModel(application: Application) : AndroidViewModel(applicatio
                         it.medicineId == schedule.medicineId &&
                             abs(it.scheduledAt - trigger) < 90_000L
                     }
+                    if (trigger < com.medremind.app.ui.doseStartRef(medicine.createdAt, schedule.startDate) &&
+                        event == null
+                    ) return@forEach
                     if (event == null || event.status == DoseStatus.MISSED) {
                         val time = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault())
                             .format(java.util.Date(trigger))
@@ -202,12 +205,14 @@ class CaregiverViewModel(application: Application) : AndroidViewModel(applicatio
                 val medicine = medicines[schedule.medicineId] ?: return@forEach
                 val createdDate = Instant.ofEpochMilli(medicine.createdAt).atZone(zone).toLocalDate()
                 if (day.isBefore(createdDate)) return@forEach
+                val startRef = com.medremind.app.ui.doseStartRef(medicine.createdAt, schedule.startDate)
                 ReminderScheduler.occurrencesOn(schedule, day).forEach { trigger ->
                     if (trigger > now) return@forEach
-                    scheduled++
                     val event = events.firstOrNull {
                         it.medicineId == schedule.medicineId && abs(it.scheduledAt - trigger) < 90_000L
                     }
+                    if (trigger < startRef && event == null) return@forEach
+                    scheduled++
                     when (event?.status) {
                         DoseStatus.TAKEN -> taken++
                         DoseStatus.SKIPPED -> {}
@@ -222,6 +227,10 @@ class CaregiverViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun medicinesFor(profileId: Long): Flow<List<Medicine>> =
         db.medicineDao().observeAll(profileId)
+
+    /** Health readings (BP / glucose / weight) for a patient profile. */
+    fun metricsFor(profileId: Long): Flow<List<com.medremind.app.data.Metric>> =
+        db.metricDao().observeAll(profileId)
 
     fun schedulesFor(medicineId: Long): Flow<List<com.medremind.app.data.Schedule>> =
         db.scheduleDao().observeForMedicine(medicineId)
@@ -368,10 +377,12 @@ class CaregiverViewModel(application: Application) : AndroidViewModel(applicatio
                 val medicine = byId[schedule.medicineId] ?: return@forEach
                 val createdDate = Instant.ofEpochMilli(medicine.createdAt).atZone(zone).toLocalDate()
                 if (date.isBefore(createdDate)) return@forEach
+                val startRef = com.medremind.app.ui.doseStartRef(medicine.createdAt, schedule.startDate)
                 ReminderScheduler.occurrencesOn(schedule, date).forEach { trigger ->
                     val event = events.firstOrNull {
                         it.medicineId == schedule.medicineId && abs(it.scheduledAt - trigger) < 90_000L
                     }
+                    if (trigger < startRef && event == null) return@forEach
                     val status = event?.status ?: if (trigger < now) DoseStatus.MISSED else DoseStatus.PENDING
                     result.add(PatientDose(trigger, medicine, status, event?.id))
                 }

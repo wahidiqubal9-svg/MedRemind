@@ -864,6 +864,13 @@ private fun MetricRow(metric: Metric, onDelete: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            if (metric.loggedBy.isNotBlank()) {
+                Text(
+                    "Logged by ${metric.loggedBy}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
         Text(
             formatMetric(metric),

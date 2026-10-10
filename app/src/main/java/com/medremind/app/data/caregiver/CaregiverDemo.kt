@@ -12,6 +12,9 @@ import com.medremind.app.data.CaregiverStatus
 import com.medremind.app.data.IntakeInstruction
 import com.medremind.app.data.Medicine
 import com.medremind.app.data.MedicineForm
+import com.medremind.app.data.Metric
+import com.medremind.app.data.MetricContext
+import com.medremind.app.data.MetricType
 import com.medremind.app.data.Patient
 import com.medremind.app.data.Schedule
 import com.medremind.app.data.ScheduleType
@@ -62,39 +65,67 @@ object CaregiverDemo {
         val dao = db.caregiverDao()
         val existing = dao.patientsOnce()
         val name = patientName.ifBlank { "Mom" }
+        val actor = caregiverName.ifBlank { "You" }
         val patientId = dao.insertPatient(
             Patient(name = name, relation = "Demo", sortOrder = existing.size)
         )
         dao.insertLink(
             CaregiverLink(
                 patientProfileId = patientId,
-                caregiverName = caregiverName.ifBlank { "You" },
+                caregiverName = actor,
                 direction = CaregiverDirection.OUTGOING,
                 status = CaregiverStatus.ACTIVE,
-                permissions = CaregiverPermission.DEFAULT_MEDICATION
+                // Demo grants the opt-in health permissions so the caregiver can
+                // see the patient's readings (BP, glucose, weight).
+                permissions = CaregiverPermission.DEFAULT_MEDICATION or
+                    CaregiverPermission.HEALTH_BP or
+                    CaregiverPermission.HEALTH_GLUCOSE or
+                    CaregiverPermission.HEALTH_WEIGHT
             )
         )
 
         seedMedicine(
-            db, patientId,
+            db, patientId, actor,
             name = "Metformin", strength = "500 mg",
             doseLabel = "1 tablet", intake = IntakeInstruction.WITH_MEAL,
             quantity = 30, refillThreshold = 5,
             schedule = Schedule(medicineId = 0L, type = ScheduleType.DAILY, times = "08:00,20:00")
         )
         seedMedicine(
-            db, patientId,
+            db, patientId, actor,
             name = "Amlodipine", strength = "5 mg",
             doseLabel = "1 tablet", intake = IntakeInstruction.AFTER_MEAL,
             quantity = 20, refillThreshold = 4,
             schedule = Schedule(medicineId = 0L, type = ScheduleType.DAILY, times = "09:00")
         )
         seedMedicine(
-            db, patientId,
+            db, patientId, actor,
             name = "Paracetamol", strength = "500 mg",
             doseLabel = "1 tablet", intake = IntakeInstruction.NONE,
             quantity = 0, refillThreshold = 0,
             schedule = Schedule(medicineId = 0L, type = ScheduleType.AS_NEEDED, times = "08:00")
+        )
+
+        // A few sample readings so the caregiver's Health tab has content. They
+        // were logged by the patient themselves (no caregiver footnote).
+        val now = System.currentTimeMillis()
+        db.metricDao().insert(
+            Metric(
+                type = MetricType.BP, value = 128f, value2 = 82f,
+                profileId = patientId, recordedAt = now - 86_400_000L
+            )
+        )
+        db.metricDao().insert(
+            Metric(
+                type = MetricType.GLUCOSE, value = 110f, context = MetricContext.PRE_MEAL,
+                profileId = patientId, recordedAt = now - 43_200_000L
+            )
+        )
+        db.metricDao().insert(
+            Metric(
+                type = MetricType.WEIGHT, value = 68f,
+                profileId = patientId, recordedAt = now - 3_600_000L
+            )
         )
 
         dao.insertActivity(
@@ -111,6 +142,7 @@ object CaregiverDemo {
     private suspend fun seedMedicine(
         db: AppDatabase,
         profileId: Long,
+        addedBy: String,
         name: String,
         strength: String,
         doseLabel: String,
@@ -127,7 +159,8 @@ object CaregiverDemo {
                 intakeInstruction = intake,
                 quantity = quantity,
                 refillThreshold = refillThreshold,
-                profileId = profileId
+                profileId = profileId,
+                addedBy = addedBy
             )
         )
         db.scheduleDao().insert(schedule.copy(medicineId = medicineId, doseLabel = doseLabel))

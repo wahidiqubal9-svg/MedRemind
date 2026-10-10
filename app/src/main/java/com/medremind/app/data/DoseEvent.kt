@@ -33,5 +33,7 @@ data class DoseEvent(
     val actedAt: Long? = null,
     val snoozeCount: Int = 0,
     /** Who/what created this dose: see [DoseSource]. */
-    val source: String = DoseSource.SCHEDULED
+    val source: String = DoseSource.SCHEDULED,
+    /** Name of the caregiver who sent this dose (blank unless [source] is CAREGIVER). */
+    val actorName: String = ""
 )

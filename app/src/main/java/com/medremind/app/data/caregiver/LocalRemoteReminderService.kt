@@ -41,7 +41,8 @@ class LocalRemoteReminderService(private val context: Context) : RemoteReminderS
                 medicineId = medicineId,
                 scheduledAt = now,
                 status = DoseStatus.PENDING,
-                source = DoseSource.CAREGIVER
+                source = DoseSource.CAREGIVER,
+                actorName = caregiverName
             )
         )
 

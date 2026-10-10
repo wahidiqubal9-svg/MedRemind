@@ -52,5 +52,10 @@ data class Metric(
     /** Meal context for glucose readings. */
     val context: String = MetricContext.NONE,
     /** Profile (patient) this reading belongs to. 0 = the device owner. */
-    val profileId: Long = 0L
+    val profileId: Long = 0L,
+    /**
+     * Name of the caregiver who logged this reading (blank = the owner logged it
+     * themselves). Shown as a small "Logged by ..." footnote for transparency.
+     */
+    val loggedBy: String = ""
 )

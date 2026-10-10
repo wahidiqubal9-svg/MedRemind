@@ -166,7 +166,8 @@ fun AddEditMedicineScreen(
     vm: MedicineViewModel,
     onCancel: () -> Unit,
     onDone: () -> Unit,
-    profileId: Long = 0L
+    profileId: Long = 0L,
+    actor: String = ""
 ) {
     val context = LocalContext.current
     val initialStrength = remember(initial?.id) { splitAmountUnit(initial?.strength ?: "", "mg") }
@@ -445,7 +446,7 @@ fun AddEditMedicineScreen(
                                     times = sharedTimes,
                                     doseLabel = "$qtyAmount $qtyUnit".trim()
                                 )
-                                vm.saveMedicine(medicine, listOf(schedule), profileId) { saved = true }
+                                vm.saveMedicine(medicine, listOf(schedule), profileId, actor) { saved = true }
                             }
                         },
                         enabled = when (step) {
