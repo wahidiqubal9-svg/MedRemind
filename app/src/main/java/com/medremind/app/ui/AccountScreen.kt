@@ -13,16 +13,17 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -37,6 +38,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -46,11 +48,19 @@ import com.medremind.app.data.auth.AuthResult
 import com.medremind.app.data.auth.FirebaseAuthRepository
 import kotlinx.coroutines.launch
 
-/** Email/password sign-in backed by Firebase Auth. */
+/**
+ * Email/password + Google sign-in backed by Firebase Auth. Signing in is optional:
+ * the app keeps working offline, and this only adds cloud backup/sync.
+ */
 @Composable
-fun AccountScreen(onBack: () -> Unit, onSignedIn: () -> Unit = {}) {
+fun AccountScreen(
+    onBack: () -> Unit,
+    onSignedIn: () -> Unit = {},
+    settings: SettingsViewModel? = null
+) {
     BackHandler { onBack() }
-    val repo = remember { FirebaseAuthRepository() }
+    val context = LocalContext.current
+    val repo = remember { FirebaseAuthRepository(context.applicationContext) }
     val scope = rememberCoroutineScope()
     var mode by remember { mutableIntStateOf(0) }
     var email by remember { mutableStateOf("") }
@@ -62,7 +72,28 @@ fun AccountScreen(onBack: () -> Unit, onSignedIn: () -> Unit = {}) {
     val titles = listOf("Sign in", "Create account", "Reset password")
     val actions = listOf("Sign in", "Create account", "Send reset link")
 
-    fun submit() {
+    fun fillProfileFromAccount() {
+        val name = repo.currentUser?.displayName
+        settings?.let { s ->
+            if (!name.isNullOrBlank() && s.profileName.isBlank()) s.updateProfileName(name)
+        }
+    }
+
+    fun handle(result: AuthResult) {
+        when (result) {
+            is AuthResult.Success -> {
+                if (mode == 2) {
+                    info = "Password reset link sent to ${result.email}."
+                } else {
+                    fillProfileFromAccount()
+                    onSignedIn()
+                }
+            }
+            is AuthResult.Error -> error = result.message
+        }
+    }
+
+    fun submitEmail() {
         if (loading) return
         error = null
         info = null
@@ -74,16 +105,19 @@ fun AccountScreen(onBack: () -> Unit, onSignedIn: () -> Unit = {}) {
                 else -> repo.sendPasswordReset(email)
             }
             loading = false
-            when (result) {
-                is AuthResult.Success -> {
-                    if (mode == 2) {
-                        info = "Password reset link sent to ${result.email}."
-                    } else {
-                        onSignedIn()
-                    }
-                }
-                is AuthResult.Error -> error = result.message
-            }
+            handle(result)
+        }
+    }
+
+    fun submitGoogle() {
+        if (loading) return
+        error = null
+        info = null
+        loading = true
+        scope.launch {
+            val result = repo.signInWithGoogle()
+            loading = false
+            handle(result)
         }
     }
 
@@ -113,13 +147,36 @@ fun AccountScreen(onBack: () -> Unit, onSignedIn: () -> Unit = {}) {
                     Icon(Icons.Rounded.CloudDone, contentDescription = null)
                     Spacer(Modifier.size(12.dp))
                     Text(
-                        "Sign in to back up your data and sync it across your devices.",
+                        "Signing in is optional. It backs up your data and syncs it " +
+                            "across devices \u2014 the app still works offline.",
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
+            if (mode != 2) {
+                Spacer(Modifier.height(20.dp))
+                OutlinedButton(
+                    onClick = { submitGoogle() },
+                    enabled = !loading,
+                    shape = MaterialTheme.shapes.extraLarge,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Rounded.AccountCircle, contentDescription = null)
+                    Spacer(Modifier.size(10.dp))
+                    Text("Continue with Google", fontWeight = FontWeight.SemiBold)
+                }
+                Spacer(Modifier.height(18.dp))
+                Text(
+                    "or use email",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            Spacer(Modifier.height(18.dp))
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
@@ -150,7 +207,7 @@ fun AccountScreen(onBack: () -> Unit, onSignedIn: () -> Unit = {}) {
                 text = if (loading) "Please wait\u2026" else actions[mode],
                 enabled = !loading && email.contains("@") &&
                     (mode == 2 || password.length >= 6),
-                onClick = { submit() },
+                onClick = { submitEmail() },
                 modifier = Modifier.fillMaxWidth()
             )
 

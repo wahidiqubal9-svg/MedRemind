@@ -165,7 +165,8 @@ fun AppRoot(
                     onSignedIn = {
                         settings.finishOnboarding()
                         showAccount = false
-                    }
+                    },
+                    settings = settings
                 )
             } else {
                 StartChoiceScreen(
@@ -222,7 +223,8 @@ fun AppRoot(
                 settings = settings,
                 onBack = { showMe = false },
                 onOpenCaregiver = { showCaregiver = true },
-                onOpenCaregiving = { showCaregiving = true }
+                onOpenCaregiving = { showCaregiving = true },
+                onOpenAccount = { showAccount = true }
             )
 
             "paywall" -> com.medremind.app.ui.PaywallScreen(
@@ -271,7 +273,8 @@ fun AppRoot(
 
             "account" -> AccountScreen(
                 onBack = { showAccount = false },
-                onSignedIn = { showAccount = false }
+                onSignedIn = { showAccount = false },
+                settings = settings
             )
 
             "permissions" -> PermissionScreen(

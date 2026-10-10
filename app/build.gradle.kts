@@ -20,8 +20,8 @@ android {
         applicationId = "com.medremind.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 155
-        versionName = "0.154.0"
+        versionCode = 156
+        versionName = "0.155.0"
     }
 
     signingConfigs {
@@ -109,6 +109,11 @@ dependencies {
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-messaging")
+
+    // Google sign-in (account picker) + Firebase credential exchange.
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

@@ -31,8 +31,10 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Group
+import androidx.compose.material.icons.rounded.Logout
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material3.DropdownMenu
@@ -45,10 +47,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -72,10 +76,13 @@ fun MeScreen(
     settings: SettingsViewModel,
     onBack: () -> Unit,
     onOpenCaregiver: () -> Unit = {},
-    onOpenCaregiving: () -> Unit = {}
+    onOpenCaregiving: () -> Unit = {},
+    onOpenAccount: () -> Unit = {}
 ) {
     BackHandler { onBack() }
     val context = LocalContext.current
+    val authVm: AuthViewModel = viewModel()
+    val account by authVm.user.collectAsState()
     var editing by remember { mutableStateOf(false) }
     val openCaregiver = rememberProAction(onOpenCaregiver)
     val openCaregiving = rememberProAction(onOpenCaregiving)
@@ -178,6 +185,69 @@ fun MeScreen(
                 pro = true,
                 onClick = openCaregiving
             )
+        }
+
+        Spacer(Modifier.height(22.dp))
+        SectionHeader("Account", modifier = Modifier.padding(start = 4.dp))
+        Spacer(Modifier.height(10.dp))
+        MedCard(modifier = Modifier.fillMaxWidth()) {
+            val me = account
+            if (me == null) {
+                CaregiverEntryRow(
+                    icon = Icons.Rounded.CloudDone,
+                    title = "Sign in or create an account",
+                    subtitle = "Optional \u2014 back up and sync across devices",
+                    onClick = onOpenAccount
+                )
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Box(modifier = Modifier.size(42.dp), contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Rounded.Person,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            me.displayName?.takeIf { it.isNotBlank() } ?: "Signed in",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            me.email.orEmpty(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant)
+                )
+                Spacer(Modifier.height(6.dp))
+                CaregiverEntryRow(
+                    icon = Icons.Rounded.Logout,
+                    title = "Log out",
+                    subtitle = "Your data stays on this device",
+                    onClick = { authVm.signOut() }
+                )
+            }
         }
         Spacer(Modifier.height(20.dp))
     }
