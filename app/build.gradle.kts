@@ -5,6 +5,13 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+// Enable Firebase only once the config file is dropped in (app/google-services.json).
+// This keeps every other build working when Firebase isn't set up.
+val firebaseConfigured = file("google-services.json").exists()
+if (firebaseConfigured) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.medremind.app"
     compileSdk = 35
@@ -13,8 +20,8 @@ android {
         applicationId = "com.medremind.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 154
-        versionName = "0.153.0"
+        versionCode = 155
+        versionName = "0.154.0"
     }
 
     signingConfigs {
@@ -95,6 +102,13 @@ dependencies {
     implementation("androidx.glance:glance-appwidget:1.1.0")
     // QR generation only (no camera, no scanning, no OCR) for caregiver pairing.
     implementation("com.google.zxing:core:3.5.3")
+
+    // Firebase backend (auth, database, push). Activated by google-services.json;
+    // the libraries stay inert until FirebaseApp is initialised from that config.
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-messaging")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
