@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -101,10 +102,14 @@ class CaregiverViewModel(application: Application) : AndroidViewModel(applicatio
         buildNotifications(activity, patients, medicines, schedules, events)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** Badge count: notifications in the centre the user hasn't opened yet. */
-    val unreadCount: StateFlow<Int> = notifications
-        .map { list -> list.count { it.key !in seenKeys.value } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+    /**
+     * Badge count: notifications in the centre the user hasn't opened yet.
+     * Combines [notifications] with [seenKeys] so it updates the moment the
+     * centre is opened (badge drops to 0) and when a new item arrives.
+     */
+    val unreadCount: StateFlow<Int> = combine(notifications, seenKeys) { list, seen ->
+        list.count { it.key !in seen }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     /** Marks the given notification keys as seen; the badge clears to zero. */
     fun markNotificationsSeen(keys: Collection<String>) {

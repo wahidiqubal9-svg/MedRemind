@@ -28,11 +28,13 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -91,6 +93,7 @@ fun AppRoot(
     var editingProfileId by remember { mutableStateOf(0L) }
     var editing by remember { mutableStateOf<Medicine?>(null) }
     var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var promptAlarmOnAdd by remember { mutableStateOf(false) }
     var unlocked by remember { mutableStateOf(!settings.appLock) }
     val context = LocalContext.current
 
@@ -284,9 +287,15 @@ fun AppRoot(
                 settings = settings,
                 onAdd = {
                     guarded {
-                        editing = null
-                        editingProfileId = 0L
-                        showEditor = true
+                        // Alarms can't fire without the permission, so nudge the
+                        // user to set it up before creating a schedule.
+                        if (needsAlarmSetup) {
+                            promptAlarmOnAdd = true
+                        } else {
+                            editing = null
+                            editingProfileId = 0L
+                            showEditor = true
+                        }
                     }
                 },
                 onEdit = { medicine ->
@@ -344,6 +353,40 @@ fun AppRoot(
         ) {
             SplashScreen()
         }
+    }
+
+    if (promptAlarmOnAdd) {
+        AlertDialog(
+            onDismissRequest = { promptAlarmOnAdd = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Rounded.NotificationsActive,
+                    contentDescription = null,
+                    tint = Color(0xFFF59E0B)
+                )
+            },
+            title = { Text("Turn on reminders first?") },
+            text = {
+                Text(
+                    "A medicine can't alert you without alarm & notification " +
+                        "permission. Set it up now so your reminders actually fire?"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    promptAlarmOnAdd = false
+                    showPermissions = true
+                }) { Text("Set up") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    promptAlarmOnAdd = false
+                    editing = null
+                    editingProfileId = 0L
+                    showEditor = true
+                }) { Text("Add anyway") }
+            }
+        )
     }
 
     val action = pendingAction

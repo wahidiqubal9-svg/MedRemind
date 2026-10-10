@@ -999,27 +999,27 @@ fun ReminderSetupCard(
                     modifier = Modifier
                         .size(46.dp)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(MedGradients.heroHorizontal()),
+                        .background(Color(0xFFF59E0B)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.NotificationsActive,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(23.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Turn on reminders",
+                        text = "Turn on reminders \u2014 action needed",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        text = "Allow alarms & notifications so MedRemind can alert you " +
-                            "on time, even with the screen off.",
+                        text = "Your medicine alarms can't fire until alarms & " +
+                            "notifications are allowed. It only takes a moment.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
