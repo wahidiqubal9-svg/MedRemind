@@ -76,7 +76,14 @@ for R in $REL_REPOS; do
 
   echo "==> Uploading ${ASSET_NAME} to ${R}"
   # Only ONE APK asset per release, otherwise update tools ask "pick an APK".
-  upload_asset "$UP" "$ASSET_NAME" | grep -o '"browser_download_url": "[^"]*' | sed 's/"browser_download_url": "//'
+  # Keep this step non-fatal so a hiccup never skips the apk-branch publish below.
+  if upload_asset "$UP" "$ASSET_NAME" > "/tmp/asset_${R}.json"; then
+    grep -o '"browser_download_url": "[^"]*' "/tmp/asset_${R}.json" \
+      | sed 's/"browser_download_url": "//' \
+      | sed 's/"$//' || true
+  else
+    echo "    (asset upload returned an error; see /tmp/asset_${R}.json)"
+  fi
 done
 
 # ---------------------------------------------------------------------------
@@ -97,9 +104,13 @@ curl -sS -o /dev/null -X DELETE "${AUTH[@]}" \
 curl -sS -X POST "${AUTH[@]}" "${PAPI}/releases" \
   -d "{\"tag_name\":\"latest\",\"target_commitish\":\"main\",\"name\":\"Latest build (auto-updated)\",\"body\":\"Always points to the newest APK: releases/download/latest/medremind.apk\",\"draft\":false,\"prerelease\":true}" \
   > /tmp/latest.json
-LATEST_UPLOAD="$(grep -o '"upload_url": "[^"]*' /tmp/latest.json | sed 's/"upload_url": "//' | sed 's/{.*//')"
-upload_asset "${LATEST_UPLOAD}" "medremind.apk" > /dev/null
-echo "    https://github.com/${OWNER}/${PRIMARY_REL_REPO}/releases/download/latest/medremind.apk"
+LATEST_UPLOAD="$(grep -o '"upload_url": "[^"]*' /tmp/latest.json | sed 's/"upload_url": "//' | sed 's/{.*//' || true)"
+if [ -n "${LATEST_UPLOAD:-}" ]; then
+  upload_asset "${LATEST_UPLOAD}" "medremind.apk" > /dev/null || true
+  echo "    https://github.com/${OWNER}/${PRIMARY_REL_REPO}/releases/download/latest/medremind.apk"
+else
+  echo "    (could not refresh 'latest' release; skipping)"
+fi
 
 echo "==> Publishing direct APK link"
 PUB_TMP="$(mktemp -d)"
