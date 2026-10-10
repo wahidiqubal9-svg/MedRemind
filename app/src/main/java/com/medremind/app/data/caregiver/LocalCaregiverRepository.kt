@@ -48,7 +48,9 @@ class LocalCaregiverRepository(private val context: Context) : CaregiverReposito
 
     override suspend fun removePatient(profileId: Long) {
         if (profileId == 0L) return
-        // Delete this patient's medicines (cascades schedules) and photos.
+        // Disconnect this patient from this device: remove their medicines
+        // (cancelling schedules) and photos, their shared health readings, the
+        // caregiver activity about them, the links, then the profile itself.
         db.medicineDao().getAllOnce(profileId).forEach { medicine ->
             db.scheduleDao().forMedicine(medicine.id).forEach {
                 ReminderScheduler.cancel(context, it.id)
@@ -56,6 +58,8 @@ class LocalCaregiverRepository(private val context: Context) : CaregiverReposito
             db.medicineDao().delete(medicine)
             PhotoStorage.delete(medicine.photoPath)
         }
+        db.metricDao().deleteFor(profileId)
+        db.caregiverDao().deleteActivityFor(profileId)
         dao.linksOnce().filter { it.patientProfileId == profileId }.forEach {
             dao.deleteLink(it.id)
         }

@@ -70,6 +70,17 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     var tourDone by mutableStateOf(prefs.getBoolean("tour_done", false))
         private set
 
+    /** Timestamp before which the gentle "turn on reminders" card stays hidden. */
+    var reminderHiddenUntil by mutableStateOf(prefs.getLong("reminder_hidden_until", 0L))
+        private set
+
+    /** Snooze the in-content reminder card for [days] (default a week). */
+    fun snoozeReminder(days: Int = 7) {
+        val until = System.currentTimeMillis() + days * 86_400_000L
+        reminderHiddenUntil = until
+        prefs.edit().putLong("reminder_hidden_until", until).apply()
+    }
+
     fun finishTour() {
         tourDone = true
         prefs.edit().putBoolean("tour_done", true).apply()

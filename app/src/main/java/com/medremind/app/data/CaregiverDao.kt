@@ -99,6 +99,9 @@ interface CaregiverDao {
     @Insert
     suspend fun insertActivity(activity: CaregiverActivity): Long
 
+    @Query("DELETE FROM caregiver_activity WHERE patientProfileId = :profileId")
+    suspend fun deleteActivityFor(profileId: Long)
+
     // ---- Backup --------------------------------------------------------------
 
     @Query("SELECT * FROM patients")

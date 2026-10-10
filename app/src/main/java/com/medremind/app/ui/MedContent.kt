@@ -113,7 +113,8 @@ fun MedContent(
     onAdd: () -> Unit,
     onOpenMe: () -> Unit,
     profilePhoto: String? = null,
-    onOpenNotifications: () -> Unit = {}
+    onOpenNotifications: () -> Unit = {},
+    reminderCard: (@Composable () -> Unit)? = null
 ) {
     val context = LocalContext.current
     var pendingDelete by remember { mutableStateOf<Medicine?>(null) }
@@ -183,6 +184,9 @@ fun MedContent(
                 ),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                reminderCard?.let { card ->
+                    item(key = "reminder_setup") { card() }
+                }
                 item(key = "search") {
                     SearchField(
                         value = query,

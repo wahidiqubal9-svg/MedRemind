@@ -33,6 +33,7 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Keyboard
+import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Person
@@ -41,6 +42,7 @@ import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -744,6 +746,7 @@ fun CaregiverDashboardScreen(
     var showRefill by remember { mutableStateOf(false) }
     var refillTarget by remember { mutableStateOf<Medicine?>(null) }
     var editPatient by remember { mutableStateOf(false) }
+    var disconnectPatient by remember { mutableStateOf<Patient?>(null) }
     var week by remember { mutableStateOf<List<CaregiverViewModel.DayAdherence>>(emptyList()) }
     var exportFormat by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
@@ -1024,9 +1027,28 @@ fun CaregiverDashboardScreen(
                 onSave = { updated ->
                     vm.updatePatient(updated)
                     editPatient = false
+                },
+                onRemove = {
+                    editPatient = false
+                    disconnectPatient = p
                 }
             )
         }
+    }
+
+    disconnectPatient?.let { p ->
+        MedConfirmDialog(
+            title = "Disconnect ${p.name}?",
+            message = "You'll stop sharing with ${p.name}. Data on ${p.name}'s own " +
+                "device is not affected.",
+            confirmText = "Disconnect",
+            onConfirm = {
+                vm.removePatient(p.id)
+                disconnectPatient = null
+                onBack()
+            },
+            onDismiss = { disconnectPatient = null }
+        )
     }
 }
 
@@ -1181,7 +1203,8 @@ private fun RefillPickerSheet(
 private fun EditPatientDialog(
     patient: Patient,
     onDismiss: () -> Unit,
-    onSave: (Patient) -> Unit
+    onSave: (Patient) -> Unit,
+    onRemove: () -> Unit = {}
 ) {
     var name by remember { mutableStateOf(patient.name) }
     var relation by remember { mutableStateOf(patient.relation) }
@@ -1215,6 +1238,23 @@ private fun EditPatientDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(Modifier.height(14.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                TextButton(
+                    onClick = onRemove,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.LinkOff,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Disconnect person")
+                }
             }
         },
         confirmButton = {

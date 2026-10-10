@@ -120,9 +120,20 @@ fun MainTabs(
     onOpenMe: () -> Unit,
     onOpenNotifications: () -> Unit = {},
     onOpenPatient: (Long) -> Unit = {},
-    onOpenCaregiving: () -> Unit = {}
+    onOpenCaregiving: () -> Unit = {},
+    reminderSetupNeeded: Boolean = false,
+    onOpenReminderSetup: () -> Unit = {},
+    onDismissReminderSetup: () -> Unit = {}
 ) {
     val schedulesByMedicine by vm.schedulesByMedicine.collectAsState()
+    val reminderCard: (@Composable () -> Unit)? = if (reminderSetupNeeded) {
+        {
+            ReminderSetupCard(
+                onSetup = onOpenReminderSetup,
+                onDismiss = onDismissReminderSetup
+            )
+        }
+    } else null
     val snackbarHostState = remember { SnackbarHostState() }
     val caregiverVm: com.medremind.app.ui.caregiver.CaregiverViewModel = viewModel()
     val people by caregiverVm.patients.collectAsState()
@@ -181,7 +192,8 @@ fun MainTabs(
                     greetingName = settings.profileName,
                     onOpenNotifications = onOpenNotifications,
                     onOpenPeople = { showPeople = true },
-                    snackbarHostState = snackbarHostState
+                    snackbarHostState = snackbarHostState,
+                    reminderCard = reminderCard
                 )
                 1 -> MedContent(
                     modifier = Modifier.padding(padding),
@@ -194,7 +206,8 @@ fun MainTabs(
                     onAdd = onAdd,
                     onOpenMe = onOpenMe,
                     profilePhoto = settings.profilePhoto,
-                    onOpenNotifications = onOpenNotifications
+                    onOpenNotifications = onOpenNotifications,
+                    reminderCard = reminderCard
                 )
                 2 -> HistoryContent(
                     modifier = Modifier.padding(padding),

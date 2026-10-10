@@ -308,7 +308,12 @@ fun AppRoot(
                     caregiverProfileId = profileId
                     showCaregiverDashboard = true
                 },
-                onOpenCaregiving = { showCaregiving = true }
+                onOpenCaregiving = { showCaregiving = true },
+                reminderSetupNeeded = needsAlarmSetup &&
+                    settings.onboardingDone && settings.tourDone &&
+                    System.currentTimeMillis() >= settings.reminderHiddenUntil,
+                onOpenReminderSetup = { showPermissions = true },
+                onDismissReminderSetup = { settings.snoozeReminder() }
             )
             }
         }
@@ -331,41 +336,6 @@ fun AppRoot(
             AppLockScreen(pin = settings.pin, onUnlocked = { unlocked = true })
         }
         }
-        }
-        // Sit just above the fixed bottom navigation bar instead of at the top.
-        AnimatedVisibility(
-            visible = needsAlarmSetup && settings.onboardingDone && settings.tourDone,
-            enter = fadeIn(tween(300)),
-            exit = fadeOut(tween(200)),
-            modifier = Modifier.align(Alignment.BottomCenter)
-        ) {
-            Surface(
-                onClick = { showPermissions = true },
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.errorContainer,
-                contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                shadowElevation = 6.dp,
-                modifier = Modifier
-                    .navigationBarsPadding()
-                    .padding(bottom = 96.dp, start = 16.dp, end = 16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Rounded.Warning,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "Allow alarms & notifications \u2014 tap to set up",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
         }
         AnimatedVisibility(
             visible = !splashDone,

@@ -107,7 +107,8 @@ fun TodayContent(
     greetingName: String? = null,
     onOpenNotifications: () -> Unit = {},
     onOpenPeople: () -> Unit = {},
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    reminderCard: (@Composable () -> Unit)? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
@@ -333,6 +334,9 @@ fun TodayContent(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 200.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            reminderCard?.let { card ->
+                item(key = "reminder_setup") { card() }
+            }
             if (!dosesLoaded) {
                 item(key = "loading") {
                     TodaySkeleton()

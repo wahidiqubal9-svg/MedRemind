@@ -29,6 +29,9 @@ interface MetricDao {
     @Query("DELETE FROM metrics")
     suspend fun clear()
 
+    @Query("DELETE FROM metrics WHERE profileId = :profileId")
+    suspend fun deleteFor(profileId: Long)
+
     @Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE)
     suspend fun insertAll(metrics: List<Metric>)
 }

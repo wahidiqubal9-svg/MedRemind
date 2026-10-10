@@ -87,7 +87,9 @@ fun NotificationsScreen(
     val vm: CaregiverViewModel = viewModel()
     val items by vm.notifications.collectAsState()
 
-    LaunchedEffect(Unit) { vm.markNotificationsSeen() }
+    // Mark everything seen when the centre opens, and keep marking as new items
+    // arrive while it's on screen, so the badge stays clear while you read.
+    LaunchedEffect(items) { vm.markNotificationsSeen(items.map { it.key }) }
 
     Scaffold(contentWindowInsets = WindowInsets(0.dp)) { padding ->
         Column(

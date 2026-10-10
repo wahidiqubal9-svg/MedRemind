@@ -46,6 +46,8 @@ object NotificationType {
 
 /** One row in the caregiver notification centre. */
 data class CaregiverNotification(
+    /** Stable identity used to decide whether this item has been seen. */
+    val key: String,
     val at: Long,
     val type: String,
     val title: String,
@@ -82,20 +84,11 @@ class CaregiverViewModel(application: Application) : AndroidViewModel(applicatio
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val prefs = app.getSharedPreferences("medremind_settings", Context.MODE_PRIVATE)
-    private val seenAt = kotlinx.coroutines.flow.MutableStateFlow(
-        prefs.getLong("caregiver_seen_at", 0L)
+
+    /** Keys of notifications the user has already opened. */
+    private val seenKeys = kotlinx.coroutines.flow.MutableStateFlow(
+        (prefs.getStringSet("notif_seen_keys", emptySet()) ?: emptySet()).toSet()
     )
-
-    /** Badge count: new caregiver activity since the notification centre was last opened. */
-    val unreadCount: StateFlow<Int> = caregiverRepo.activity(null)
-        .map { list -> list.count { it.at > seenAt.value } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
-
-    fun markNotificationsSeen() {
-        val now = System.currentTimeMillis()
-        seenAt.value = now
-        prefs.edit().putLong("caregiver_seen_at", now).apply()
-    }
 
     /** A merged feed of caregiver activity, missed doses and low stock. */
     val notifications: StateFlow<List<CaregiverNotification>> = kotlinx.coroutines.flow.combine(
@@ -107,6 +100,18 @@ class CaregiverViewModel(application: Application) : AndroidViewModel(applicatio
     ) { activity, patients, medicines, schedules, events ->
         buildNotifications(activity, patients, medicines, schedules, events)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Badge count: notifications in the centre the user hasn't opened yet. */
+    val unreadCount: StateFlow<Int> = notifications
+        .map { list -> list.count { it.key !in seenKeys.value } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    /** Marks the given notification keys as seen; the badge clears to zero. */
+    fun markNotificationsSeen(keys: Collection<String>) {
+        val now = keys.toSet()
+        seenKeys.value = now
+        prefs.edit().putStringSet("notif_seen_keys", now).apply()
+    }
 
     private fun buildNotifications(
         activity: List<CaregiverActivity>,
@@ -123,6 +128,7 @@ class CaregiverViewModel(application: Application) : AndroidViewModel(applicatio
         activity.forEach {
             items.add(
                 CaregiverNotification(
+                    key = "a${it.id}",
                     at = it.at,
                     type = NotificationType.ACTIVITY,
                     title = it.type.replace('_', ' ').lowercase()
@@ -138,6 +144,7 @@ class CaregiverViewModel(application: Application) : AndroidViewModel(applicatio
             .forEach {
                 items.add(
                     CaregiverNotification(
+                        key = "s${it.id}:${it.quantity}",
                         at = now,
                         type = NotificationType.LOW_STOCK,
                         title = "${it.name} running low",
@@ -168,6 +175,7 @@ class CaregiverViewModel(application: Application) : AndroidViewModel(applicatio
                             .format(java.util.Date(trigger))
                         items.add(
                             CaregiverNotification(
+                                key = "m${medicine.id}:$trigger",
                                 at = trigger,
                                 type = NotificationType.MISSED,
                                 title = "Missed dose",
