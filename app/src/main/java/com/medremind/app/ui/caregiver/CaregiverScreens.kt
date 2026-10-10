@@ -692,12 +692,21 @@ fun CaregiverDashboardScreen(
     val patientTitle = if (relation != null) "$patientName ($relation)" else patientName
     val todayLabel = SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(Date())
 
-    // Health tab only appears once the patient has granted a health permission.
+    // Everything the caregiver can see or do here is bounded by what the patient
+    // explicitly granted. Deny by default: no link = no access at all.
     val myLinks by vm.peopleICareFor.collectAsState()
     val patientLink = remember(profileId, myLinks) {
         myLinks.firstOrNull { it.patientProfileId == profileId && it.status == CaregiverStatus.ACTIVE }
     }
     val permissions = patientLink?.permissions ?: 0
+    val canViewMedicines = CaregiverPermission.has(permissions, CaregiverPermission.VIEW_MEDICINES)
+    val canAdd = CaregiverPermission.has(permissions, CaregiverPermission.ADD_MEDICINES)
+    val canEdit = CaregiverPermission.has(permissions, CaregiverPermission.EDIT_MEDICINES)
+    val canRemove = CaregiverPermission.has(permissions, CaregiverPermission.REMOVE_MEDICINES)
+    val canRemind = CaregiverPermission.has(permissions, CaregiverPermission.SEND_REMINDERS)
+    val canViewConfirmations = CaregiverPermission.has(permissions, CaregiverPermission.VIEW_CONFIRMATIONS)
+    val canViewHistory = CaregiverPermission.has(permissions, CaregiverPermission.VIEW_HISTORY)
+    val canViewPhotos = CaregiverPermission.has(permissions, CaregiverPermission.VIEW_PHOTOS)
     val healthTypes = remember(permissions) {
         buildList {
             if (CaregiverPermission.has(permissions, CaregiverPermission.HEALTH_BP)) {
@@ -711,9 +720,11 @@ fun CaregiverDashboardScreen(
             }
         }
     }
-    val tabTitles = remember(healthTypes) {
+    val tabTitles = remember(permissions, healthTypes) {
         buildList {
-            add("Today"); add("Medicines"); add("Activity")
+            if (canViewConfirmations) add("Today")
+            if (canViewMedicines) add("Medicines")
+            add("Activity")
             if (healthTypes.isNotEmpty()) add("Health")
         }
     }
@@ -722,6 +733,7 @@ fun CaregiverDashboardScreen(
 
     var section by remember { mutableIntStateOf(0) }
     val safeSection = section.coerceIn(0, tabTitles.lastIndex)
+    val currentTab = tabTitles.getOrNull(safeSection)
     var todayDoses by remember { mutableStateOf<List<PatientDose>>(emptyList()) }
     var progress by remember { mutableStateOf(CaregiverViewModel.Progress(0, 0, 0, 0)) }
     var adherence by remember { mutableStateOf(CaregiverViewModel.Adherence(0, 0, 0)) }
@@ -815,6 +827,8 @@ fun CaregiverDashboardScreen(
                     progress = progress,
                     attentionCount = attentionCount,
                     canContact = phone.isNotBlank(),
+                    canRemind = canRemind,
+                    canRefill = canEdit,
                     onRemind = { showRemind = true },
                     onRefill = { showRefill = true },
                     onCall = { callNumber(context, phone) },
@@ -828,9 +842,17 @@ fun CaregiverDashboardScreen(
                     onSelect = { section = it },
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (!canAdd || !canEdit || !canRemove || !canRemind) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "$patientName controls what you can see and do here.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
 
-                if (safeSection == 3) {
+                if (currentTab == "Health") {
                     // The shared Health tab manages its own scrolling.
                     com.medremind.app.ui.HealthScreen(
                         modifier = Modifier.fillMaxSize(),
@@ -850,8 +872,8 @@ fun CaregiverDashboardScreen(
                             .padding(bottom = 40.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        when (safeSection) {
-                            0 -> {
+                        when (currentTab) {
+                            "Today" -> {
                                 TodaySection(
                                     progress = progress,
                                     doses = todayDoses,
@@ -860,18 +882,27 @@ fun CaregiverDashboardScreen(
                                     week = week,
                                     lowStock = lowStock,
                                     patientName = patientName,
+                                    canRemind = canRemind,
+                                    showPhotos = canViewPhotos,
                                     onRemind = { remind(it) },
                                     onRefresh = { reload++ }
                                 )
-                                ExportCard(
-                                    enabled = medicines.isNotEmpty(),
-                                    onCsv = rememberProAction { exportFormat = "csv" },
-                                    onPdf = rememberProAction { exportFormat = "pdf" }
-                                )
+                                if (canViewHistory) {
+                                    ExportCard(
+                                        enabled = medicines.isNotEmpty(),
+                                        onCsv = rememberProAction { exportFormat = "csv" },
+                                        onPdf = rememberProAction { exportFormat = "pdf" }
+                                    )
+                                }
                             }
-                            1 -> MedicinesSection(
+                            "Medicines" -> MedicinesSection(
                                 medicines = medicines,
                                 schedules = schedules,
+                                canAdd = canAdd,
+                                canEdit = canEdit,
+                                canRemove = canRemove,
+                                canRemind = canRemind,
+                                showPhotos = canViewPhotos,
                                 onRemind = { remind(it) },
                                 onEdit = onEditMedicine,
                                 onDelete = { removeMedicine = it },
@@ -889,6 +920,10 @@ fun CaregiverDashboardScreen(
             CaregiverMedicineDetail(
                 medicine = medicine,
                 schedules = schedules.filter { it.medicineId == medicine.id },
+                canRemind = canRemind,
+                canEdit = canEdit,
+                canRemove = canRemove,
+                showPhotos = canViewPhotos,
                 onBack = { detail = null },
                 onRemind = { remind(medicine) },
                 onEdit = {
@@ -1337,6 +1372,8 @@ private fun CaregiverPatientCard(
     progress: CaregiverViewModel.Progress,
     attentionCount: Int,
     canContact: Boolean,
+    canRemind: Boolean,
+    canRefill: Boolean,
     onRemind: () -> Unit,
     onRefill: () -> Unit,
     onCall: () -> Unit,
@@ -1421,7 +1458,7 @@ private fun CaregiverPatientCard(
                     label = "Remind",
                     icon = Icons.Rounded.NotificationsActive,
                     tint = MaterialTheme.colorScheme.primary,
-                    enabled = true,
+                    enabled = canRemind,
                     onClick = onRemind,
                     modifier = Modifier.weight(1f)
                 )
@@ -1429,7 +1466,7 @@ private fun CaregiverPatientCard(
                     label = "Refill",
                     icon = Icons.Rounded.Inventory2,
                     tint = Color(0xFF2563EB),
-                    enabled = true,
+                    enabled = canRefill,
                     onClick = onRefill,
                     modifier = Modifier.weight(1f)
                 )
@@ -1497,6 +1534,8 @@ private fun TodaySection(
     week: List<CaregiverViewModel.DayAdherence>,
     lowStock: List<Medicine>,
     patientName: String,
+    canRemind: Boolean = true,
+    showPhotos: Boolean = true,
     onRemind: (Medicine) -> Unit,
     onRefresh: () -> Unit
 ) {
@@ -1518,7 +1557,7 @@ private fun TodaySection(
                 MedIconSquare(
                     label = dose.medicine.name,
                     seed = dose.medicine.id,
-                    photoPath = dose.medicine.photoPath
+                    photoPath = if (showPhotos) dose.medicine.photoPath else null
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
@@ -1597,7 +1636,7 @@ private fun TodaySection(
                     MedIconSquare(
                         label = medicine.name,
                         seed = medicine.id,
-                        photoPath = medicine.photoPath
+                        photoPath = if (showPhotos) medicine.photoPath else null
                     )
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
@@ -1641,13 +1680,15 @@ private fun TodaySection(
                         )
                     }
                 }
-                Spacer(Modifier.height(10.dp))
-                GradientPillButton(
-                    text = "Remind now",
-                    icon = Icons.Rounded.NotificationsActive,
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { onRemind(dose.medicine) }
-                )
+                if (canRemind) {
+                    Spacer(Modifier.height(10.dp))
+                    GradientPillButton(
+                        text = "Remind now",
+                        icon = Icons.Rounded.NotificationsActive,
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onRemind(dose.medicine) }
+                    )
+                }
             }
         }
     }
@@ -1721,17 +1762,24 @@ private fun LegendDot(color: Color, label: String) {
 private fun MedicinesSection(
     medicines: List<Medicine>,
     schedules: List<Schedule>,
+    canAdd: Boolean = true,
+    canEdit: Boolean = true,
+    canRemove: Boolean = true,
+    canRemind: Boolean = true,
+    showPhotos: Boolean = true,
     onRemind: (Medicine) -> Unit,
     onEdit: (Medicine) -> Unit,
     onDelete: (Medicine) -> Unit,
     onOpenDetail: (Medicine) -> Unit,
     onAdd: () -> Unit
 ) {
-    GradientPillButton(
-        text = "Add medicine",
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onAdd
-    )
+    if (canAdd) {
+        GradientPillButton(
+            text = "Add medicine",
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onAdd
+        )
+    }
     if (medicines.isEmpty()) {
         MedEmptyState(
             icon = Icons.Rounded.Medication,
@@ -1757,7 +1805,7 @@ private fun MedicinesSection(
                 MedIconSquare(
                     label = medicine.name,
                     seed = medicine.id,
-                    photoPath = medicine.photoPath
+                    photoPath = if (showPhotos) medicine.photoPath else null
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
@@ -1778,26 +1826,34 @@ private fun MedicinesSection(
                     }
                 }
             }
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(
-                    onClick = { onEdit(medicine) },
-                    shape = RoundedCornerShape(50),
-                    modifier = Modifier.weight(1f)
-                ) { Text("Edit") }
-                OutlinedButton(
-                    onClick = { onDelete(medicine) },
-                    shape = RoundedCornerShape(50),
-                    modifier = Modifier.weight(1f)
-                ) { Text("Remove") }
+            if (canEdit || canRemove) {
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (canEdit) {
+                        OutlinedButton(
+                            onClick = { onEdit(medicine) },
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Edit") }
+                    }
+                    if (canRemove) {
+                        OutlinedButton(
+                            onClick = { onDelete(medicine) },
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Remove") }
+                    }
+                }
             }
-            Spacer(Modifier.height(8.dp))
-            GradientPillButton(
-                text = "Remind now",
-                icon = Icons.Rounded.NotificationsActive,
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { onRemind(medicine) }
-            )
+            if (canRemind) {
+                Spacer(Modifier.height(8.dp))
+                GradientPillButton(
+                    text = "Remind now",
+                    icon = Icons.Rounded.NotificationsActive,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { onRemind(medicine) }
+                )
+            }
         }
     }
 }
@@ -1946,6 +2002,10 @@ private fun toggle(current: Int, flag: Int, on: Boolean): Int =
 private fun CaregiverMedicineDetail(
     medicine: Medicine,
     schedules: List<Schedule>,
+    canRemind: Boolean = true,
+    canEdit: Boolean = true,
+    canRemove: Boolean = true,
+    showPhotos: Boolean = true,
     onBack: () -> Unit,
     onRemind: () -> Unit,
     onEdit: () -> Unit,
@@ -1981,7 +2041,7 @@ private fun CaregiverMedicineDetail(
                     .height(240.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    val photo = medicine.photoPath
+                    val photo = if (showPhotos) medicine.photoPath else null
                     if (photo != null) {
                         AsyncImage(
                             model = File(photo),
@@ -2041,23 +2101,31 @@ private fun CaregiverMedicineDetail(
                 }
             }
 
-            GradientPillButton(
-                text = "Remind now",
-                icon = Icons.Rounded.NotificationsActive,
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onRemind
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(
-                    onClick = onEdit,
-                    shape = RoundedCornerShape(50),
-                    modifier = Modifier.weight(1f)
-                ) { Text("Edit") }
-                OutlinedButton(
-                    onClick = onRemove,
-                    shape = RoundedCornerShape(50),
-                    modifier = Modifier.weight(1f)
-                ) { Text("Remove") }
+            if (canRemind) {
+                GradientPillButton(
+                    text = "Remind now",
+                    icon = Icons.Rounded.NotificationsActive,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onRemind
+                )
+            }
+            if (canEdit || canRemove) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (canEdit) {
+                        OutlinedButton(
+                            onClick = onEdit,
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Edit") }
+                    }
+                    if (canRemove) {
+                        OutlinedButton(
+                            onClick = onRemove,
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Remove") }
+                    }
+                }
             }
         }
     }
