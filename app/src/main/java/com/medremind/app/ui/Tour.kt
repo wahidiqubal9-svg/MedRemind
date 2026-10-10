@@ -1,7 +1,8 @@
 package com.medremind.app.ui
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -16,7 +17,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -40,56 +40,74 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-/** One stop of the guided tour: which element to spotlight and what to say. */
+/**
+ * One stop of the guided tour.
+ *
+ * [anchor] is the id of a real UI element to spotlight (see [Modifier.tourAnchor]).
+ * When [tapToAdvance] is true, the tour expects the user to tap that element: the
+ * tap passes through to the real control (so the feature actually opens) and the
+ * tour then moves on. Steps with no anchor are read-only and advance with "Next".
+ */
 data class TourStep(
     val anchor: String?,
     val title: String,
     val body: String,
-    val tab: Int
+    val tapToAdvance: Boolean = anchor != null
 )
 
+/**
+ * An interactive walkthrough: each step highlights a real button and asks the user
+ * to tap it. Tapping opens that feature for real, then the tour continues.
+ */
 val defaultTourSteps = listOf(
     TourStep(
         anchor = null,
         title = "Welcome to MedRemind",
-        body = "Let's take a quick look around the important parts. It only takes a few seconds.",
-        tab = 0
+        body = "Let's take a quick look around. At each step, tap the highlighted " +
+            "button to open that feature \u2014 it's the real thing.",
+        tapToAdvance = false
     ),
     TourStep(
-        anchor = "nav_today",
-        title = "Today",
-        body = "Every dose for the day shows here with its time. Slide to take, snooze or skip.",
-        tab = 0
+        anchor = "nav_med",
+        title = "Medicines",
+        body = "Tap the Medicines button below to open your cabinet."
     ),
     TourStep(
         anchor = "fab_add",
         title = "Add a medicine",
-        body = "Tap here to add a medicine \u2014 with a photo, a schedule and stock details.",
-        tab = 1
+        body = "Tap the \u201cAdd medicine\u201d button to add one \u2014 with a photo, " +
+            "a schedule and stock details."
     ),
     TourStep(
         anchor = "nav_progress",
         title = "Progress",
-        body = "See your adherence over time and export a report for your doctor.",
-        tab = 2
+        body = "Tap Progress to see your adherence over time and export a report."
     ),
     TourStep(
         anchor = "nav_health",
         title = "Health",
-        body = "Log blood pressure, glucose and weight, and watch the trends.",
-        tab = 3
+        body = "Tap Health to log blood pressure, glucose and weight."
+    ),
+    TourStep(
+        anchor = "nav_today",
+        title = "Today",
+        body = "Tap Today for your day's doses with their times."
     ),
     TourStep(
         anchor = "people",
         title = "People you care for",
-        body = "Tap the arrow beside your name to add or open the people you help.",
-        tab = 0
+        body = "Tap the arrow beside your name to add or open the people you help."
     ),
     TourStep(
         anchor = "bell",
         title = "Notifications",
-        body = "Reminders, missed doses and caregiver activity show up here.",
-        tab = 0
+        body = "Tap the bell for reminders, missed doses and caregiver activity."
+    ),
+    TourStep(
+        anchor = null,
+        title = "You're all set",
+        body = "You can replay this tour anytime from Settings \u2192 Help.",
+        tapToAdvance = false
     )
 )
 
@@ -113,24 +131,36 @@ val LocalTour = compositionLocalOf<TourController?> { null }
 @Composable
 fun Modifier.tourAnchor(id: String): Modifier {
     val controller = LocalTour.current ?: return this
-    return this.onGloballyPositioned { controller.anchors[id] = it.boundsInRoot() }
+    val step = controller.current
+    val current = step.anchor == id && step.tapToAdvance
+    return this
+        .onGloballyPositioned { controller.anchors[id] = it.boundsInRoot() }
+        .then(
+            if (current) {
+                // The user tapped the highlighted control: advance the tour.
+                // We never consume, so the control's own click still fires and
+                // the feature really opens.
+                Modifier.pointerInput(controller.index) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        controller.next()
+                    }
+                }
+            } else {
+                Modifier
+            }
+        )
 }
 
 @Composable
 fun TourOverlay(
     controller: TourController,
-    onTabChange: (Int) -> Unit,
     onFinish: () -> Unit
 ) {
     val step = controller.current
-    LaunchedEffect(controller.index) { onTabChange(step.tab) }
     val bounds = step.anchor?.let { controller.anchors[it] }
 
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) { detectTapGestures { /* block interaction */ } }
-    ) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val density = LocalDensity.current
         val screenHeight = with(density) { maxHeight.toPx() }
         val pad = with(density) { 8.dp.toPx() }
@@ -139,6 +169,25 @@ fun TourOverlay(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .pointerInput(controller.index, bounds) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val onTarget = step.tapToAdvance &&
+                            bounds?.contains(down.position) == true
+                        if (!onTarget) {
+                            // Swallow taps that miss the highlighted control so the
+                            // user interacts only with the spotlighted feature.
+                            down.consume()
+                            var event = awaitPointerEvent()
+                            while (event.changes.any { it.pressed }) {
+                                event.changes.forEach { it.consume() }
+                                event = awaitPointerEvent()
+                            }
+                        }
+                        // On the target: do nothing and don't consume, so the real
+                        // control receives the tap (its tourAnchor hook advances us).
+                    }
+                }
         ) {
             drawRect(Color.Black.copy(alpha = 0.75f))
             if (bounds != null) {
@@ -192,6 +241,21 @@ fun TourOverlay(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (step.tapToAdvance && bounds != null) {
+                    Spacer(Modifier.height(10.dp))
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ) {
+                        Text(
+                            "\uD83D\uDC46 Tap the highlighted button to continue",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
+                }
                 Spacer(Modifier.height(16.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

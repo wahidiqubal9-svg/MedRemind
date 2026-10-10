@@ -24,7 +24,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -313,11 +313,14 @@ fun AppRoot(
             }
         }
         if (!settings.tourDone) {
-            TourOverlay(
-                controller = tourController,
-                onTabChange = { tab = it },
-                onFinish = { settings.finishTour() }
-            )
+            // Only overlay the main screen; sub-screens open during the tour
+            // (e.g. the Add medicine editor) take over so the user can use them.
+            if (screen == "main") {
+                TourOverlay(
+                    controller = tourController,
+                    onFinish = { settings.finishTour() }
+                )
+            }
         } else if (!settings.alarmSetupSeen) {
             PermissionScreen(
                 onBack = { settings.finishAlarmSetup() },
@@ -329,11 +332,12 @@ fun AppRoot(
         }
         }
         }
+        // Sit just above the fixed bottom navigation bar instead of at the top.
         AnimatedVisibility(
-            visible = needsAlarmSetup,
+            visible = needsAlarmSetup && settings.onboardingDone && settings.tourDone,
             enter = fadeIn(tween(300)),
             exit = fadeOut(tween(200)),
-            modifier = Modifier.align(Alignment.TopCenter)
+            modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             Surface(
                 onClick = { showPermissions = true },
@@ -342,8 +346,8 @@ fun AppRoot(
                 contentColor = MaterialTheme.colorScheme.onErrorContainer,
                 shadowElevation = 6.dp,
                 modifier = Modifier
-                    .statusBarsPadding()
-                    .padding(top = 8.dp, start = 16.dp, end = 16.dp)
+                    .navigationBarsPadding()
+                    .padding(bottom = 96.dp, start = 16.dp, end = 16.dp)
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
