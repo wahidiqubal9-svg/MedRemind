@@ -348,15 +348,31 @@ private fun RowScope.BottomNavCell(
     }
 }
 
+/**
+ * The Health tab: readings, charts, trends and export.
+ *
+ * Shared by the owner's tab and the caregiver's view of a patient. Pass
+ * [metricsOverride] + [profileId] + [actor] to show another person's readings and
+ * stamp any reading the caregiver logs, or [allowedTypes] to limit which of the
+ * patient's health permissions are visible.
+ */
 @Composable
-private fun HealthScreen(
+fun HealthScreen(
     modifier: Modifier = Modifier,
-    settings: SettingsViewModel,
+    settings: SettingsViewModel? = null,
     vm: MedicineViewModel,
-    onOpenMe: () -> Unit,
-    onOpenNotifications: () -> Unit = {}
+    onOpenMe: () -> Unit = {},
+    onOpenNotifications: () -> Unit = {},
+    metricsOverride: List<Metric>? = null,
+    profileId: Long = 0L,
+    actor: String = "",
+    allowedTypes: Set<String>? = null,
+    showHeader: Boolean = true
 ) {
-    val metrics by vm.metrics.collectAsState()
+    val collected by vm.metrics.collectAsState()
+    val metrics = (metricsOverride ?: collected).let { all ->
+        if (allowedTypes == null) all else all.filter { it.type in allowedTypes }
+    }
     var showAddGlucose by remember { mutableStateOf(false) }
     var showAddBp by remember { mutableStateOf(false) }
     var showAddWeight by remember { mutableStateOf(false) }
@@ -408,15 +424,17 @@ private fun HealthScreen(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        ScreenHeader("Health", modifier = Modifier.padding(horizontal = 16.dp)) {
-            com.medremind.app.ui.caregiver.NotificationBell(onClick = onOpenNotifications)
-            Spacer(Modifier.width(10.dp))
-            SquareIconButton(
-                icon = Icons.Rounded.Person,
-                contentDescription = "Me",
-                onClick = onOpenMe,
-                photoPath = settings.profilePhoto
-            )
+        if (showHeader) {
+            ScreenHeader("Health", modifier = Modifier.padding(horizontal = 16.dp)) {
+                com.medremind.app.ui.caregiver.NotificationBell(onClick = onOpenNotifications)
+                Spacer(Modifier.width(10.dp))
+                SquareIconButton(
+                    icon = Icons.Rounded.Person,
+                    contentDescription = "Me",
+                    onClick = onOpenMe,
+                    photoPath = settings?.profilePhoto
+                )
+            }
         }
         Column(
             modifier = Modifier
@@ -427,12 +445,23 @@ private fun HealthScreen(
                 .padding(bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            MedCard(modifier = Modifier.fillMaxWidth()) {
-                Text("Add a reading", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(4.dp))
-                AddReadingRow(Icons.Rounded.MonitorHeart, "Blood pressure") { showAddBp = true }
-                AddReadingRow(Icons.Rounded.WaterDrop, "Blood glucose") { showAddGlucose = true }
-                AddReadingRow(Icons.Rounded.MonitorWeight, "Weight") { showAddWeight = true }
+            val canAddBp = allowedTypes == null || MetricType.BP in allowedTypes
+            val canAddGlucose = allowedTypes == null || MetricType.GLUCOSE in allowedTypes
+            val canAddWeight = allowedTypes == null || MetricType.WEIGHT in allowedTypes
+            if (canAddBp || canAddGlucose || canAddWeight) {
+                MedCard(modifier = Modifier.fillMaxWidth()) {
+                    Text("Add a reading", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(4.dp))
+                    if (canAddBp) {
+                        AddReadingRow(Icons.Rounded.MonitorHeart, "Blood pressure") { showAddBp = true }
+                    }
+                    if (canAddGlucose) {
+                        AddReadingRow(Icons.Rounded.WaterDrop, "Blood glucose") { showAddGlucose = true }
+                    }
+                    if (canAddWeight) {
+                        AddReadingRow(Icons.Rounded.MonitorWeight, "Weight") { showAddWeight = true }
+                    }
+                }
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -558,7 +587,7 @@ private fun HealthScreen(
         AddGlucoseDialog(
             onDismiss = { showAddGlucose = false },
             onSave = { ctx, value ->
-                vm.addMetric(MetricType.GLUCOSE, value, 0f, ctx)
+                vm.addMetric(MetricType.GLUCOSE, value, 0f, ctx, profileId, actor)
                 showAddGlucose = false
             }
         )
@@ -567,7 +596,7 @@ private fun HealthScreen(
         AddBpDialog(
             onDismiss = { showAddBp = false },
             onSave = { sys, dia ->
-                vm.addMetric(MetricType.BP, sys, dia)
+                vm.addMetric(MetricType.BP, sys, dia, profileId = profileId, actor = actor)
                 showAddBp = false
             }
         )
@@ -576,7 +605,7 @@ private fun HealthScreen(
         AddWeightDialog(
             onDismiss = { showAddWeight = false },
             onSave = { kg ->
-                vm.addMetric(MetricType.WEIGHT, kg)
+                vm.addMetric(MetricType.WEIGHT, kg, profileId = profileId, actor = actor)
                 showAddWeight = false
             }
         )

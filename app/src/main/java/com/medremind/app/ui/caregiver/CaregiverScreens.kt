@@ -71,6 +71,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.medremind.app.data.CaregiverLink
 import com.medremind.app.data.CaregiverPermission
@@ -93,9 +94,15 @@ import com.medremind.app.ui.MedIconSquare
 import com.medremind.app.ui.MedSegmentedButtons
 import com.medremind.app.ui.ScreenHeader
 import com.medremind.app.ui.StatusChip
+import com.medremind.app.ui.ExportCard
+import com.medremind.app.ui.ExportRangeSheet
 import com.medremind.app.ui.MedicineViewModel
 import com.medremind.app.ui.ProgressRing
+import com.medremind.app.ui.ReportExporter
+import com.medremind.app.ui.rememberProAction
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -726,6 +733,7 @@ fun CaregiverDashboardScreen(
     var refillTarget by remember { mutableStateOf<Medicine?>(null) }
     var editPatient by remember { mutableStateOf(false) }
     var week by remember { mutableStateOf<List<CaregiverViewModel.DayAdherence>>(emptyList()) }
+    var exportFormat by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
 
     LaunchedEffect(profileId, reload) {
@@ -740,6 +748,23 @@ fun CaregiverDashboardScreen(
             scope.launch { snackbar.showSnackbar(message) }
         }
         reload++
+    }
+
+    fun shareReport(mime: String, chooser: String, build: () -> File) {
+        scope.launch {
+            val file = withContext(Dispatchers.IO) { build() }
+            val uri = FileProvider.getUriForFile(
+                context,
+                context.packageName + ".fileprovider",
+                file
+            )
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = mime
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(intent, chooser))
+        }
     }
 
     val now = System.currentTimeMillis()
@@ -762,11 +787,8 @@ fun CaregiverDashboardScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .verticalScroll(rememberScrollState())
                     .navigationBarsPadding()
                     .padding(horizontal = 16.dp)
-                    .padding(bottom = 40.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -799,40 +821,66 @@ fun CaregiverDashboardScreen(
                     onEdit = { editPatient = true }
                 )
 
+                Spacer(Modifier.height(12.dp))
                 MedSegmentedButtons(
                     options = tabTitles,
                     selectedIndex = safeSection,
                     onSelect = { section = it },
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(Modifier.height(12.dp))
 
-                when (safeSection) {
-                    0 -> TodaySection(
-                        progress = progress,
-                        doses = todayDoses,
-                        nextDose = nextDose,
-                        adherence = adherence,
-                        week = week,
-                        lowStock = lowStock,
-                        patientName = patientName,
-                        onRemind = { remind(it) },
-                        onRefresh = { reload++ }
+                if (safeSection == 3) {
+                    // The shared Health tab manages its own scrolling.
+                    com.medremind.app.ui.HealthScreen(
+                        modifier = Modifier.fillMaxSize(),
+                        settings = null,
+                        vm = medicineVm,
+                        metricsOverride = metrics,
+                        profileId = profileId,
+                        actor = vm.myName,
+                        allowedTypes = healthTypes.toSet(),
+                        showHeader = false
                     )
-                    1 -> MedicinesSection(
-                        medicines = medicines,
-                        schedules = schedules,
-                        onRemind = { remind(it) },
-                        onEdit = onEditMedicine,
-                        onDelete = { removeMedicine = it },
-                        onOpenDetail = { detail = it },
-                        onAdd = onAddMedicine
-                    )
-                    2 -> ActivitySection(activity)
-                    else -> HealthSection(
-                        metrics = metrics,
-                        types = healthTypes,
-                        patientName = patientName
-                    )
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(bottom = 40.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        when (safeSection) {
+                            0 -> {
+                                TodaySection(
+                                    progress = progress,
+                                    doses = todayDoses,
+                                    nextDose = nextDose,
+                                    adherence = adherence,
+                                    week = week,
+                                    lowStock = lowStock,
+                                    patientName = patientName,
+                                    onRemind = { remind(it) },
+                                    onRefresh = { reload++ }
+                                )
+                                ExportCard(
+                                    enabled = medicines.isNotEmpty(),
+                                    onCsv = rememberProAction { exportFormat = "csv" },
+                                    onPdf = rememberProAction { exportFormat = "pdf" }
+                                )
+                            }
+                            1 -> MedicinesSection(
+                                medicines = medicines,
+                                schedules = schedules,
+                                onRemind = { remind(it) },
+                                onEdit = onEditMedicine,
+                                onDelete = { removeMedicine = it },
+                                onOpenDetail = { detail = it },
+                                onAdd = onAddMedicine
+                            )
+                            else -> ActivitySection(activity)
+                        }
+                    }
                 }
             }
         }
@@ -865,6 +913,36 @@ fun CaregiverDashboardScreen(
                 removeMedicine = null
             },
             onDismiss = { removeMedicine = null }
+        )
+    }
+
+    exportFormat?.let { format ->
+        ExportRangeSheet(
+            title = "Adherence report",
+            onDismiss = { exportFormat = null },
+            onSelect = { days ->
+                val chosen = format
+                exportFormat = null
+                val range = if (days == 0) 3650 else days
+                val mime = if (chosen == "csv") "text/csv" else "application/pdf"
+                val chooser = if (chosen == "csv") "Share CSV report" else "Share PDF report"
+                scope.launch {
+                    val data = withContext(Dispatchers.IO) {
+                        medicineVm.doseLogForRange(range, profileId).filter {
+                            it.status == DoseStatus.TAKEN || it.status == DoseStatus.MISSED ||
+                                it.status == DoseStatus.SKIPPED
+                        }
+                    }
+                    if (data.isEmpty()) {
+                        snackbar.showSnackbar("No doses in that period")
+                        return@launch
+                    }
+                    shareReport(mime, chooser) {
+                        if (chosen == "csv") ReportExporter.exportCsv(context, data)
+                        else ReportExporter.exportPdf(context, data, range)
+                    }
+                }
+            }
         )
     }
 
@@ -1752,97 +1830,6 @@ private fun ActivitySection(activity: List<com.medremind.app.data.CaregiverActiv
     }
 }
 
-@Composable
-private fun HealthSection(
-    metrics: List<com.medremind.app.data.Metric>,
-    types: List<String>,
-    patientName: String
-) {
-    val shared = metrics.filter { it.type in types }
-    if (shared.isEmpty()) {
-        MedEmptyState(
-            icon = Icons.Rounded.Favorite,
-            title = "No readings yet",
-            message = "Readings $patientName shares will appear here.",
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 24.dp)
-        )
-        return
-    }
-    val dateFormat = remember { SimpleDateFormat("d MMM, h:mm a", Locale.getDefault()) }
-    types.forEach { type ->
-        val readings = shared.filter { it.type == type }.sortedByDescending { it.recordedAt }
-        if (readings.isEmpty()) return@forEach
-        val latest = readings.first()
-        MedCard(modifier = Modifier.fillMaxWidth()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Rounded.Favorite,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        com.medremind.app.data.MetricType.label(type),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        "Latest \u00b7 ${dateFormat.format(Date(latest.recordedAt))}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Text(
-                    caregiverMetricText(latest),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.ExtraBold
-                )
-            }
-            Spacer(Modifier.height(10.dp))
-            readings.take(5).forEach { m ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            dateFormat.format(Date(m.recordedAt)),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if (m.loggedBy.isNotBlank()) {
-                            Text(
-                                "Logged by ${m.loggedBy}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    Text(
-                        caregiverMetricText(m),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-                Spacer(Modifier.height(6.dp))
-            }
-        }
-    }
-}
-
-private fun caregiverMetricText(m: com.medremind.app.data.Metric): String {
-    val unit = com.medremind.app.data.MetricType.unit(m.type)
-    return when (m.type) {
-        com.medremind.app.data.MetricType.BP -> "${m.value.toInt()}/${m.value2.toInt()} $unit"
-        com.medremind.app.data.MetricType.WEIGHT -> {
-            val number = if (m.value % 1f == 0f) m.value.toInt().toString()
-            else String.format(Locale.getDefault(), "%.1f", m.value)
-            "$number $unit"
-        }
-        else -> "${m.value.toInt()} $unit"
-    }
-}
 
 // =============================================================================
 // PERMISSIONS

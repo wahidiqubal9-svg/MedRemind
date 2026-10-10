@@ -161,14 +161,17 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
     suspend fun schedulesFor(medicineId: Long): List<Schedule> =
         withContext(Dispatchers.IO) { db.scheduleDao().forMedicine(medicineId) }
 
-    suspend fun doseLogForRange(days: Int): List<DoseLogEntry> = withContext(Dispatchers.IO) {
+    suspend fun doseLogForRange(
+        days: Int,
+        profileId: Long = activeProfile.value
+    ): List<DoseLogEntry> = withContext(Dispatchers.IO) {
         val zone = ZoneId.systemDefault()
         val today = LocalDate.now()
         val start = today.minusDays((days - 1).toLong())
         val startMillis = start.atStartOfDay(zone).toInstant().toEpochMilli()
         val endMillis = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
         val schedules = db.scheduleDao().getAllOnce().filter { it.enabled }
-        val medicinesById = db.medicineDao().getAllOnce(activeProfile.value).associateBy { it.id }
+        val medicinesById = db.medicineDao().getAllOnce(profileId).associateBy { it.id }
         // scheduleId == 0 marks the "test alarm" - exclude it.
         val events = db.doseEventDao().between(startMillis, endMillis).filter { it.scheduleId != 0L }
         val now = System.currentTimeMillis()

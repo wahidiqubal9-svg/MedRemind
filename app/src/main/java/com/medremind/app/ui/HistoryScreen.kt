@@ -489,7 +489,7 @@ private fun ReliabilityRow(bucket: BucketAdherence) {
 }
 
 @Composable
-private fun ExportCard(
+internal fun ExportCard(
     enabled: Boolean,
     onCsv: () -> Unit,
     onPdf: () -> Unit
