@@ -76,6 +76,7 @@ fun OnboardingFlow(
     settings: SettingsViewModel,
     vm: MedicineViewModel,
     isPro: Boolean,
+    onOpenCaregiverPaywall: () -> Unit,
     onFinished: () -> Unit
 ) {
     when (settings.onboardStep) {
@@ -84,6 +85,7 @@ fun OnboardingFlow(
             selected = settings.managingFor,
             isPro = isPro,
             onSelect = settings::selectManagingFor,
+            onOpenCaregiverPaywall = onOpenCaregiverPaywall,
             onBack = { settings.goToOnboardStep(0) },
             onNext = { settings.goToOnboardStep(2) }
         )
@@ -265,6 +267,7 @@ private fun ManagingForStep(
     selected: String,
     isPro: Boolean,
     onSelect: (String) -> Unit,
+    onOpenCaregiverPaywall: () -> Unit,
     onBack: () -> Unit,
     onNext: () -> Unit
 ) {
@@ -291,34 +294,20 @@ private fun ManagingForStep(
                 subtitle = "A family member or someone I care for",
                 selected = selected == "other",
                 pro = true,
-                onClick = { onSelect("other") }
+                // Tapping this opens the caregiver paywall straight away.
+                onClick = { if (isPro) onSelect("other") else onOpenCaregiverPaywall() }
             )
-            if (selected == "other" && !isPro) {
-                Spacer(Modifier.height(12.dp))
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.tertiaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Rounded.Info, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            "Caregiving is a Pro feature \u2014 you'll see upgrade " +
-                                "options after setup. The app is free otherwise.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
-            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "Caregiving is a Pro feature \u2014 you (the caregiver) subscribe, and " +
+                    "the person you care for pays nothing.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Spacer(Modifier.weight(1f))
             GradientPillButton(
                 text = "Continue",
-                onClick = onNext,
+                onClick = { if (selected == "other" && !isPro) onOpenCaregiverPaywall() else onNext() },
                 modifier = Modifier.fillMaxWidth()
             )
         }

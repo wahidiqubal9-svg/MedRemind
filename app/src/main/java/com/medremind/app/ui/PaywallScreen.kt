@@ -33,6 +33,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -54,10 +55,13 @@ import com.medremind.app.data.purchase.PurchaseResult
  * The paywall itself is routed by AppRoot via [EntitlementViewModel.showPaywall].
  */
 @Composable
-fun rememberProAction(onAllowed: () -> Unit): () -> Unit {
+fun rememberProAction(reason: String? = null, onAllowed: () -> Unit): () -> Unit {
     val entitlement: EntitlementViewModel = viewModel()
     val isPro by entitlement.isPro.collectAsState()
-    return { if (isPro) onAllowed() else entitlement.openPaywall() }
+    return {
+        if (isPro) onAllowed()
+        else entitlement.openPaywall(reason = reason, afterUnlock = onAllowed)
+    }
 }
 
 @Composable
@@ -108,8 +112,14 @@ fun PaywallScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val entitlement: EntitlementViewModel = viewModel()
     val isPro by entitlement.isPro.collectAsState()
+    val caregiver = entitlement.paywallReason == "caregiver"
     var planIndex by remember { mutableIntStateOf(1) }
     val plans = listOf(PurchasePlan.MONTHLY, PurchasePlan.YEARLY)
+
+    // Once the user becomes Pro, close and continue to whatever they were doing.
+    LaunchedEffect(isPro) {
+        if (isPro) entitlement.completeUnlock()
+    }
 
     Scaffold(contentWindowInsets = WindowInsets(0.dp)) { padding ->
         Column(
@@ -133,14 +143,20 @@ fun PaywallScreen(onBack: () -> Unit) {
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        "Unlock the full MedRemind",
+                        if (caregiver) "Caregiver plan" else "Unlock the full MedRemind",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.ExtraBold
                     )
                 }
                 Spacer(Modifier.size(6.dp))
                 Text(
-                    "Everything essential stays free, always. Pro adds the extras that keep you and your family organised.",
+                    if (caregiver) {
+                        "You (the caregiver) subscribe once. The person you care for " +
+                            "pays nothing \u2014 helping them is always free for them."
+                    } else {
+                        "Everything essential stays free, always. Pro adds the extras " +
+                            "that keep you and your family organised."
+                    },
                     style = MaterialTheme.typography.bodyMedium
                 )
             }

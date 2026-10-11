@@ -138,7 +138,7 @@ fun MainTabs(
     val caregiverVm: com.medremind.app.ui.caregiver.CaregiverViewModel = viewModel()
     val people by caregiverVm.patients.collectAsState()
     var showPeople by remember { mutableStateOf(false) }
-    val openConnect = rememberProAction(onOpenCaregiving)
+    val openConnect = rememberProAction(reason = "caregiver", onAllowed = onOpenCaregiving)
 
     BackHandler(enabled = tab != 0) { onTabChange(0) }
 

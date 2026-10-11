@@ -82,6 +82,12 @@ interface CaregiverDao {
     @Insert
     suspend fun insertPairing(request: PairingRequest): Long
 
+    @Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE)
+    suspend fun upsertPairing(request: PairingRequest): Long
+
+    @Query("DELETE FROM pairing_requests WHERE code = :code")
+    suspend fun deletePairingByCode(code: String)
+
     @Update
     suspend fun updatePairing(request: PairingRequest)
 

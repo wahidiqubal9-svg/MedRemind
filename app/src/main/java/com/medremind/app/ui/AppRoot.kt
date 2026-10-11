@@ -90,6 +90,7 @@ fun AppRoot(
     var showCaregiverDashboard by remember { mutableStateOf(false) }
     var showNotifications by remember { mutableStateOf(false) }
     var caregiverProfileId by remember { mutableStateOf(0L) }
+    var openConnectOnCaregiving by remember { mutableStateOf(false) }
     var editingProfileId by remember { mutableStateOf(0L) }
     var editing by remember { mutableStateOf<Medicine?>(null) }
     var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -120,7 +121,6 @@ fun AppRoot(
 
     val screen = when {
         showEditor -> "editor"
-        entitlementVm.showPaywall -> "paywall"
         showCaregiverDashboard -> "caregiverDashboard"
         showNotifications -> "notifications"
         showCaregiver -> "caregiver"
@@ -167,15 +167,33 @@ fun AppRoot(
                 settings = settings,
                 vm = vm,
                 isPro = isPro,
+                onOpenCaregiverPaywall = {
+                    // Chose "Someone else": open the caregiver paywall right away.
+                    // On unlock, finish onboarding and jump straight to add a patient.
+                    entitlementVm.openPaywall(reason = "caregiver", afterUnlock = {
+                        settings.selectManagingFor("other")
+                        settings.finishOnboarding()
+                        settings.finishTour()
+                        settings.finishAlarmSetup()
+                        showCaregiving = true
+                        openConnectOnCaregiving = true
+                    })
+                },
                 onFinished = {
                     val managingOthers = settings.managingFor == "other"
                     settings.finishOnboarding()
                     settings.finishTour()
                     settings.finishAlarmSetup()
                     if (managingOthers) {
-                        // Caregiving is a paid (Pro) feature.
-                        if (entitlementVm.isPro.value) showCaregiving = true
-                        else entitlementVm.openPaywall()
+                        if (entitlementVm.isPro.value) {
+                            showCaregiving = true
+                            openConnectOnCaregiving = true
+                        } else {
+                            entitlementVm.openPaywall(reason = "caregiver", afterUnlock = {
+                                showCaregiving = true
+                                openConnectOnCaregiving = true
+                            })
+                        }
                     }
                 }
             )
@@ -227,12 +245,8 @@ fun AppRoot(
                 settings = settings,
                 onBack = { showMe = false },
                 onOpenCaregiver = { showCaregiver = true },
-                onOpenCaregiving = { showCaregiving = true },
+                onOpenCaregiving = { showCaregiving = true; openConnectOnCaregiving = true },
                 onOpenAccount = { showAccount = true }
-            )
-
-            "paywall" -> com.medremind.app.ui.PaywallScreen(
-                onBack = { entitlementVm.closePaywall() }
             )
 
             "notifications" -> com.medremind.app.ui.caregiver.NotificationsScreen(
@@ -251,7 +265,8 @@ fun AppRoot(
 
             "caregiving" -> com.medremind.app.ui.caregiver.CaregivingHomeScreen(
                 vm = caregiverVm,
-                onBack = { showCaregiving = false },
+                onBack = { showCaregiving = false; openConnectOnCaregiving = false },
+                autoOpenConnect = openConnectOnCaregiving,
                 onOpenPatient = { profileId ->
                     caregiverProfileId = profileId
                     showCaregiverDashboard = true
@@ -324,7 +339,7 @@ fun AppRoot(
                     caregiverProfileId = profileId
                     showCaregiverDashboard = true
                 },
-                onOpenCaregiving = { showCaregiving = true },
+                onOpenCaregiving = { showCaregiving = true; openConnectOnCaregiving = true },
                 reminderSetupNeeded = needsAlarmSetup &&
                     settings.onboardingDone && settings.tourDone &&
                     System.currentTimeMillis() >= settings.reminderHiddenUntil,
@@ -359,6 +374,12 @@ fun AppRoot(
             modifier = Modifier.fillMaxSize()
         ) {
             SplashScreen()
+        }
+        // Paywall sits on top of everything (works over onboarding and the app).
+        if (entitlementVm.showPaywall) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                PaywallScreen(onBack = { entitlementVm.closePaywall() })
+            }
         }
     }
 

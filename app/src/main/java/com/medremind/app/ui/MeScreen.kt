@@ -84,8 +84,9 @@ fun MeScreen(
     val authVm: AuthViewModel = viewModel()
     val account by authVm.user.collectAsState()
     var editing by remember { mutableStateOf(false) }
-    val openCaregiver = rememberProAction(onOpenCaregiver)
-    val openCaregiving = rememberProAction(onOpenCaregiving)
+    // Being helped (connecting a caregiver) is FREE; helping others (caregiving) is Pro.
+    val openCaregiver = onOpenCaregiver
+    val openCaregiving = rememberProAction(reason = "caregiver", onAllowed = onOpenCaregiving)
 
     val pickImage = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
@@ -167,7 +168,7 @@ fun MeScreen(
                 icon = Icons.Rounded.Favorite,
                 title = "Caregiver",
                 subtitle = "Someone who helps me with my medicines",
-                pro = true,
+                pro = false,
                 onClick = openCaregiver
             )
             Spacer(Modifier.height(6.dp))

@@ -25,7 +25,8 @@ object CaregiverProvider {
     fun connectionRepository(context: Context): ConnectionRepository {
         val app = context.applicationContext
         return connection ?: synchronized(this) {
-            connection ?: LocalConnectionRepository(app).also { connection = it }
+            // Cloud-backed pairing; degrades to local when signed out/unconfigured.
+            connection ?: FirebaseConnectionRepository(app).also { connection = it }
         }
     }
 

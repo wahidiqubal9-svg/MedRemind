@@ -264,11 +264,12 @@ class CaregiverViewModel(application: Application) : AndroidViewModel(applicatio
         connectionRepo.createPatientPairingCode(myName)
     }
 
-    suspend fun requestAccess(code: String, onError: (String) -> Unit) {
+    /** [onResult] gets null on success, or an error message. */
+    suspend fun requestAccess(code: String, onResult: (String?) -> Unit) {
         val result = withContext(Dispatchers.IO) {
             connectionRepo.requestCaregiverAccess(code, myName)
         }
-        if (result is ConnectionResult.Error) onError(result.message)
+        onResult((result as? ConnectionResult.Error)?.message)
     }
 
     fun approve(link: CaregiverLink) {

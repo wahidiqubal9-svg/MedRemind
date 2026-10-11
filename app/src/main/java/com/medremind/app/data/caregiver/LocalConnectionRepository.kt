@@ -32,6 +32,31 @@ class LocalConnectionRepository(private val context: Context) : ConnectionReposi
         return request.copy(id = id)
     }
 
+    /**
+     * Stores a pairing learned from the cloud (another device) so the normal
+     * local flow can validate and claim it. Used by the Firebase-backed repo.
+     */
+    suspend fun injectRemotePairing(
+        token: String,
+        code: String,
+        patientName: String,
+        expiresAt: Long
+    ) {
+        dao.deletePairingByCode(code)
+        dao.upsertPairing(
+            PairingRequest(
+                token = token.ifBlank {
+                    UUID.randomUUID().toString().replace("-", "").take(24)
+                },
+                code = code,
+                direction = CaregiverDirection.INCOMING,
+                peerName = patientName.ifBlank { "Patient" },
+                expiresAt = expiresAt,
+                status = PairingStatus.OPEN
+            )
+        )
+    }
+
     override suspend fun pairingByCode(code: String): PairingRequest? {
         val clean = code.filter { it.isDigit() }
         if (clean.length != 6) return null

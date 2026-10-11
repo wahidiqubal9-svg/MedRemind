@@ -73,8 +73,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import com.medremind.app.data.CaregiverLink
 import com.medremind.app.data.CaregiverPermission
 import com.medremind.app.data.CaregiverStatus
@@ -320,7 +323,8 @@ private fun PairingQrDialog(
     onShare: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val bitmap = remember(request.token) { QrEncoder.encode(request.token, 560) }
+    // Encode the 6-digit code so scanning and manual entry are the same thing.
+    val bitmap = remember(request.code) { QrEncoder.encode(request.code, 560) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Connect a caregiver") },
@@ -381,7 +385,8 @@ private fun PairingQrDialog(
 fun CaregivingHomeScreen(
     vm: CaregiverViewModel,
     onBack: () -> Unit,
-    onOpenPatient: (Long) -> Unit
+    onOpenPatient: (Long) -> Unit,
+    autoOpenConnect: Boolean = false
 ) {
     BackHandler { onBack() }
     val links by vm.peopleICareFor.collectAsState()
@@ -389,7 +394,7 @@ fun CaregivingHomeScreen(
     val pending by vm.pendingICreated.collectAsState()
     val patientById = remember(patients) { patients.associateBy { it.id } }
 
-    var showConnect by remember { mutableStateOf(false) }
+    var showConnect by remember { mutableStateOf(autoOpenConnect) }
     var showAddPatient by remember { mutableStateOf(false) }
     var codeError by remember { mutableStateOf<String?>(null) }
 
@@ -522,6 +527,33 @@ private fun ConnectOptionsDialog(
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
+    val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
+        val contents = result.contents
+        if (!contents.isNullOrBlank()) {
+            scope.launch {
+                vm.requestAccess(contents.trim()) { message ->
+                    if (message == null) onDismiss()
+                    else {
+                        code = contents.filter { it.isDigit() }.take(6)
+                        error = message
+                        showCode = true
+                    }
+                }
+            }
+        }
+    }
+
+    fun launchScan() {
+        scanLauncher.launch(
+            ScanOptions().apply {
+                setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                setPrompt("Scan the connection QR code")
+                setBeepEnabled(false)
+                setOrientationLocked(false)
+            }
+        )
+    }
+
     if (showCode) {
         AlertDialog(
             onDismissRequest = onDismiss,
@@ -529,7 +561,8 @@ private fun ConnectOptionsDialog(
             text = {
                 Column {
                     Text(
-                        "Ask the person you care for to open Me \u2192 Caregiver and read out the 6-digit code.",
+                        "Ask the person you care for to open Me \u2192 Caregiver and " +
+                            "read out the 6-digit code.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -553,7 +586,9 @@ private fun ConnectOptionsDialog(
                     enabled = code.length == 6,
                     onClick = {
                         scope.launch {
-                            vm.requestAccess(code) { message -> error = message }
+                            vm.requestAccess(code) { message ->
+                                if (message == null) onDismiss() else error = message
+                            }
                         }
                     }
                 ) { Text("Send request") }
@@ -571,8 +606,8 @@ private fun ConnectOptionsDialog(
                 OptionRow(
                     icon = Icons.Rounded.QrCodeScanner,
                     title = "Scan QR code",
-                    subtitle = "Available once cloud pairing is added."
-                ) { }
+                    subtitle = "Point at the QR shown on their app."
+                ) { launchScan() }
                 OptionRow(
                     icon = Icons.Rounded.Keyboard,
                     title = "Enter connection code",

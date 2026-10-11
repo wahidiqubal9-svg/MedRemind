@@ -20,8 +20,8 @@ android {
         applicationId = "com.medremind.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 165
-        versionName = "0.164.0"
+        versionCode = 166
+        versionName = "0.165.0"
     }
 
     signingConfigs {
@@ -103,8 +103,9 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.glance:glance-appwidget:1.1.0")
-    // QR generation only (no camera, no scanning, no OCR) for caregiver pairing.
+    // QR generation (core) + in-app QR scanning for caregiver pairing.
     implementation("com.google.zxing:core:3.5.3")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 
     // Firebase backend (auth, database, push). Activated by google-services.json;
     // the libraries stay inert until FirebaseApp is initialised from that config.
