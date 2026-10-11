@@ -49,7 +49,8 @@ if [ "${SKIP_BUILD:-0}" = "1" ]; then
   [ -f "$ROOT/$APK" ] || { echo "No APK at $APK"; exit 1; }
 else
   echo "==> Building $TAG (optimized release)"
-  "$GRADLE" --no-daemon --console=plain assembleRelease
+  # Reuse the warm Gradle daemon + configuration cache for speed.
+  "$GRADLE" --console=plain assembleRelease
 fi
 
 echo "==> Staging commit"
