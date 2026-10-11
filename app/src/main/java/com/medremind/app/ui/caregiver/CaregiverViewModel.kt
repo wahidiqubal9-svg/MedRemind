@@ -288,6 +288,13 @@ class CaregiverViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun removeCaregiver(link: CaregiverLink) {
         viewModelScope.launch(Dispatchers.IO) {
+            // Delete the cloud link so the caregiver's phone removes me too.
+            if (link.cloudId.isNotBlank()) {
+                runCatching {
+                    com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        .collection("links").document(link.cloudId).delete()
+                }
+            }
             caregiverRepo.removeLink(link.id)
             caregiverRepo.logActivity(
                 profileId = 0L,
@@ -299,7 +306,20 @@ class CaregiverViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun removePatient(profileId: Long) {
-        viewModelScope.launch(Dispatchers.IO) { caregiverRepo.removePatient(profileId) }
+        viewModelScope.launch(Dispatchers.IO) {
+            // Remove the cloud link first so the patient's phone drops this caregiver.
+            val outgoing = db.caregiverDao().linksOnce().firstOrNull {
+                it.patientProfileId == profileId &&
+                    it.direction == CaregiverDirection.OUTGOING
+            }
+            if (outgoing != null && outgoing.cloudId.isNotBlank()) {
+                runCatching {
+                    com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        .collection("links").document(outgoing.cloudId).delete()
+                }
+            }
+            caregiverRepo.removePatient(profileId)
+        }
     }
 
     fun savePermissions(link: CaregiverLink, permissions: Int) {

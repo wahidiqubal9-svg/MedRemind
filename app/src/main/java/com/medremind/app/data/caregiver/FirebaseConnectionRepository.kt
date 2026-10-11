@@ -124,6 +124,14 @@ class FirebaseConnectionRepository(private val context: Context) : ConnectionRep
                 // consent and activate the link immediately.
                 local.approve(result.pairingId)
                 val patientUid = snap.getString("ownerUid") ?: ""
+                // Remove any earlier links with this patient so reconnects don't
+                // leave duplicate caregivers/patients on either phone.
+                runCatching {
+                    database.collection("links")
+                        .whereEqualTo("caregiverUid", myUid)
+                        .whereEqualTo("patientUid", patientUid)
+                        .get().awaitResult().documents.forEach { it.reference.delete() }
+                }
                 val linkRef = database.collection("links").document()
                 runCatching {
                     database.collection("pairings").document(clean)

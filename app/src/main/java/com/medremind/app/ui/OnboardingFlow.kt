@@ -105,10 +105,14 @@ fun OnboardingFlow(
             onBack = { settings.goToOnboardStep(4) },
             onNext = { settings.goToOnboardStep(6) }
         )
-        6 -> TestReminderStep(
-            vm = vm,
+        6 -> OverlayPermissionStep(
             onBack = { settings.goToOnboardStep(5) },
             onNext = { settings.goToOnboardStep(7) }
+        )
+        7 -> TestReminderStep(
+            vm = vm,
+            onBack = { settings.goToOnboardStep(6) },
+            onNext = { settings.goToOnboardStep(8) }
         )
         else -> SetupCompleteStep(
             vm = vm,
@@ -118,7 +122,7 @@ fun OnboardingFlow(
     }
 }
 
-private const val TOTAL_STEPS = 8
+private const val TOTAL_STEPS = 9
 
 @Composable
 private fun OnboardingScaffold(
@@ -570,12 +574,52 @@ private fun ExactAlarmPermissionStep(onBack: () -> Unit, onNext: () -> Unit) {
     }
 }
 
-// ------------------------------------------------------- Step 7: test reminder
+// ----------------------------------------------- Step 7: display over other apps
+
+@Composable
+private fun OverlayPermissionStep(onBack: () -> Unit, onNext: () -> Unit) {
+    val context = LocalContext.current
+    OnboardingScaffold(stepIndex = 6, onBack = onBack) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(Modifier.height(24.dp))
+            StepArt(Icons.Rounded.Warning)
+            Spacer(Modifier.height(24.dp))
+            StepTitle(
+                "Allow full-screen reminders",
+                "Turn on \u201cDisplay over other apps\u201d so the reminder can pop up " +
+                    "as a full screen even while you're using your phone."
+            )
+            Spacer(Modifier.weight(1f))
+            GradientPillButton(
+                text = "Open settings",
+                onClick = {
+                    runCatching {
+                        context.startActivity(
+                            Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:" + context.packageName)
+                            )
+                        )
+                    }
+                    onNext()
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(8.dp))
+            TextButton(onClick = onNext) { Text("Skip for now") }
+        }
+    }
+}
+
+// ------------------------------------------------------- Step 8: test reminder
 
 @Composable
 private fun TestReminderStep(vm: MedicineViewModel, onBack: () -> Unit, onNext: () -> Unit) {
     var sent by remember { mutableStateOf(false) }
-    OnboardingScaffold(stepIndex = 6, onBack = onBack) {
+    OnboardingScaffold(stepIndex = 7, onBack = onBack) {
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -622,7 +666,7 @@ private fun SetupCompleteStep(
 ) {
     val context = LocalContext.current
     val first = vm.medicines.value.firstOrNull()
-    OnboardingScaffold(stepIndex = 7) {
+    OnboardingScaffold(stepIndex = 8) {
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally

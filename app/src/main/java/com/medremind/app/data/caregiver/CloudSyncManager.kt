@@ -18,19 +18,22 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
- * Keeps the local caregiver links in step with the cloud and delivers reminders
- * on the patient's device.
+ * Keeps caregiver links and shared medicines in step with the cloud.
  *
- * - On the **patient** device: links addressed to me become local incoming links
- *   (so I can see my caregiver and set permissions), and pending reminders fire
- *   the full-screen alarm on THIS phone.
- * - On the **caregiver** device: permission/status changes made by the patient
- *   are applied to my local links.
+ * - Patient device: links addressed to me become local incoming links (so I see
+ *   my caregiver and set permissions); reminders fire the alarm HERE; medicines
+ *   the caregiver set up are mirrored into my own list.
+ * - Caregiver device: permission/status changes come back from the patient; the
+ *   patient's medicine set is mirrored into their local profile.
+ *
+ * Mirrors never write back to the cloud, so there are no echo loops: only the
+ * user's own edits (via the app) push to Firestore.
  */
 object CloudSyncManager {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val listeners = mutableListOf<ListenerRegistration>()
+    private val medicineListeners = mutableMapOf<String, ListenerRegistration>()
     private var started = false
     private var currentUid: String? = null
 
@@ -59,6 +62,7 @@ object CloudSyncManager {
     private fun clearListeners() {
         listeners.forEach { runCatching { it.remove() } }
         listeners.clear()
+        medicineListeners.clear()
     }
 
     private fun listen(app: Context, db: FirebaseFirestore, uid: String) {
@@ -77,18 +81,24 @@ object CloudSyncManager {
                             ?: CaregiverPermission.DEFAULT_MEDICATION.toLong()).toInt()
                         val existing = dao.linkByCloudId(doc.id)
                         if (existing == null) {
-                            dao.insertLink(
-                                CaregiverLink(
-                                    patientProfileId = 0L,
-                                    caregiverName = caregiverName,
-                                    direction = CaregiverDirection.INCOMING,
-                                    status = status,
-                                    permissions = permissions,
-                                    cloudId = doc.id,
-                                    peerUid = caregiverUid
+                            // Only add one link per caregiver (avoid duplicates).
+                            val dup = dao.incomingLinkByPeer(caregiverUid)
+                            if (dup == null) {
+                                dao.insertLink(
+                                    CaregiverLink(
+                                        patientProfileId = 0L,
+                                        caregiverName = caregiverName,
+                                        direction = CaregiverDirection.INCOMING,
+                                        status = status,
+                                        permissions = permissions,
+                                        cloudId = doc.id,
+                                        peerUid = caregiverUid
+                                    )
                                 )
-                            )
-                        } else if (existing.permissions != permissions || existing.status != status) {
+                            } else {
+                                dao.updateLink(dup.copy(cloudId = doc.id, status = status, permissions = permissions))
+                            }
+                        } else {
                             dao.updateLink(
                                 existing.copy(
                                     status = status,
@@ -98,10 +108,17 @@ object CloudSyncManager {
                             )
                         }
                     }
+                    val present = snap.documents.map { it.id }.toSet()
+                    dao.linksOnce()
+                        .filter {
+                            it.direction == CaregiverDirection.INCOMING &&
+                                it.cloudId.isNotBlank() && it.cloudId !in present
+                        }
+                        .forEach { dao.deleteLink(it.id) }
                 }
             }
 
-        // I am the caregiver: apply the permissions/status the patient set.
+        // I am the caregiver: apply what the patient set, mirror their medicines.
         listeners += db.collection("links").whereEqualTo("caregiverUid", uid)
             .addSnapshotListener { snap, _ ->
                 if (snap == null) return@addSnapshotListener
@@ -114,7 +131,36 @@ object CloudSyncManager {
                         if (existing.permissions != permissions || existing.status != status) {
                             dao.updateLink(existing.copy(status = status, permissions = permissions))
                         }
+                        // Mirror the patient's medicine list into their local profile.
+                        val peer = existing.peerUid
+                        val profileId = existing.patientProfileId
+                        if (peer.isNotBlank() && profileId != 0L && medicineListeners[peer] == null) {
+                            val reg = db.collection("patients").document(peer)
+                                .collection("medicines")
+                                .addSnapshotListener { msnap, _ ->
+                                    if (msnap == null) return@addSnapshotListener
+                                    scope.launch { mirrorMedicines(app, profileId, msnap.documents) }
+                                }
+                            medicineListeners[peer] = reg
+                            listeners += reg
+                        }
                     }
+                    val present = snap.documents.map { it.id }.toSet()
+                    dao.linksOnce()
+                        .filter {
+                            it.direction == CaregiverDirection.OUTGOING &&
+                                it.cloudId.isNotBlank() && it.cloudId !in present
+                        }
+                        .forEach {
+                            val profileId = it.patientProfileId
+                            dao.deleteLink(it.id)
+                            if (profileId != 0L) {
+                                val db2 = AppDatabase.get(app)
+                                db2.medicineDao().getAllOnce(profileId)
+                                    .forEach { m -> db2.medicineDao().delete(m) }
+                                dao.patient(profileId)?.let { p -> dao.deletePatient(p) }
+                            }
+                        }
                 }
             }
 
@@ -147,15 +193,22 @@ object CloudSyncManager {
         listeners += db.collection("patients").document(uid).collection("medicines")
             .addSnapshotListener { snap, _ ->
                 if (snap == null) return@addSnapshotListener
-                scope.launch { upsertMedicines(app, snap.documents) }
+                scope.launch { mirrorMedicines(app, 0L, snap.documents) }
             }
     }
 
-    /** Creates/updates local medicines (profile 0) from the cloud documents. */
-    private suspend fun upsertMedicines(app: Context, docs: List<DocumentSnapshot>) {
+    /** Creates/updates local medicines for [profileId] from cloud docs, and
+     *  removes local ones whose cloud document disappeared. */
+    private suspend fun mirrorMedicines(
+        app: Context,
+        profileId: Long,
+        docs: List<DocumentSnapshot>
+    ) {
         val db = AppDatabase.get(app)
         val medicineDao = db.medicineDao()
         val scheduleDao = db.scheduleDao()
+        val present = docs.map { it.id }.toSet()
+
         for (doc in docs) {
             val name = doc.getString("name") ?: continue
             val strength = doc.getString("strength") ?: ""
@@ -176,7 +229,7 @@ object CloudSyncManager {
                         form = form,
                         intakeInstruction = intake,
                         addedBy = addedBy,
-                        profileId = 0L,
+                        profileId = profileId,
                         cloudId = doc.id
                     )
                 )
@@ -228,5 +281,13 @@ object CloudSyncManager {
                 }
             }
         }
+
+        // Delete local cloud-linked medicines that no longer exist in the cloud.
+        medicineDao.getAllOnce(profileId)
+            .filter { it.cloudId.isNotBlank() && it.cloudId !in present }
+            .forEach { stale ->
+                scheduleDao.forMedicine(stale.id).forEach { ReminderScheduler.cancel(app, it.id) }
+                medicineDao.delete(stale)
+            }
     }
 }
