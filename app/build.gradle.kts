@@ -20,8 +20,8 @@ android {
         applicationId = "com.medremind.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 158
-        versionName = "0.157.0"
+        versionCode = 159
+        versionName = "0.158.0"
     }
 
     signingConfigs {

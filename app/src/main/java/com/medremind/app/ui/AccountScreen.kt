@@ -62,6 +62,13 @@ fun AccountScreen(
     val context = LocalContext.current
     val repo = remember { FirebaseAuthRepository() }
     val scope = rememberCoroutineScope()
+    val googleAvailable = remember {
+        runCatching {
+            com.google.android.gms.common.GoogleApiAvailability.getInstance()
+                .isGooglePlayServicesAvailable(context) ==
+                com.google.android.gms.common.ConnectionResult.SUCCESS
+        }.getOrDefault(false)
+    }
     var mode by remember { mutableIntStateOf(0) }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -154,7 +161,7 @@ fun AccountScreen(
                 }
             }
 
-            if (mode != 2) {
+            if (mode != 2 && googleAvailable) {
                 Spacer(Modifier.height(20.dp))
                 OutlinedButton(
                     onClick = { submitGoogle() },
