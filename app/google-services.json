@@ -12,7 +12,20 @@
           "package_name": "com.medremind.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "786786442066-mrhr6tljuifaoh05f5pkunjifp14edo0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.medremind.app",
+            "certificate_hash": "20e07a4042021a81aa64a6246c079d94109c8860"
+          }
+        },
+        {
+          "client_id": "786786442066-b412skj3arpmn302p5iqgddb73ont6sb.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyB7O9IeImmP4LwBAKj0Pex5-dP_Y93tVJg"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "786786442066-b412skj3arpmn302p5iqgddb73ont6sb.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
