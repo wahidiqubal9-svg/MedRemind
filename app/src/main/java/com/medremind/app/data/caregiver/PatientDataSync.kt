@@ -66,7 +66,14 @@ object PatientDataSync {
         val scheduleDao = AppDatabase.get(app).scheduleDao()
         for (m in medicineDao.getAllOnce(profileId)) {
             val cloudId = m.cloudId.ifBlank { coll.document().id }
+            // Persist the cloud id locally BEFORE writing to the cloud, so the
+            // mirror listener (which fires on the write) can match this medicine
+            // instead of inserting a duplicate.
+            if (m.cloudId.isBlank()) {
+                medicineDao.update(m.copy(cloudId = cloudId))
+            }
             val schedule = scheduleDao.forMedicine(m.id).firstOrNull()
+            val photo = com.medremind.app.data.PhotoStorage.toBase64(m.photoPath)
             runCatching {
                 coll.document(cloudId).set(
                     mapOf(
@@ -79,11 +86,11 @@ object PatientDataSync {
                         "times" to (schedule?.times ?: ""),
                         "scheduleType" to (schedule?.type ?: "DAILY"),
                         "daysMask" to (schedule?.daysMask ?: 0),
+                        "photoBase64" to photo,
                         "updatedAt" to FieldValue.serverTimestamp()
                     )
                 ).awaitResult()
             }
-            if (m.cloudId.isBlank()) medicineDao.update(m.copy(cloudId = cloudId))
         }
     }
 }

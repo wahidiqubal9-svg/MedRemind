@@ -255,7 +255,12 @@ object CloudSyncManager {
             val daysMask = (doc.getLong("daysMask") ?: 0L).toInt()
             val doseLabel = doc.getString("doseLabel") ?: ""
 
+            // Match by cloud id, or adopt an existing unsynced medicine with the
+            // same name (prevents a mirrored copy duplicating a locally-added one).
             val existing = medicineDao.byCloudId(doc.id)
+                ?: medicineDao.getAllOnce(profileId).firstOrNull {
+                    it.cloudId.isBlank() && it.name.equals(name, ignoreCase = true)
+                }
             val medicine = if (existing == null) {
                 val id = medicineDao.insert(
                     Medicine(
@@ -275,10 +280,26 @@ object CloudSyncManager {
                     strength = strength,
                     form = form,
                     intakeInstruction = intake,
-                    addedBy = addedBy
+                    addedBy = addedBy,
+                    cloudId = doc.id
                 )
                 medicineDao.update(updated)
                 updated
+            }
+
+            // Safety net: drop any leftover duplicates of the same medicine.
+            medicineDao.getAllOnce(profileId)
+                .filter { it.id != medicine.id && it.name.equals(name, ignoreCase = true) }
+                .forEach { dup ->
+                    scheduleDao.forMedicine(dup.id).forEach { ReminderScheduler.cancel(app, it.id) }
+                    medicineDao.delete(dup)
+                }
+
+            // Bring across the medicine photo the first time we see it.
+            val photoBase64 = doc.getString("photoBase64")
+            if (!photoBase64.isNullOrBlank() && medicine.photoPath.isNullOrBlank()) {
+                val newPath = com.medremind.app.data.PhotoStorage.saveBase64(app, photoBase64)
+                if (newPath != null) medicineDao.update(medicine.copy(photoPath = newPath))
             }
 
             if (times.isNotBlank()) {
