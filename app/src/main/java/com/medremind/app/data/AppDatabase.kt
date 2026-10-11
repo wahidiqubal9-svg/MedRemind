@@ -18,7 +18,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PairingRequest::class,
         CaregiverActivity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -36,6 +36,14 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE medicines ADD COLUMN quantity INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE medicines ADD COLUMN refillThreshold INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Cross-device links carry the Firestore doc id + the peer's uid.
+                db.execSQL("ALTER TABLE caregiver_links ADD COLUMN cloudId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE caregiver_links ADD COLUMN peerUid TEXT NOT NULL DEFAULT ''")
             }
         }
 
@@ -187,7 +195,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_9_10,
                         MIGRATION_10_11,
                         MIGRATION_11_12,
-                        MIGRATION_12_13
+                        MIGRATION_12_13,
+                        MIGRATION_13_14
                     )
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .build()

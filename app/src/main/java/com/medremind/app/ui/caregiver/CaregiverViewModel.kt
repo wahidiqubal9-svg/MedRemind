@@ -303,7 +303,18 @@ class CaregiverViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun savePermissions(link: CaregiverLink, permissions: Int) {
-        viewModelScope.launch(Dispatchers.IO) { caregiverRepo.updatePermissions(link.id, permissions) }
+        viewModelScope.launch(Dispatchers.IO) {
+            caregiverRepo.updatePermissions(link.id, permissions)
+            // Push the patient's choices to the cloud so the caregiver's phone
+            // immediately reflects what's allowed.
+            if (link.cloudId.isNotBlank()) {
+                runCatching {
+                    com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        .collection("links").document(link.cloudId)
+                        .update("permissions", permissions)
+                }
+            }
+        }
     }
 
     // ---- Local demo (no cloud) ----------------------------------------------

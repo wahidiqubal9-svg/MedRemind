@@ -52,6 +52,10 @@ data class CaregiverLink(
     val permissions: Int = CaregiverPermission.DEFAULT_MEDICATION,
     /** Correlates the two sides of one pairing (0 when created directly). */
     val pairingId: Long = 0L,
+    /** Firestore link document id, when this link is a cloud (cross-device) link. */
+    val cloudId: String = "",
+    /** The other person's account uid (caregiver when INCOMING, patient when OUTGOING). */
+    val peerUid: String = "",
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.medremind.app.data.AppDatabase
 import com.medremind.app.data.CaregiverDirection
 import com.medremind.app.data.CaregiverLink
 import com.medremind.app.data.CaregiverPermission
@@ -122,13 +123,15 @@ class FirebaseConnectionRepository(private val context: Context) : ConnectionRep
                 // The patient generated the code on purpose, so treat that as
                 // consent and activate the link immediately.
                 local.approve(result.pairingId)
+                val patientUid = snap.getString("ownerUid") ?: ""
+                val linkRef = database.collection("links").document()
                 runCatching {
                     database.collection("pairings").document(clean)
                         .update("status", PairingStatus.CLAIMED)
-                    database.collection("links").document().set(
+                    linkRef.set(
                         mapOf(
                             "caregiverUid" to myUid,
-                            "patientUid" to (snap.getString("ownerUid") ?: ""),
+                            "patientUid" to patientUid,
                             "caregiverName" to caregiverName.ifBlank { "Caregiver" },
                             "patientName" to (snap.getString("peerName") ?: "Patient"),
                             "status" to "ACTIVE",
@@ -136,6 +139,15 @@ class FirebaseConnectionRepository(private val context: Context) : ConnectionRep
                             "createdAt" to FieldValue.serverTimestamp()
                         )
                     ).awaitResult()
+                }
+                // Remember the cloud id + patient's uid locally so that
+                // "Remind now" can route to the patient's phone.
+                val dao = AppDatabase.get(context).caregiverDao()
+                dao.linksOnce().firstOrNull {
+                    it.pairingId == result.pairingId &&
+                        it.direction == CaregiverDirection.OUTGOING
+                }?.let {
+                    dao.updateLink(it.copy(cloudId = linkRef.id, peerUid = patientUid))
                 }
             }
             return result

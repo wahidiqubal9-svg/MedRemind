@@ -53,6 +53,12 @@ interface CaregiverDao {
     @Query("SELECT * FROM caregiver_links WHERE pairingId = :pairingId AND status != 'REMOVED'")
     suspend fun linksForPairing(pairingId: Long): List<CaregiverLink>
 
+    @Query("SELECT * FROM caregiver_links WHERE cloudId = :cloudId AND cloudId != '' LIMIT 1")
+    suspend fun linkByCloudId(cloudId: String): CaregiverLink?
+
+    @Query("SELECT * FROM caregiver_links WHERE peerUid = :peerUid AND direction = 'INCOMING' AND status != 'REMOVED' LIMIT 1")
+    suspend fun incomingLinkByPeer(peerUid: String): CaregiverLink?
+
     @Query("SELECT * FROM caregiver_links WHERE direction = :direction AND status = 'PENDING' ORDER BY createdAt ASC")
     fun observePending(direction: String): Flow<List<CaregiverLink>>
 

@@ -33,7 +33,7 @@ object BackupManager {
         val activity = db.caregiverDao().activityForBackup()
 
         val json = JSONObject().apply {
-            put("version", 5)
+            put("version", 6)
             put("exportedAt", System.currentTimeMillis())
             put("medicines", JSONArray().apply {
                 medicines.forEach { m ->
@@ -134,6 +134,8 @@ object BackupManager {
                         put("status", l.status)
                         put("permissions", l.permissions)
                         put("pairingId", l.pairingId)
+                        put("cloudId", l.cloudId)
+                        put("peerUid", l.peerUid)
                         put("createdAt", l.createdAt)
                         put("updatedAt", l.updatedAt)
                     })
@@ -327,6 +329,8 @@ object BackupManager {
                     status = o.optString("status", CaregiverStatus.PENDING),
                     permissions = o.optInt("permissions", CaregiverPermission.DEFAULT_MEDICATION),
                     pairingId = o.optLong("pairingId", 0),
+                    cloudId = o.optString("cloudId", ""),
+                    peerUid = o.optString("peerUid", ""),
                     createdAt = o.optLong("createdAt", System.currentTimeMillis()),
                     updatedAt = o.optLong("updatedAt", System.currentTimeMillis())
                 )

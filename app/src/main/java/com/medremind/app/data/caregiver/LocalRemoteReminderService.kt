@@ -60,4 +60,29 @@ class LocalRemoteReminderService(private val context: Context) : RemoteReminderS
         ReminderScheduler.scheduleSnooze(context, eventId, now + 1500L)
         return ReminderResult.Delivered(eventId = eventId)
     }
+
+    override suspend fun sendReminderByName(
+        patientProfileId: Long,
+        medicineName: String,
+        caregiverName: String
+    ): ReminderResult {
+        val db = AppDatabase.get(context)
+        val name = medicineName.trim().ifBlank { "Medicine" }
+        val existing = db.medicineDao().getAllOnce(patientProfileId)
+            .firstOrNull { it.name.equals(name, ignoreCase = true) }
+        // If the patient hasn't got this medicine yet, add it (marked as added by
+        // the caregiver) so the alarm can show it and they keep a record.
+        val medicine = existing ?: run {
+            val id = db.medicineDao().insert(
+                com.medremind.app.data.Medicine(
+                    name = name,
+                    profileId = patientProfileId,
+                    addedBy = caregiverName,
+                    createdAt = System.currentTimeMillis()
+                )
+            )
+            db.medicineDao().byId(id)
+        } ?: return ReminderResult.Error("Couldn't create the reminder on this device.")
+        return sendReminder(patientProfileId, medicine.id, caregiverName)
+    }
 }

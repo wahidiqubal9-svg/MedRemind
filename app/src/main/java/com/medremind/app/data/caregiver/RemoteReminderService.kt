@@ -13,6 +13,13 @@ interface RemoteReminderService {
         medicineId: Long,
         caregiverName: String
     ): ReminderResult
+
+    /** Patient side: fire the alarm for a medicine named in a cloud reminder. */
+    suspend fun sendReminderByName(
+        patientProfileId: Long,
+        medicineName: String,
+        caregiverName: String
+    ): ReminderResult
 }
 
 sealed class ReminderResult {

@@ -33,7 +33,9 @@ object CaregiverProvider {
     fun reminderService(context: Context): RemoteReminderService {
         val app = context.applicationContext
         return reminders ?: synchronized(this) {
-            reminders ?: LocalRemoteReminderService(app).also { reminders = it }
+            // Cloud-first: reaches the patient's phone when linked cross-device,
+            // otherwise falls back to the local alarm pipeline.
+            reminders ?: CloudRemoteReminderService(app).also { reminders = it }
         }
     }
 }
