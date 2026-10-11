@@ -159,7 +159,9 @@ fun AppRoot(
                 )
             )
         }
-        if (!settings.onboardingDone) {
+        if (!settings.introSeen) {
+            IntroCarousel(onDone = { settings.finishIntro() })
+        } else if (!settings.onboardingDone) {
             if (showAccount) {
                 AccountScreen(
                     onBack = { showAccount = false },

@@ -1,5 +1,7 @@
 package com.medremind.app.ui
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,9 +10,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -45,130 +50,146 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.launch
 
-private data class OnboardPage(
+private data class IntroSlide(
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
     val title: String,
-    val message: String,
-    val accent: Color
+    val message: String
 )
 
+/**
+ * Premium first-run intro: a few branded slides before the account choice.
+ * Shown over the brand gradient so the very first impression feels polished.
+ */
 @Composable
-fun OnboardingScreen(onDone: () -> Unit) {
-    val pages = listOf(
-        OnboardPage(
-            Icons.Rounded.Medication,
-            "Welcome to MedRemind",
-            "The right medicine, shown to the right person, at the right time \u2014 with help from someone you trust.",
-            Color(0xFF6366F1)
-        ),
-        OnboardPage(
-            Icons.Rounded.WbSunny,
-            "Today",
-            "Your day at a glance. See every dose and its time \u2014 then slide to take, snooze, or skip.",
-            Color(0xFFF59E0B)
-        ),
-        OnboardPage(
-            Icons.Rounded.Medication,
-            "Your medicine cabinet",
-            "Add medicines with a photo, set smart schedules (daily, weekly, as\u2011needed), and track your stock.",
-            Color(0xFF10B981)
-        ),
-        OnboardPage(
-            Icons.Rounded.Insights,
-            "Progress & Health",
-            "Watch your adherence over time, and log blood pressure, glucose and weight \u2014 export a report anytime.",
-            Color(0xFF0EA5E9)
-        ),
-        OnboardPage(
-            Icons.Rounded.Favorite,
-            "Caregiver",
-            "Connect someone you trust. They can add medicines, send reminders and see confirmations \u2014 with your approval.",
-            Color(0xFFE11D48)
-        ),
-        OnboardPage(
+fun IntroCarousel(onDone: () -> Unit) {
+    val slides = listOf(
+        IntroSlide(
             Icons.Rounded.NotificationsActive,
-            "Reliable alarms",
-            "Full\u2011screen reminders with the medicine photo, working even when your phone is locked.",
-            Color(0xFF8B5CF6)
+            "Your medicines, on time",
+            "Full\u2011screen reminders with the medicine photo \u2014 working even when " +
+                "your phone is locked."
+        ),
+        IntroSlide(
+            Icons.Rounded.Insights,
+            "Health & progress at a glance",
+            "See your adherence over time, and log blood pressure, glucose and weight."
+        ),
+        IntroSlide(
+            Icons.Rounded.Favorite,
+            "Help from someone you trust",
+            "Connect a caregiver so they can remind you and see confirmations \u2014 " +
+                "with your approval."
         )
     )
-    val pager = rememberPagerState(pageCount = { pages.size })
+    val pager = rememberPagerState(pageCount = { slides.size })
     val scope = rememberCoroutineScope()
-    val last = pager.currentPage == pages.lastIndex
+    val isLast = pager.currentPage == slides.lastIndex
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .navigationBarsPadding()
-            .padding(24.dp)
+            .background(MedGradients.hero())
     ) {
-        HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { page ->
-            val item = pages[page]
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Surface(shape = CircleShape, color = item.accent.copy(alpha = 0.16f)) {
-                    Icon(
-                        imageVector = item.icon,
-                        contentDescription = null,
-                        tint = item.accent,
-                        modifier = Modifier
-                            .padding(28.dp)
-                            .size(56.dp)
-                    )
-                }
-                Spacer(Modifier.size(26.dp))
-                Text(
-                    item.title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(Modifier.size(10.dp))
-                Text(
-                    item.message,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            repeat(pages.size) { index ->
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 4.dp)
-                        .size(if (index == pager.currentPage) 10.dp else 8.dp)
-                        .background(
-                            color = if (index == pager.currentPage) {
-                                MaterialTheme.colorScheme.primary
-                            } else MaterialTheme.colorScheme.outlineVariant,
-                            shape = CircleShape
-                        )
-                )
-            }
-        }
-        Spacer(Modifier.size(22.dp))
-        GradientPillButton(
-            text = if (last) "Get started" else "Next",
-            onClick = {
-                if (last) onDone()
-                else scope.launch { pager.animateScrollToPage(pager.currentPage + 1) }
-            },
-            modifier = Modifier.fillMaxWidth()
-        )
         TextButton(
             onClick = onDone,
-            modifier = Modifier.align(Alignment.CenterHorizontally)
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(8.dp)
         ) {
-            Text("Skip")
+            Text("Skip", color = Color.White, fontWeight = FontWeight.SemiBold)
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp, vertical = 28.dp)
+        ) {
+            HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { page ->
+                val slide = slides[page]
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(34.dp),
+                        color = Color.White.copy(alpha = 0.18f),
+                        modifier = Modifier.size(150.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = slide.icon,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(68.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(34.dp))
+                    Text(
+                        slide.title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color.White,
+                        fontWeight = FontWeight.ExtraBold,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        slide.message,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.White.copy(alpha = 0.9f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                repeat(slides.size) { index ->
+                    val selected = index == pager.currentPage
+                    val width by animateDpAsState(
+                        targetValue = if (selected) 22.dp else 8.dp,
+                        animationSpec = tween(260),
+                        label = "dotWidth"
+                    )
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 4.dp)
+                            .width(width)
+                            .height(8.dp)
+                            .background(
+                                color = if (selected) Color.White
+                                else Color.White.copy(alpha = 0.4f),
+                                shape = CircleShape
+                            )
+                    )
+                }
+            }
+            Spacer(Modifier.height(22.dp))
+            Surface(
+                onClick = {
+                    if (isLast) onDone()
+                    else scope.launch { pager.animateScrollToPage(pager.currentPage + 1) }
+                },
+                shape = RoundedCornerShape(50),
+                color = Color.White,
+                contentColor = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(
+                    modifier = Modifier.padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        if (isLast) "Get started" else "Next",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
     }
 }

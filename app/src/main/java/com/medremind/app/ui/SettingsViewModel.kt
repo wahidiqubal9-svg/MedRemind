@@ -64,6 +64,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     var choiceDone by mutableStateOf(prefs.getBoolean("choice_done", false))
         private set
 
+    /** Whether the intro carousel (before the account choice) has been completed. */
+    var introSeen by mutableStateOf(prefs.getBoolean("intro_seen", false))
+        private set
+
+    fun finishIntro() {
+        introSeen = true
+        prefs.edit().putBoolean("intro_seen", true).apply()
+    }
+
     var alarmSetupSeen by mutableStateOf(prefs.getBoolean("alarm_setup_seen", false))
         private set
 

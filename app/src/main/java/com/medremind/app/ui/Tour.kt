@@ -62,36 +62,35 @@ data class TourStep(
 val defaultTourSteps = listOf(
     TourStep(
         anchor = null,
-        title = "Welcome to MedRemind",
-        body = "Let's take a quick look around. At each step, tap the highlighted " +
-            "button to open that feature \u2014 it's the real thing.",
+        title = "A quick tour",
+        body = "Let's look around. At each step, tap the highlighted button to open " +
+            "it for real — you can skip any time.",
         tapToAdvance = false
     ),
     TourStep(
         anchor = "nav_med",
-        title = "Medicines",
-        body = "Tap the Medicines button below to open your cabinet."
+        title = "Your medicine cabinet",
+        body = "Tap Medicines to see everything you take, with photos and schedules."
     ),
     TourStep(
         anchor = "fab_add",
         title = "Add a medicine",
-        body = "Tap the \u201cAdd medicine\u201d button to add one \u2014 with a photo, " +
-            "a schedule and stock details."
+        body = "Tap \u201cAdd medicine\u201d — photo, schedule and stock in a few taps."
     ),
     TourStep(
         anchor = "nav_progress",
-        title = "Progress",
-        body = "Tap Progress to see your adherence over time and export a report."
+        title = "See how you're doing",
+        body = "Tap Progress for your adherence over time and a report for your doctor."
     ),
     TourStep(
         anchor = "nav_health",
-        title = "Health",
-        body = "Tap Health to log blood pressure, glucose and weight."
+        title = "Track your numbers",
+        body = "Tap Health to log blood pressure, glucose and weight and watch trends."
     ),
     TourStep(
         anchor = "nav_today",
-        title = "Today",
-        body = "Tap Today for your day's doses with their times."
+        title = "Your day at a glance",
+        body = "Tap Today for every dose and its time — take, snooze or skip."
     ),
     TourStep(
         anchor = "people",
@@ -100,13 +99,13 @@ val defaultTourSteps = listOf(
     ),
     TourStep(
         anchor = "bell",
-        title = "Notifications",
+        title = "Stay informed",
         body = "Tap the bell for reminders, missed doses and caregiver activity."
     ),
     TourStep(
         anchor = null,
         title = "You're all set",
-        body = "You can replay this tour anytime from Settings \u2192 Help.",
+        body = "Replay this tour anytime from Settings \u2192 Help.",
         tapToAdvance = false
     )
 )

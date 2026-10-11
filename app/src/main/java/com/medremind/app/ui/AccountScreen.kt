@@ -164,7 +164,10 @@ fun AccountScreen(
             .requestEmail()
             .build()
         val client = GoogleSignIn.getClient(context, gso)
-        googleLauncher.launch(client.signInIntent)
+        // Clear any cached account first so the picker is always shown.
+        client.signOut().addOnCompleteListener {
+            googleLauncher.launch(client.signInIntent)
+        }
     }
 
     Scaffold(contentWindowInsets = WindowInsets(0.dp)) { padding ->

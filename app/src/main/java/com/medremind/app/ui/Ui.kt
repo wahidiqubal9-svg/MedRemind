@@ -699,10 +699,10 @@ fun SplashScreen() {
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_nav_med),
+                    painter = painterResource(R.drawable.ic_launcher_foreground),
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(64.dp)
+                    modifier = Modifier.size(84.dp)
                 )
             }
             Spacer(Modifier.height(22.dp))
