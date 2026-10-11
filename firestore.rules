@@ -1,0 +1,31 @@
+rules_version = '2';
+// Deploy with:  firebase deploy --only firestore:rules
+// (or paste into Firebase Console -> Firestore -> Rules)
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Short-lived pairing codes. Any signed-in user can look a code up to claim
+    // it; only its owner creates it.
+    match /pairings/{code} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null;
+    }
+
+    // A caregiver<->patient link. Only the two people involved can read/write it.
+    match /links/{linkId} {
+      allow create: if request.auth != null
+        && request.resource.data.caregiverUid == request.auth.uid;
+      allow read, update, delete: if request.auth != null
+        && (resource.data.caregiverUid == request.auth.uid
+            || resource.data.patientUid == request.auth.uid);
+    }
+
+    // Each user owns their own profile.
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

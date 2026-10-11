@@ -25,23 +25,26 @@ class FirebaseConnectionRepository(private val context: Context) : ConnectionRep
 
     private val uid: String? get() = auth?.currentUser?.uid
 
+    /** Whether a cloud pairing is possible (signed in + Firestore available). */
+    val cloudReady: Boolean get() = uid != null && db != null
+
     override suspend fun createPatientPairingCode(patientName: String): PairingRequest {
         val request = local.createPatientPairingCode(patientName)
         val u = uid
         val database = db
         if (u != null && database != null) {
-            runCatching {
-                database.collection("pairings").document(request.code).set(
-                    mapOf(
-                        "ownerUid" to u,
-                        "peerName" to request.peerName,
-                        "token" to request.token,
-                        "expiresAt" to request.expiresAt,
-                        "status" to PairingStatus.OPEN,
-                        "createdAt" to FieldValue.serverTimestamp()
-                    )
-                ).awaitResult()
-            }
+            // Publish the code so a caregiver on another device can find it.
+            // Fire-and-forget: never block showing the QR/code on the network.
+            database.collection("pairings").document(request.code).set(
+                mapOf(
+                    "ownerUid" to u,
+                    "peerName" to request.peerName,
+                    "token" to request.token,
+                    "expiresAt" to request.expiresAt,
+                    "status" to PairingStatus.OPEN,
+                    "createdAt" to FieldValue.serverTimestamp()
+                )
+            )
         }
         return request
     }
@@ -79,10 +82,20 @@ class FirebaseConnectionRepository(private val context: Context) : ConnectionRep
         val clean = code.filter { it.isDigit() }
         if (clean.length != 6) return ConnectionResult.Error("Enter the 6-digit code.")
         val database = db
-        val snap = if (database != null) {
-            runCatching { database.collection("pairings").document(clean).get().awaitResult() }
-                .getOrNull()
-        } else null
+        if (database == null) {
+            return local.requestCaregiverAccess(clean, caregiverName)
+        }
+
+        val read = runCatching {
+            database.collection("pairings").document(clean).get().awaitResult()
+        }
+        if (read.isFailure) {
+            return ConnectionResult.Error(
+                "Couldn't reach the cloud. Check your internet and that Firestore " +
+                    "is enabled for this project."
+            )
+        }
+        val snap = read.getOrNull()
 
         if (snap != null && snap.exists()) {
             val status = snap.getString("status")
@@ -95,6 +108,9 @@ class FirebaseConnectionRepository(private val context: Context) : ConnectionRep
             }
             // Bring the cloud pairing into the local store, then run the local
             // flow (creates the patient profile and both link rows).
+            val myUid = uid ?: return ConnectionResult.Error(
+                "Sign in on this phone, then try again to connect to someone on another device."
+            )
             local.injectRemotePairing(
                 token = snap.getString("token") ?: "",
                 code = clean,
@@ -106,30 +122,41 @@ class FirebaseConnectionRepository(private val context: Context) : ConnectionRep
                 // The patient generated the code on purpose, so treat that as
                 // consent and activate the link immediately.
                 local.approve(result.pairingId)
-                val myUid = uid
-                if (database != null && myUid != null) {
-                    runCatching {
-                        database.collection("pairings").document(clean)
-                            .update("status", PairingStatus.CLAIMED)
-                        database.collection("links").document().set(
-                            mapOf(
-                                "caregiverUid" to myUid,
-                                "patientUid" to (snap.getString("ownerUid") ?: ""),
-                                "caregiverName" to caregiverName.ifBlank { "Caregiver" },
-                                "patientName" to (snap.getString("peerName") ?: "Patient"),
-                                "status" to "ACTIVE",
-                                "permissions" to CaregiverPermission.DEFAULT_MEDICATION,
-                                "createdAt" to FieldValue.serverTimestamp()
-                            )
-                        ).awaitResult()
-                    }
+                runCatching {
+                    database.collection("pairings").document(clean)
+                        .update("status", PairingStatus.CLAIMED)
+                    database.collection("links").document().set(
+                        mapOf(
+                            "caregiverUid" to myUid,
+                            "patientUid" to (snap.getString("ownerUid") ?: ""),
+                            "caregiverName" to caregiverName.ifBlank { "Caregiver" },
+                            "patientName" to (snap.getString("peerName") ?: "Patient"),
+                            "status" to "ACTIVE",
+                            "permissions" to CaregiverPermission.DEFAULT_MEDICATION,
+                            "createdAt" to FieldValue.serverTimestamp()
+                        )
+                    ).awaitResult()
                 }
             }
             return result
         }
 
-        // No cloud config / signed out: same-device local pairing.
-        return local.requestCaregiverAccess(clean, caregiverName)
+        // Not in the cloud: try the same-device local flow, else explain clearly.
+        val localResult = local.requestCaregiverAccess(clean, caregiverName)
+        if (localResult is ConnectionResult.Error) {
+            return if (uid == null) {
+                ConnectionResult.Error(
+                    "Sign in on this phone, then try again \u2014 cross-device " +
+                        "connection needs an account."
+                )
+            } else {
+                ConnectionResult.Error(
+                    "That code doesn't match an active request. Make sure the other " +
+                        "phone is signed in when it creates the code."
+                )
+            }
+        }
+        return localResult
     }
 
     override suspend fun approve(pairingId: Long): Boolean = local.approve(pairingId)

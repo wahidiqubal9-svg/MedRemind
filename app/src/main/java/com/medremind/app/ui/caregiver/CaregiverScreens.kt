@@ -133,6 +133,7 @@ fun CaregiverHomeScreen(vm: CaregiverViewModel, onBack: () -> Unit) {
     var permissionLink by remember { mutableStateOf<CaregiverLink?>(null) }
     var removeLink by remember { mutableStateOf<CaregiverLink?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var showSignInNeeded by remember { mutableStateOf(false) }
 
     permissionLink?.let { link ->
         CaregiverPermissionScreen(
@@ -247,10 +248,14 @@ fun CaregiverHomeScreen(vm: CaregiverViewModel, onBack: () -> Unit) {
                     enabled = !busy,
                     modifier = Modifier.fillMaxWidth(),
                     onClick = {
-                        busy = true
-                        scope.launch {
-                            pairing = vm.createPairingCode()
-                            busy = false
+                        if (!vm.isSignedIn) {
+                            showSignInNeeded = true
+                        } else {
+                            busy = true
+                            scope.launch {
+                                pairing = vm.createPairingCode()
+                                busy = false
+                            }
                         }
                     }
                 )
@@ -313,6 +318,23 @@ fun CaregiverHomeScreen(vm: CaregiverViewModel, onBack: () -> Unit) {
                 removeLink = null
             },
             onDismiss = { removeLink = null }
+        )
+    }
+
+    if (showSignInNeeded) {
+        AlertDialog(
+            onDismissRequest = { showSignInNeeded = false },
+            title = { Text("Sign in first") },
+            text = {
+                Text(
+                    "To connect with a caregiver on another phone, sign in under " +
+                        "Me \u2192 Account first. Without an account, connecting only " +
+                        "works on this device."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showSignInNeeded = false }) { Text("OK") }
+            }
         )
     }
 }

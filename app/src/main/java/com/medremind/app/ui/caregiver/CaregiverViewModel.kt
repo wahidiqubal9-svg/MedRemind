@@ -69,6 +69,12 @@ class CaregiverViewModel(application: Application) : AndroidViewModel(applicatio
         app.getSharedPreferences("medremind_settings", Context.MODE_PRIVATE)
             .getString("profile_name", "")?.ifBlank { null } ?: "You"
 
+    /** Cross-device pairing needs a signed-in account. */
+    val isSignedIn: Boolean
+        get() = runCatching {
+            com.google.firebase.auth.FirebaseAuth.getInstance().currentUser != null
+        }.getOrDefault(false)
+
     val patients: StateFlow<List<Patient>> = caregiverRepo.patients()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
