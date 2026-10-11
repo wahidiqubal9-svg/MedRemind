@@ -110,7 +110,11 @@ fun AppRoot(
         context.getSystemService(android.app.NotificationManager::class.java)
             ?.canUseFullScreenIntent() == true
     } else true
-    val needsAlarmSetup = loaded && (!notificationsOk || !exactAlarmsOk || !fullScreenOk)
+    // "Display over other apps" is what lets the alarm show full-screen over a
+    // running app (screen on) and block until Take/Snooze/Skip.
+    val overlayOk = android.provider.Settings.canDrawOverlays(context)
+    val needsAlarmSetup = loaded &&
+        (!notificationsOk || !exactAlarmsOk || !fullScreenOk || !overlayOk)
 
     fun guarded(action: () -> Unit) {
         if (settings.pin.isNullOrEmpty()) action() else pendingAction = action
