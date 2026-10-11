@@ -20,8 +20,8 @@ android {
         applicationId = "com.medremind.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 160
-        versionName = "0.159.0"
+        versionCode = 161
+        versionName = "0.160.0"
     }
 
     signingConfigs {
@@ -37,8 +37,11 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // R8 minification is the heaviest, most RAM-hungry build step, and this
+            // device is memory-constrained (heavy swap) which makes it slow and
+            // flaky. Disabled for fast, reliable builds; turn back on for Play Store.
+            isMinifyEnabled = false
+            isShrinkResources = false
             signingConfig = signingConfigs.getByName("deviceDebug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android.txt"),
