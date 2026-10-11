@@ -25,6 +25,9 @@ interface MedicineDao {
     @Query("SELECT * FROM medicines WHERE id = :id")
     suspend fun byId(id: Long): Medicine?
 
+    @Query("SELECT * FROM medicines WHERE cloudId = :cloudId AND cloudId != '' LIMIT 1")
+    suspend fun byCloudId(cloudId: String): Medicine?
+
     @Query("SELECT * FROM medicines ORDER BY id ASC LIMIT 1")
     suspend fun first(): Medicine?
 

@@ -280,6 +280,10 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                         ReminderScheduler.schedule(app, toSave)
                     }
                 }
+                // Sync a caregiver-managed patient's medicines to their phone.
+                if (profileId != 0L) {
+                    com.medremind.app.data.caregiver.PatientDataSync.pushMedicines(app, profileId)
+                }
             }
             refreshWidget()
             onDone()
@@ -314,6 +318,12 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                 }
                 db.medicineDao().delete(medicine)
                 PhotoStorage.delete(medicine.photoPath)
+                // Keep the patient's phone in step when a caregiver removes one.
+                if (medicine.profileId != 0L) {
+                    com.medremind.app.data.caregiver.PatientDataSync.pushMedicines(
+                        app, medicine.profileId
+                    )
+                }
             }
             refreshWidget()
             onDone()

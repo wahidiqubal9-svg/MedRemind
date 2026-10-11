@@ -2,12 +2,16 @@ package com.medremind.app.data.caregiver
 
 import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.medremind.app.alarm.ReminderScheduler
 import com.medremind.app.data.AppDatabase
 import com.medremind.app.data.CaregiverDirection
 import com.medremind.app.data.CaregiverLink
 import com.medremind.app.data.CaregiverPermission
+import com.medremind.app.data.Medicine
+import com.medremind.app.data.Schedule
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -138,5 +142,91 @@ object CloudSyncManager {
                     }
                 }
             }
+
+        // I am the patient: mirror the medicines the caregiver set up for me.
+        listeners += db.collection("patients").document(uid).collection("medicines")
+            .addSnapshotListener { snap, _ ->
+                if (snap == null) return@addSnapshotListener
+                scope.launch { upsertMedicines(app, snap.documents) }
+            }
+    }
+
+    /** Creates/updates local medicines (profile 0) from the cloud documents. */
+    private suspend fun upsertMedicines(app: Context, docs: List<DocumentSnapshot>) {
+        val db = AppDatabase.get(app)
+        val medicineDao = db.medicineDao()
+        val scheduleDao = db.scheduleDao()
+        for (doc in docs) {
+            val name = doc.getString("name") ?: continue
+            val strength = doc.getString("strength") ?: ""
+            val form = doc.getString("form") ?: "tablet"
+            val intake = doc.getString("intake") ?: ""
+            val addedBy = doc.getString("addedBy") ?: ""
+            val times = doc.getString("times") ?: ""
+            val scheduleType = doc.getString("scheduleType") ?: "DAILY"
+            val daysMask = (doc.getLong("daysMask") ?: 0L).toInt()
+            val doseLabel = doc.getString("doseLabel") ?: ""
+
+            val existing = medicineDao.byCloudId(doc.id)
+            val medicine = if (existing == null) {
+                val id = medicineDao.insert(
+                    Medicine(
+                        name = name,
+                        strength = strength,
+                        form = form,
+                        intakeInstruction = intake,
+                        addedBy = addedBy,
+                        profileId = 0L,
+                        cloudId = doc.id
+                    )
+                )
+                medicineDao.byId(id) ?: continue
+            } else {
+                val updated = existing.copy(
+                    name = name,
+                    strength = strength,
+                    form = form,
+                    intakeInstruction = intake,
+                    addedBy = addedBy
+                )
+                medicineDao.update(updated)
+                updated
+            }
+
+            if (times.isNotBlank()) {
+                val schedule = scheduleDao.forMedicine(medicine.id).firstOrNull()
+                if (schedule == null) {
+                    val sid = scheduleDao.insert(
+                        Schedule(
+                            medicineId = medicine.id,
+                            type = scheduleType,
+                            times = times,
+                            daysMask = daysMask,
+                            doseLabel = doseLabel
+                        )
+                    )
+                    ReminderScheduler.schedule(
+                        app,
+                        Schedule(
+                            id = sid,
+                            medicineId = medicine.id,
+                            type = scheduleType,
+                            times = times,
+                            daysMask = daysMask,
+                            doseLabel = doseLabel
+                        )
+                    )
+                } else {
+                    val updated = schedule.copy(
+                        type = scheduleType,
+                        times = times,
+                        daysMask = daysMask,
+                        doseLabel = doseLabel
+                    )
+                    scheduleDao.update(updated)
+                    ReminderScheduler.schedule(app, updated)
+                }
+            }
+        }
     }
 }

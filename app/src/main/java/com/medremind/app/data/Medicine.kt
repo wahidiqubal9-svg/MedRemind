@@ -92,5 +92,7 @@ data class Medicine(
      * Name of the caregiver who added/edited this medicine (blank = the owner
      * added it themselves). Shown as a small "Added by ..." footnote for transparency.
      */
-    val addedBy: String = ""
+    val addedBy: String = "",
+    /** Cloud (Firestore) document id when this medicine is synced across devices. */
+    val cloudId: String = ""
 )

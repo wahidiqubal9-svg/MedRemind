@@ -56,6 +56,9 @@ interface CaregiverDao {
     @Query("SELECT * FROM caregiver_links WHERE cloudId = :cloudId AND cloudId != '' LIMIT 1")
     suspend fun linkByCloudId(cloudId: String): CaregiverLink?
 
+    @Query("SELECT * FROM caregiver_links WHERE patientProfileId = :profileId AND direction = 'OUTGOING' AND cloudId != '' LIMIT 1")
+    suspend fun outgoingCloudLink(profileId: Long): CaregiverLink?
+
     @Query("SELECT * FROM caregiver_links WHERE peerUid = :peerUid AND direction = 'INCOMING' AND status != 'REMOVED' LIMIT 1")
     suspend fun incomingLinkByPeer(peerUid: String): CaregiverLink?
 
