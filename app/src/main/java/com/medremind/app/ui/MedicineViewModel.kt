@@ -320,14 +320,8 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                 }
                 db.medicineDao().delete(medicine)
                 PhotoStorage.delete(medicine.photoPath)
-                // Keep the other device in step when a medicine is removed.
-                if (medicine.profileId != 0L) {
-                    com.medremind.app.data.caregiver.PatientDataSync.pushMedicines(
-                        app, medicine.profileId
-                    )
-                } else {
-                    com.medremind.app.data.caregiver.PatientDataSync.pushMyMedicines(app)
-                }
+                // Propagate the deletion so the other phone drops it too.
+                com.medremind.app.data.caregiver.PatientDataSync.deleteMedicine(app, medicine)
             }
             refreshWidget()
             onDone()

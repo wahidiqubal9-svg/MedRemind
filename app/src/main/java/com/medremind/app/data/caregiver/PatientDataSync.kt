@@ -7,13 +7,13 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.medremind.app.data.AppDatabase
 import com.medremind.app.data.CaregiverDirection
+import com.medremind.app.data.Medicine
 import com.medremind.app.data.remote.awaitResult
 
 /**
- * Pushes a person's medicines (and schedules) to Firestore so the other side of
- * a caregiver link mirrors them:
- *  - caregiver device: a patient's medicines -> `patients/{patientUid}/medicines`
- *  - patient device: my own medicines      -> `patients/{myUid}/medicines`
+ * Pushes a person's medicines to Firestore so the other side of a caregiver link
+ * mirrors them. Additive only (never removes other docs) so the two sides can
+ * both contribute; deletions are propagated explicitly via [deleteMedicine].
  */
 object PatientDataSync {
 
@@ -22,10 +22,7 @@ object PatientDataSync {
         if (profileId == 0L) return
         val app = context.applicationContext
         val db = runCatching { FirebaseFirestore.getInstance() }.getOrNull() ?: return
-        val dao = AppDatabase.get(app).caregiverDao()
-        val link = dao.outgoingCloudLink(profileId) ?: return
-        val patientUid = link.peerUid
-        if (patientUid.isBlank()) return
+        val patientUid = resolvePatientUid(context, profileId) ?: return
         push(db.collection("patients").document(patientUid).collection("medicines"), app, profileId)
     }
 
@@ -33,23 +30,42 @@ object PatientDataSync {
     suspend fun pushMyMedicines(context: Context) {
         val app = context.applicationContext
         val db = runCatching { FirebaseFirestore.getInstance() }.getOrNull() ?: return
-        val uid = runCatching { FirebaseAuth.getInstance().currentUser?.uid }.getOrNull() ?: return
-        val dao = AppDatabase.get(app).caregiverDao()
-        val linked = dao.linksOnce().any {
-            it.direction == CaregiverDirection.INCOMING && it.cloudId.isNotBlank()
+        val patientUid = resolvePatientUid(context, 0L) ?: return
+        push(db.collection("patients").document(patientUid).collection("medicines"), app, 0L)
+    }
+
+    /** Remove a medicine's cloud document so the other phone drops it. */
+    suspend fun deleteMedicine(context: Context, medicine: Medicine) {
+        val cloudId = medicine.cloudId
+        if (cloudId.isBlank()) return
+        val db = runCatching { FirebaseFirestore.getInstance() }.getOrNull() ?: return
+        val patientUid = resolvePatientUid(context, medicine.profileId) ?: return
+        runCatching {
+            db.collection("patients").document(patientUid)
+                .collection("medicines").document(cloudId).delete().awaitResult()
         }
-        if (!linked) return
-        push(db.collection("patients").document(uid).collection("medicines"), app, 0L)
+    }
+
+    /** Which account owns the shared medicine list for this profile. */
+    private suspend fun resolvePatientUid(context: Context, profileId: Long): String? {
+        val app = context.applicationContext
+        val dao = AppDatabase.get(app).caregiverDao()
+        return if (profileId != 0L) {
+            dao.outgoingCloudLink(profileId)?.peerUid?.ifBlank { null }
+        } else {
+            val uid = runCatching { FirebaseAuth.getInstance().currentUser?.uid }.getOrNull()
+            val linked = dao.linksOnce().any {
+                it.direction == CaregiverDirection.INCOMING && it.cloudId.isNotBlank()
+            }
+            if (uid != null && linked) uid else null
+        }
     }
 
     private suspend fun push(coll: CollectionReference, app: Context, profileId: Long) {
         val medicineDao = AppDatabase.get(app).medicineDao()
         val scheduleDao = AppDatabase.get(app).scheduleDao()
-        val medicines = medicineDao.getAllOnce(profileId)
-        val keep = mutableSetOf<String>()
-        for (m in medicines) {
+        for (m in medicineDao.getAllOnce(profileId)) {
             val cloudId = m.cloudId.ifBlank { coll.document().id }
-            keep += cloudId
             val schedule = scheduleDao.forMedicine(m.id).firstOrNull()
             runCatching {
                 coll.document(cloudId).set(
@@ -68,12 +84,6 @@ object PatientDataSync {
                 ).awaitResult()
             }
             if (m.cloudId.isBlank()) medicineDao.update(m.copy(cloudId = cloudId))
-        }
-        // Remove cloud medicines that were deleted locally.
-        runCatching {
-            coll.get().awaitResult().documents.forEach {
-                if (it.id !in keep) it.reference.delete()
-            }
         }
     }
 }

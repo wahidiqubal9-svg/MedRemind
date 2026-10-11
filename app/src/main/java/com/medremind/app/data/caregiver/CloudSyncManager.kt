@@ -124,27 +124,32 @@ object CloudSyncManager {
                 if (snap == null) return@addSnapshotListener
                 scope.launch {
                     for (doc in snap.documents) {
-                        val existing = dao.linkByCloudId(doc.id) ?: continue
-                        val status = doc.getString("status") ?: existing.status
-                        val permissions = (doc.getLong("permissions")
-                            ?: existing.permissions.toLong()).toInt()
-                        if (existing.permissions != permissions || existing.status != status) {
-                            dao.updateLink(existing.copy(status = status, permissions = permissions))
+                        var existing = dao.linkByCloudId(doc.id)
+                        if (existing == null) {
+                            // Heal an older link that predates cloud ids: attach it to
+                            // this cloud link so existing connections keep working
+                            // across updates without a manual reconnect.
+                            val orphans = dao.linksOnce().filter {
+                                it.direction == CaregiverDirection.OUTGOING && it.cloudId.isBlank()
+                            }
+                            if (orphans.size == 1) {
+                                existing = orphans.first().copy(
+                                    cloudId = doc.id,
+                                    peerUid = doc.getString("patientUid") ?: ""
+                                )
+                                dao.updateLink(existing)
+                            }
                         }
-                        // Mirror the patient's medicine list into their local profile.
-                        val peer = existing.peerUid
-                        val profileId = existing.patientProfileId
-                        if (peer.isNotBlank() && profileId != 0L && medicineListeners[peer] == null) {
-                            val reg = db.collection("patients").document(peer)
-                                .collection("medicines")
-                                .addSnapshotListener { msnap, _ ->
-                                    if (msnap == null) return@addSnapshotListener
-                                    scope.launch { mirrorMedicines(app, profileId, msnap.documents) }
-                                }
-                            medicineListeners[peer] = reg
-                            listeners += reg
+                        val link = existing ?: continue
+                        val status = doc.getString("status") ?: link.status
+                        val permissions = (doc.getLong("permissions")
+                            ?: link.permissions.toLong()).toInt()
+                        if (link.permissions != permissions || link.status != status) {
+                            dao.updateLink(link.copy(status = status, permissions = permissions))
                         }
                     }
+                    // Ensure a medicine mirror per patient (from local links).
+                    ensureMedicineListeners(app, db)
                     val present = snap.documents.map { it.id }.toSet()
                     dao.linksOnce()
                         .filter {
@@ -195,6 +200,36 @@ object CloudSyncManager {
                 if (snap == null) return@addSnapshotListener
                 scope.launch { mirrorMedicines(app, 0L, snap.documents) }
             }
+
+        // I am the caregiver: make sure each linked patient is mirrored too.
+        ensureMedicineListeners(app, db)
+    }
+
+    /** For every linked patient, mirror their cloud medicines into their profile. */
+    private fun ensureMedicineListeners(app: Context, db: FirebaseFirestore) {
+        val dao = AppDatabase.get(app).caregiverDao()
+        scope.launch {
+            val links = dao.linksOnce().filter {
+                it.direction == CaregiverDirection.OUTGOING &&
+                    it.cloudId.isNotBlank() &&
+                    it.peerUid.isNotBlank() &&
+                    it.patientProfileId != 0L
+            }
+            for (link in links) {
+                val peer = link.peerUid
+                val profileId = link.patientProfileId
+                if (medicineListeners[peer] == null) {
+                    val reg = db.collection("patients").document(peer)
+                        .collection("medicines")
+                        .addSnapshotListener { msnap, _ ->
+                            if (msnap == null) return@addSnapshotListener
+                            scope.launch { mirrorMedicines(app, profileId, msnap.documents) }
+                        }
+                    medicineListeners[peer] = reg
+                    listeners += reg
+                }
+            }
+        }
     }
 
     /** Creates/updates local medicines for [profileId] from cloud docs, and
