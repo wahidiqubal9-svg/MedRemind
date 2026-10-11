@@ -1,6 +1,5 @@
 package com.medremind.app.data.auth
 
-import android.content.Context
 import com.google.android.gms.tasks.Task
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
@@ -13,7 +12,6 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withTimeoutOrNull
 
 /** The signed-in user, or null. */
 data class AuthUser(
@@ -40,7 +38,7 @@ interface AuthRepository {
     suspend fun signIn(email: String, password: String): AuthResult
     suspend fun signUp(email: String, password: String): AuthResult
     suspend fun sendPasswordReset(email: String): AuthResult
-    suspend fun signInWithGoogle(context: Context): AuthResult
+    suspend fun signInWithGoogleToken(idToken: String): AuthResult
     fun signOut()
 }
 
@@ -93,76 +91,19 @@ class FirebaseAuthRepository : AuthRepository {
             )
     }
 
-    /**
-     * Shows the device's Google account picker (Credential Manager) and signs in
-     * to Firebase with the chosen account. Needs the Google provider enabled in
-     * Firebase and a web client id in google-services.json.
-     *
-     * [context] must be an Activity context (Credential Manager shows UI).
-     */
-    override suspend fun signInWithGoogle(context: Context): AuthResult {
+    /** Exchanges a Google ID token (from the account picker) for a Firebase session. */
+    override suspend fun signInWithGoogleToken(idToken: String): AuthResult {
         val a = auth ?: return AuthResult.Error(NOT_CONFIGURED)
-        if (!playServicesAvailable(context)) {
-            return AuthResult.Error(
-                "Google Play Services isn't available on this device, so Google " +
-                    "sign-in can't be used. Please sign in with email instead."
-            )
-        }
-        val serverClientId = context.resources.getIdentifier(
-            "default_web_client_id", "string", context.packageName
-        ).takeIf { it != 0 }?.let { context.getString(it) }
-        if (serverClientId.isNullOrBlank()) {
-            return AuthResult.Error(
-                "Google sign-in isn't set up yet. Enable Google in Firebase and " +
-                    "re-download google-services.json."
-            )
-        }
-        // Never hang forever: the account picker either returns or times out.
-        return withTimeoutOrNull(45_000) { googleFlow(a, context, serverClientId) }
-            ?: AuthResult.Error(
-                "Google sign-in timed out. Check that a Google account is added to " +
-                    "this device and try again."
+        val credential = GoogleAuthProvider.getCredential(idToken, null)
+        return runCatching { a.signInWithCredential(credential).await() }
+            .fold(
+                onSuccess = { result ->
+                    result.user?.let { ensureProfile(it) }
+                    AuthResult.Success(result.user?.email ?: "")
+                },
+                onFailure = { AuthResult.Error(it.friendly()) }
             )
     }
-
-    private suspend fun googleFlow(
-        a: FirebaseAuth,
-        context: Context,
-        serverClientId: String
-    ): AuthResult = try {
-        val credentialManager = androidx.credentials.CredentialManager.create(context)
-        val option = com.google.android.libraries.identity.googleid.GetGoogleIdOption.Builder()
-            .setFilterByAuthorizedAccounts(false)
-            .setServerClientId(serverClientId)
-            .setAutoSelectEnabled(false)
-            .build()
-        val request = androidx.credentials.GetCredentialRequest.Builder()
-            .addCredentialOption(option)
-            .build()
-        val response = credentialManager.getCredential(context, request)
-        val googleId = com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-            .createFrom(response.credential.data)
-        val firebaseCred = GoogleAuthProvider.getCredential(googleId.idToken, null)
-        val result = a.signInWithCredential(firebaseCred).await()
-        result.user?.let { ensureProfile(it) }
-        AuthResult.Success(result.user?.email ?: googleId.id)
-    } catch (e: androidx.credentials.exceptions.GetCredentialCancellationException) {
-        AuthResult.Error("Sign-in cancelled.")
-    } catch (e: androidx.credentials.exceptions.NoCredentialException) {
-        AuthResult.Error("No Google account found on this device.")
-    } catch (e: androidx.credentials.exceptions.GetCredentialException) {
-        android.util.Log.w("GoogleSignIn", "Credential exception", e)
-        AuthResult.Error(e.friendly())
-    } catch (e: Exception) {
-        android.util.Log.w("GoogleSignIn", "Google sign-in failed", e)
-        AuthResult.Error(e.friendly())
-    }
-
-    private fun playServicesAvailable(context: Context): Boolean = runCatching {
-        com.google.android.gms.common.GoogleApiAvailability.getInstance()
-            .isGooglePlayServicesAvailable(context) ==
-            com.google.android.gms.common.ConnectionResult.SUCCESS
-    }.getOrDefault(false)
 
     override fun signOut() {
         runCatching { auth?.signOut() }

@@ -1,6 +1,8 @@
 package com.medremind.app.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,6 +46,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.medremind.app.data.auth.AuthResult
 import com.medremind.app.data.auth.FirebaseAuthRepository
 import kotlinx.coroutines.launch
@@ -116,16 +120,51 @@ fun AccountScreen(
         }
     }
 
+    val webClientId = remember {
+        context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+            .takeIf { it != 0 }?.let { context.getString(it) }
+    }
+
+    val googleLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        task.addOnCompleteListener { t ->
+            if (t.isSuccessful) {
+                val idToken = t.result?.idToken
+                if (idToken.isNullOrBlank()) {
+                    loading = false
+                    error = "Google didn't return a sign-in token. The SHA-1 or " +
+                        "Google provider may be misconfigured."
+                } else {
+                    scope.launch {
+                        val r = repo.signInWithGoogleToken(idToken)
+                        loading = false
+                        handle(r)
+                    }
+                }
+            } else {
+                loading = false
+                error = googleError(t.exception)
+            }
+        }
+    }
+
     fun submitGoogle() {
         if (loading) return
+        if (webClientId.isNullOrBlank()) {
+            error = "Google sign-in isn't set up yet (missing web client id)."
+            return
+        }
         error = null
         info = null
         loading = true
-        scope.launch {
-            val result = repo.signInWithGoogle(context)
-            loading = false
-            handle(result)
-        }
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(webClientId)
+            .requestEmail()
+            .build()
+        val client = GoogleSignIn.getClient(context, gso)
+        googleLauncher.launch(client.signInIntent)
     }
 
     Scaffold(contentWindowInsets = WindowInsets(0.dp)) { padding ->
@@ -265,5 +304,18 @@ fun AccountScreen(
                 else -> TextButton(onClick = { mode = 0; error = null }) { Text("Back to sign in") }
             }
         }
+    }
+}
+
+private fun googleError(e: Exception?): String {
+    val msg = e?.message ?: return "Google sign-in failed."
+    return when {
+        msg.contains("12501", true) || msg.contains("cancel", true) -> "Sign-in cancelled."
+        msg.contains("12500", true) || msg.contains("10:", true) ||
+            msg.contains("DEVELOPER_ERROR", true) ->
+            "Google sign-in is misconfigured (SHA-1 or OAuth client)."
+        msg.contains("12502", true) || msg.contains("network", true) ->
+            "No connection. Check your internet and retry."
+        else -> "Google sign-in failed: $msg"
     }
 }
