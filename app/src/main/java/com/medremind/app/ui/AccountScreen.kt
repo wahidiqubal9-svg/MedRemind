@@ -60,7 +60,7 @@ fun AccountScreen(
 ) {
     BackHandler { onBack() }
     val context = LocalContext.current
-    val repo = remember { FirebaseAuthRepository(context.applicationContext) }
+    val repo = remember { FirebaseAuthRepository() }
     val scope = rememberCoroutineScope()
     var mode by remember { mutableIntStateOf(0) }
     var email by remember { mutableStateOf("") }
@@ -115,7 +115,7 @@ fun AccountScreen(
         info = null
         loading = true
         scope.launch {
-            val result = repo.signInWithGoogle()
+            val result = repo.signInWithGoogle(context)
             loading = false
             handle(result)
         }

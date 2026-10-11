@@ -39,11 +39,11 @@ interface AuthRepository {
     suspend fun signIn(email: String, password: String): AuthResult
     suspend fun signUp(email: String, password: String): AuthResult
     suspend fun sendPasswordReset(email: String): AuthResult
-    suspend fun signInWithGoogle(): AuthResult
+    suspend fun signInWithGoogle(context: Context): AuthResult
     fun signOut()
 }
 
-class FirebaseAuthRepository(private val context: Context) : AuthRepository {
+class FirebaseAuthRepository : AuthRepository {
 
     private val auth: FirebaseAuth? = runCatching { FirebaseAuth.getInstance() }.getOrNull()
     private val firestore: FirebaseFirestore? = runCatching { FirebaseFirestore.getInstance() }.getOrNull()
@@ -96,8 +96,10 @@ class FirebaseAuthRepository(private val context: Context) : AuthRepository {
      * Shows the device's Google account picker (Credential Manager) and signs in
      * to Firebase with the chosen account. Needs the Google provider enabled in
      * Firebase and a web client id in google-services.json.
+     *
+     * [context] must be an Activity context (Credential Manager shows UI).
      */
-    override suspend fun signInWithGoogle(): AuthResult {
+    override suspend fun signInWithGoogle(context: Context): AuthResult {
         val a = auth ?: return AuthResult.Error(NOT_CONFIGURED)
         val serverClientId = context.resources.getIdentifier(
             "default_web_client_id", "string", context.packageName

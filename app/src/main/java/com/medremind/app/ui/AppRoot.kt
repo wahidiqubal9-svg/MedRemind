@@ -126,8 +126,9 @@ fun AppRoot(
         showCaregiver -> "caregiver"
         showCaregiving -> "caregiving"
         showPermissions -> "permissions"
-        showMe -> "me"
+        // Account takes precedence over Me so "Sign in" from Me actually opens it.
         showAccount -> "account"
+        showMe -> "me"
         else -> "main"
     }
 

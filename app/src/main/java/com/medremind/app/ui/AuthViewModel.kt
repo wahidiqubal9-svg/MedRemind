@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.stateIn
 
 /** Shared, app-wide view of the signed-in account. */
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
-    private val repo = FirebaseAuthRepository(application)
+    private val repo = FirebaseAuthRepository()
 
     val user: StateFlow<AuthUser?> = repo.authState()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), repo.currentUser)
