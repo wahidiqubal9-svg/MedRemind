@@ -596,13 +596,25 @@ private fun OverlayPermissionStep(onBack: () -> Unit, onNext: () -> Unit) {
             GradientPillButton(
                 text = "Open settings",
                 onClick = {
-                    runCatching {
-                        context.startActivity(
-                            Intent(
-                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                Uri.parse("package:" + context.packageName)
+                    val pkg = Uri.parse("package:" + context.packageName)
+                    if (runCatching {
+                            context.startActivity(
+                                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, pkg)
                             )
-                        )
+                        }.isFailure
+                    ) {
+                        if (runCatching {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+                                )
+                            }.isFailure
+                        ) {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, pkg)
+                                )
+                            }
+                        }
                     }
                     onNext()
                 },

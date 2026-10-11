@@ -176,7 +176,10 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel, firstRun: Boolea
                     Intent(
                         Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
                         Uri.parse("package:" + context.packageName)
-                    )
+                    ),
+                    // Fallback for devices (incl. some Samsung) that don't handle
+                    // the direct request: open the battery-optimization list.
+                    Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
                 )
             }
         ),
@@ -192,7 +195,9 @@ fun PermissionScreen(onBack: () -> Unit, vm: MedicineViewModel, firstRun: Boolea
                     Intent(
                         Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                         Uri.parse("package:" + context.packageName)
-                    )
+                    ),
+                    // Fallback: the overlay list, then this app's info page.
+                    Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
                 )
             }
         )
