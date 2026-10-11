@@ -162,13 +162,21 @@ fun AppRoot(
         if (settings.onboardVersion < 2) {
             // Guided first-run onboarding (welcome → use case → first medicine →
             // permissions → test reminder → done).
+            val isPro by entitlementVm.isPro.collectAsState()
             OnboardingFlow(
                 settings = settings,
                 vm = vm,
+                isPro = isPro,
                 onFinished = {
+                    val managingOthers = settings.managingFor == "other"
                     settings.finishOnboarding()
                     settings.finishTour()
                     settings.finishAlarmSetup()
+                    if (managingOthers) {
+                        // Caregiving is a paid (Pro) feature.
+                        if (entitlementVm.isPro.value) showCaregiving = true
+                        else entitlementVm.openPaywall()
+                    }
                 }
             )
         } else {

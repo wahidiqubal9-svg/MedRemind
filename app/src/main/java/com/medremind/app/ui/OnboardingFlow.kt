@@ -9,6 +9,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -59,10 +60,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.medremind.app.R
 
 /**
  * Guided first-run onboarding: welcome → who you manage for → add first medicine
@@ -72,12 +75,14 @@ import androidx.core.content.ContextCompat
 fun OnboardingFlow(
     settings: SettingsViewModel,
     vm: MedicineViewModel,
+    isPro: Boolean,
     onFinished: () -> Unit
 ) {
     when (settings.onboardStep) {
         0 -> WelcomeStep(onNext = { settings.goToOnboardStep(1) })
         1 -> ManagingForStep(
             selected = settings.managingFor,
+            isPro = isPro,
             onSelect = settings::selectManagingFor,
             onBack = { settings.goToOnboardStep(0) },
             onNext = { settings.goToOnboardStep(2) }
@@ -258,6 +263,7 @@ private fun WelcomeStep(onNext: () -> Unit) {
 @Composable
 private fun ManagingForStep(
     selected: String,
+    isPro: Boolean,
     onSelect: (String) -> Unit,
     onBack: () -> Unit,
     onNext: () -> Unit
@@ -271,20 +277,44 @@ private fun ManagingForStep(
             )
             Spacer(Modifier.height(24.dp))
             UseCaseCard(
-                icon = Icons.Rounded.Person,
+                painterRes = R.drawable.il_avatar_me,
                 title = "Myself",
                 subtitle = "My own medicines and reminders",
                 selected = selected == "me",
+                pro = false,
                 onClick = { onSelect("me") }
             )
             Spacer(Modifier.height(14.dp))
             UseCaseCard(
-                icon = Icons.Rounded.Group,
+                painterRes = R.drawable.il_avatar_family,
                 title = "Someone else",
                 subtitle = "A family member or someone I care for",
                 selected = selected == "other",
+                pro = true,
                 onClick = { onSelect("other") }
             )
+            if (selected == "other" && !isPro) {
+                Spacer(Modifier.height(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Rounded.Info, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            "Caregiving is a Pro feature \u2014 you'll see upgrade " +
+                                "options after setup. The app is free otherwise.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.weight(1f))
             GradientPillButton(
                 text = "Continue",
@@ -297,10 +327,11 @@ private fun ManagingForStep(
 
 @Composable
 private fun UseCaseCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    painterRes: Int,
     title: String,
     subtitle: String,
     selected: Boolean,
+    pro: Boolean,
     onClick: () -> Unit
 ) {
     val border = if (selected) MaterialTheme.colorScheme.primary
@@ -315,25 +346,33 @@ private fun UseCaseCard(
             .border(2.dp, border, RoundedCornerShape(22.dp))
     ) {
         Row(
-            modifier = Modifier.padding(18.dp),
+            modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = if (selected) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.surfaceContainerHigh
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.size(68.dp)
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = if (selected) MaterialTheme.colorScheme.onPrimary
-                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(12.dp).size(26.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Image(
+                        painter = painterResource(painterRes),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(8.dp)
+                    )
+                }
             }
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    if (pro) {
+                        Spacer(Modifier.width(8.dp))
+                        ProBadge()
+                    }
+                }
                 Text(
                     subtitle,
                     style = MaterialTheme.typography.bodySmall,
@@ -368,29 +407,91 @@ private fun AddFirstMedicineStep(vm: MedicineViewModel, onDone: () -> Unit) {
 @Composable
 private fun PermissionIntroStep(onBack: () -> Unit, onNext: () -> Unit) {
     OnboardingScaffold(stepIndex = 3, onBack = onBack) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        Column(Modifier.fillMaxSize()) {
+            Spacer(Modifier.height(8.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(30.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(112.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.NotificationsActive,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(56.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(20.dp))
+                StepTitle(
+                    "Make your reminders reliable",
+                    "To alert you on time, MedRemind needs a few permissions. You " +
+                        "can change these later in Settings."
+                )
+            }
             Spacer(Modifier.height(24.dp))
-            StepArt(Icons.Rounded.NotificationsActive)
-            Spacer(Modifier.height(24.dp))
-            StepTitle(
-                "Make your reminders reliable",
-                "To alert you on time, MedRemind needs a few permissions. You can " +
-                    "change these later in Settings."
-            )
-            Spacer(Modifier.height(28.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Bullet(Icons.Rounded.Notifications, "Notifications")
-                Bullet(Icons.Rounded.Info, "Exact alarms")
-                Bullet(Icons.Rounded.Warning, "Full-screen alerts")
+            MedCard(modifier = Modifier.fillMaxWidth()) {
+                PermissionInfoRow(
+                    icon = Icons.Rounded.Notifications,
+                    title = "Notifications",
+                    subtitle = "Shows the reminder when it's time to take medicine."
+                )
+                Spacer(Modifier.height(16.dp))
+                PermissionInfoRow(
+                    icon = Icons.Rounded.Info,
+                    title = "Exact alarms",
+                    subtitle = "Fires the reminder at the exact scheduled time."
+                )
+                Spacer(Modifier.height(16.dp))
+                PermissionInfoRow(
+                    icon = Icons.Rounded.Warning,
+                    title = "Full-screen alerts",
+                    subtitle = "Shows the medicine photo over the lock screen."
+                )
             }
             Spacer(Modifier.weight(1f))
             GradientPillButton(
                 text = "Continue",
                 onClick = onNext,
                 modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+private fun PermissionInfoRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.primaryContainer,
+            modifier = Modifier.size(42.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

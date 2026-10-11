@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Flat illustration: two people (Someone else / caregiving). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="100dp"
+    android:viewportWidth="120"
+    android:viewportHeight="100">
+    <!-- back person (caregiver) -->
+    <path
+        android:fillColor="#6366F1"
+        android:pathData="M56,100 C56,77 66,64 80,64 C94,64 104,77 104,100 Z" />
+    <path
+        android:fillColor="#EFC3A0"
+        android:pathData="M74,48 h12 v13 a6,6 0 0 1 -12,0 z" />
+    <path
+        android:fillColor="#F7D2B0"
+        android:pathData="M80,34 m-16,0 a16,16 0 1 0 32,0 a16,16 0 1 0 -32,0" />
+    <path
+        android:fillColor="#3B3F4A"
+        android:pathData="M64,32 C64,23 71,16 80,16 C89,16 96,23 96,32 C96,26 88,22 80,22 C72,22 64,26 64,32 Z" />
+    <!-- front person (elder) -->
+    <path
+        android:fillColor="#A855F7"
+        android:pathData="M16,100 C16,79 27,67 42,67 C57,67 68,79 68,100 Z" />
+    <path
+        android:fillColor="#EFC3A0"
+        android:pathData="M36,52 h12 v13 a6,6 0 0 1 -12,0 z" />
+    <path
+        android:fillColor="#F7D2B0"
+        android:pathData="M42,39 m-15,0 a15,15 0 1 0 30,0 a15,15 0 1 0 -30,0" />
+    <path
+        android:fillColor="#9AA0AE"
+        android:pathData="M27,37 C27,29 34,23 42,23 C50,23 57,29 57,37 C57,32 50,28 42,28 C34,28 27,32 27,37 Z" />
+</vector>

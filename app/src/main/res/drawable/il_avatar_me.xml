@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Flat illustration: one person (Myself). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <path
+        android:fillColor="#6366F1"
+        android:pathData="M22,100 C22,76 34,63 50,63 C66,63 78,76 78,100 Z" />
+    <path
+        android:fillColor="#EFC3A0"
+        android:pathData="M44,47 h12 v13 a6,6 0 0 1 -12,0 z" />
+    <path
+        android:fillColor="#F7D2B0"
+        android:pathData="M50,33 m-16,0 a16,16 0 1 0 32,0 a16,16 0 1 0 -32,0" />
+    <path
+        android:fillColor="#3B3F4A"
+        android:pathData="M34,31 C34,22 41,15 50,15 C59,15 66,22 66,31 C66,25 58,21 50,21 C42,21 34,25 34,31 Z" />
+</vector>
