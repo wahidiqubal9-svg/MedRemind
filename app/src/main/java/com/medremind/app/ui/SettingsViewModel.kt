@@ -7,6 +7,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 
+/** Bump when the guided onboarding changes so existing users see it again once. */
+private const val ONBOARDING_VERSION = 2
+
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs =
@@ -60,6 +63,31 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     var onboardingDone by mutableStateOf(prefs.getBoolean("onboarding_done", false))
         private set
+
+    /**
+     * Version of the guided onboarding. Bumped when the flow is redesigned so
+     * existing installs see the new one once.
+     */
+    var onboardVersion by mutableStateOf(prefs.getInt("onboard_version", 0))
+        private set
+
+    /** Current step within the guided onboarding (0 = welcome). */
+    var onboardStep by mutableStateOf(prefs.getInt("onboard_step", 0))
+        private set
+
+    fun goToOnboardStep(step: Int) {
+        onboardStep = step
+        prefs.edit().putInt("onboard_step", step).apply()
+    }
+
+    /** "me" or "other" — who the user is managing medicines for. */
+    var managingFor by mutableStateOf(prefs.getString("managing_for", "me") ?: "me")
+        private set
+
+    fun selectManagingFor(value: String) {
+        managingFor = value
+        prefs.edit().putString("managing_for", value).apply()
+    }
 
     var choiceDone by mutableStateOf(prefs.getBoolean("choice_done", false))
         private set
@@ -122,7 +150,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun finishOnboarding() {
         onboardingDone = true
-        prefs.edit().putBoolean("onboarding_done", true).apply()
+        onboardVersion = ONBOARDING_VERSION
+        onboardStep = 0
+        prefs.edit()
+            .putBoolean("onboarding_done", true)
+            .putInt("onboard_version", ONBOARDING_VERSION)
+            .putInt("onboard_step", 0)
+            .apply()
     }
 
     fun updateSnoozeMinutes(value: Int) {

@@ -159,25 +159,18 @@ fun AppRoot(
                 )
             )
         }
-        if (!settings.introSeen) {
-            IntroCarousel(onDone = { settings.finishIntro() })
-        } else if (!settings.onboardingDone) {
-            if (showAccount) {
-                AccountScreen(
-                    onBack = { showAccount = false },
-                    onSignedIn = {
-                        settings.finishOnboarding()
-                        showAccount = false
-                    },
-                    settings = settings
-                )
-            } else {
-                StartChoiceScreen(
-                    onContinueWithoutAccount = { settings.finishOnboarding() },
-                    onSignIn = { showAccount = true },
-                    onCreateAccount = { showAccount = true }
-                )
-            }
+        if (settings.onboardVersion < 2) {
+            // Guided first-run onboarding (welcome → use case → first medicine →
+            // permissions → test reminder → done).
+            OnboardingFlow(
+                settings = settings,
+                vm = vm,
+                onFinished = {
+                    settings.finishOnboarding()
+                    settings.finishTour()
+                    settings.finishAlarmSetup()
+                }
+            )
         } else {
         val tourController = remember(settings.tourDone) { TourController() }
         CompositionLocalProvider(
