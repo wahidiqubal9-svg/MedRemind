@@ -270,16 +270,54 @@ object ReminderScheduler {
         am.cancel(pendingIntent(context, scheduleId))
     }
 
+    /** Schedules a wake-up to check whether a "Remind now" reached the patient. */
+    fun scheduleReminderCheck(
+        context: Context,
+        reminderId: String,
+        triggerAt: Long,
+        kind: String
+    ) {
+        val am = context.getSystemService(AlarmManager::class.java) ?: return
+        val intent = Intent(context, ReminderStatusReceiver::class.java).apply {
+            action = ACTION_REMINDER_CHECK
+            putExtra(EXTRA_REMINDER_ID, reminderId)
+            putExtra(EXTRA_REMINDER_KIND, kind)
+        }
+        val pi = PendingIntent.getBroadcast(
+            context,
+            (reminderId + kind).hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        if (canScheduleExact(am)) {
+            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
+        } else {
+            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
+        }
+    }
+
     fun canScheduleExact(am: AlarmManager): Boolean =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) am.canScheduleExactAlarms() else true
 
     suspend fun rescheduleAll(context: Context) = withContext(Dispatchers.IO) {
         val db = AppDatabase.get(context)
-        db.scheduleDao().getAllOnce().forEach { schedule(context, it) }
+        val medicines = db.medicineDao().getAllOnce().associateBy { it.id }
+        db.scheduleDao().getAllOnce().forEach { schedule ->
+            // Alarms ring only for the device owner's own medicines. A patient's
+            // medicines must ring on the patient's phone, never the caregiver's.
+            if (medicines[schedule.medicineId]?.profileId == 0L) {
+                schedule(context, schedule)
+            } else {
+                cancel(context, schedule.id)
+            }
+        }
     }
 
     const val ACTION_ALARM = "com.medremind.app.ALARM"
     const val ACTION_SNOOZE = "com.medremind.app.SNOOZE"
+    const val ACTION_REMINDER_CHECK = "com.medremind.app.REMINDER_CHECK"
     const val EXTRA_SCHEDULE_ID = "scheduleId"
     const val EXTRA_SNOOZE_EVENT_ID = "snoozeEventId"
+    const val EXTRA_REMINDER_ID = "reminderId"
+    const val EXTRA_REMINDER_KIND = "reminderKind"
 }

@@ -35,6 +35,7 @@ class AlarmReceiver : BroadcastReceiver() {
                         val name = db.medicineDao().byId(schedule.medicineId)?.name
                         AlarmNotifier.show(context, eventId, name)
                         ReminderScheduler.schedule(context, schedule)
+                        com.medremind.app.data.caregiver.DoseDataSync.pushEvent(context, eventId)
                     }
                 }
             } finally {

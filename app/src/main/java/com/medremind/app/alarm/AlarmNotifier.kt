@@ -11,6 +11,7 @@ import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import com.medremind.app.MainActivity
 import com.medremind.app.R
 
 object AlarmNotifier {
@@ -176,4 +177,39 @@ object AlarmNotifier {
     }
 
     const val REFILL_CHANNEL_ID = "med_refill"
+
+    const val CAREGIVER_CHANNEL_ID = "caregiver_alerts"
+
+    /** A high-priority alert on the caregiver's phone (delivery / expiry). */
+    fun showCaregiverAlert(context: Context, id: Int, title: String, text: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val nm = context.getSystemService(NotificationManager::class.java)
+            if (nm != null && nm.getNotificationChannel(CAREGIVER_CHANNEL_ID) == null) {
+                nm.createNotificationChannel(
+                    NotificationChannel(
+                        CAREGIVER_CHANNEL_ID,
+                        "Caregiver alerts",
+                        NotificationManager.IMPORTANCE_HIGH
+                    ).apply { description = "Delivery and expiry alerts for reminders you send" }
+                )
+            }
+        }
+        val pi = PendingIntent.getActivity(
+            context,
+            id,
+            Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(context, CAREGIVER_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_pill)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pi)
+            .build()
+        runCatching { NotificationManagerCompat.from(context).notify(id, notification) }
+    }
 }

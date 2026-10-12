@@ -35,5 +35,7 @@ data class DoseEvent(
     /** Who/what created this dose: see [DoseSource]. */
     val source: String = DoseSource.SCHEDULED,
     /** Name of the caregiver who sent this dose (blank unless [source] is CAREGIVER). */
-    val actorName: String = ""
+    val actorName: String = "",
+    /** Cloud (Firestore) document id when this dose event is synced across devices. */
+    val cloudId: String = ""
 )

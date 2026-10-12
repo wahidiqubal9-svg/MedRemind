@@ -57,5 +57,7 @@ data class Metric(
      * Name of the caregiver who logged this reading (blank = the owner logged it
      * themselves). Shown as a small "Logged by ..." footnote for transparency.
      */
-    val loggedBy: String = ""
+    val loggedBy: String = "",
+    /** Cloud (Firestore) document id when this reading is synced across devices. */
+    val cloudId: String = ""
 )

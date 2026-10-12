@@ -107,6 +107,11 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                         loggedBy = actor
                     )
                 )
+                if (profileId != 0L) {
+                    com.medremind.app.data.caregiver.HealthDataSync.pushMetrics(app, profileId)
+                } else {
+                    com.medremind.app.data.caregiver.HealthDataSync.pushMyMetrics(app)
+                }
             }
             onDone()
         }
@@ -127,7 +132,10 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
 
     fun deleteMetric(metric: Metric, onDone: () -> Unit = {}) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { db.metricDao().delete(metric) }
+            withContext(Dispatchers.IO) {
+                db.metricDao().delete(metric)
+                com.medremind.app.data.caregiver.HealthDataSync.deleteMetric(app, metric)
+            }
             onDone()
         }
     }
@@ -272,12 +280,18 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                         schedule.copy(startDate = System.currentTimeMillis())
                     } else schedule
                     val toSave = normalized.copy(medicineId = medicineId)
-                    if (toSave.id == 0L) {
-                        val newId = db.scheduleDao().insert(toSave)
-                        ReminderScheduler.schedule(app, toSave.copy(id = newId))
+                    val savedId = if (toSave.id == 0L) {
+                        db.scheduleDao().insert(toSave)
                     } else {
                         db.scheduleDao().update(toSave)
-                        ReminderScheduler.schedule(app, toSave)
+                        toSave.id
+                    }
+                    // Only the device owner's medicines ring on this device; a
+                    // patient's medicines ring on the patient's own phone.
+                    if (profileId == 0L) {
+                        ReminderScheduler.schedule(app, toSave.copy(id = savedId))
+                    } else {
+                        ReminderScheduler.cancel(app, savedId)
                     }
                 }
                 // Sync medicines across the caregiver link (both directions).
@@ -447,6 +461,7 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                         }
                     }
                 }
+                eventId?.let { com.medremind.app.data.caregiver.DoseDataSync.pushEvent(app, it) }
             }
             refreshWidget()
             onDone(eventId)
@@ -470,6 +485,7 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                         actedAt = now
                     )
                 )
+                eventId?.let { com.medremind.app.data.caregiver.DoseDataSync.pushEvent(app, it) }
             }
             refreshWidget()
             onDone(eventId)
@@ -506,6 +522,7 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                     dao.byId(eventId)?.let { event ->
                         dao.update(event.copy(status = DoseStatus.PENDING, actedAt = null))
                     }
+                    com.medremind.app.data.caregiver.DoseDataSync.pushEvent(app, eventId)
                 }
             }
             onDone()

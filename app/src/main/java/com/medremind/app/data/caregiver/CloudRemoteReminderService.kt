@@ -40,17 +40,29 @@ class CloudRemoteReminderService(private val context: Context) : RemoteReminderS
             }
             val medicine = AppDatabase.get(context).medicineDao().byId(medicineId)
             val name = medicine?.name ?: "Medicine"
+            val patientName = AppDatabase.get(context).caregiverDao()
+                .patient(link.patientProfileId)?.name ?: "your patient"
+            val now = System.currentTimeMillis()
             return runCatching {
-                database.collection("reminders").add(
+                val ref = database.collection("reminders").add(
                     mapOf(
                         "caregiverUid" to uid,
                         "patientUid" to link.peerUid,
                         "medicineName" to name,
                         "caregiverName" to caregiverName,
+                        "patientName" to patientName,
                         "status" to "PENDING",
+                        "sentAtMillis" to now,
                         "createdAt" to FieldValue.serverTimestamp()
                     )
                 ).awaitResult()
+                // Alert the caregiver if it isn't delivered (5 min) or expires (30 min).
+                com.medremind.app.alarm.ReminderScheduler.scheduleReminderCheck(
+                    context, ref.id, now + 5 * 60 * 1000L, "CHECK5"
+                )
+                com.medremind.app.alarm.ReminderScheduler.scheduleReminderCheck(
+                    context, ref.id, now + 30 * 60 * 1000L, "EXPIRE30"
+                )
                 ReminderResult.Delivered(eventId = 0L, local = false)
             }.getOrElse {
                 ReminderResult.Error("Couldn't reach the cloud to send the reminder.")

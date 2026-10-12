@@ -53,6 +53,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".alarm.ReminderStatusReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".widget.NextDoseWidgetReceiver"
             android:exported="true">
             <intent-filter>

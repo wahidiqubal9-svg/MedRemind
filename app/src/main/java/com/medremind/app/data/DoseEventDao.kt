@@ -17,6 +17,9 @@ interface DoseEventDao {
     @Query("SELECT * FROM dose_events WHERE id = :id")
     suspend fun byId(id: Long): DoseEvent?
 
+    @Query("SELECT * FROM dose_events WHERE cloudId = :cloudId AND cloudId != '' LIMIT 1")
+    suspend fun byCloudId(cloudId: String): DoseEvent?
+
     @Query("SELECT * FROM dose_events ORDER BY scheduledAt DESC")
     fun observeAll(): Flow<List<DoseEvent>>
 

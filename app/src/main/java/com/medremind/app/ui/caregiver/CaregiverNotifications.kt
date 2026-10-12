@@ -30,6 +30,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,6 +42,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.medremind.app.ui.MedCard
 import com.medremind.app.ui.MedClickableCard
 import com.medremind.app.ui.MedEmptyState
+import com.medremind.app.ui.MedSegmentedButtons
 import com.medremind.app.ui.ScreenHeader
 import com.medremind.app.ui.SquareIconButton
 import com.medremind.app.ui.tourAnchor
@@ -86,10 +90,31 @@ fun NotificationsScreen(
     BackHandler { onBack() }
     val vm: CaregiverViewModel = viewModel()
     val items by vm.notifications.collectAsState()
+    val patients by vm.patients.collectAsState()
 
     // Mark everything seen when the centre opens, and keep marking as new items
     // arrive while it's on screen, so the badge stays clear while you read.
     LaunchedEffect(items) { vm.markNotificationsSeen(items.map { it.key }) }
+
+    // Separate your own notifications from each patient's.
+    var filter by remember { mutableStateOf<String?>(null) } // null = All, "you", or a patient id
+    val filterOptions = remember(items, patients) {
+        buildList {
+            add("All" to null)
+            if (items.any { it.patientProfileId == 0L }) add("You" to "you")
+            items.map { it.patientProfileId }.distinct().filter { it != 0L }.forEach { id ->
+                val name = patients.firstOrNull { it.id == id }?.name ?: "Patient"
+                add(name to id.toString())
+            }
+        }
+    }
+    val visible = remember(items, filter) {
+        when (filter) {
+            null -> items
+            "you" -> items.filter { it.patientProfileId == 0L }
+            else -> items.filter { it.patientProfileId.toString() == filter }
+        }
+    }
 
     Scaffold(contentWindowInsets = WindowInsets(0.dp)) { padding ->
         Column(
@@ -110,7 +135,17 @@ fun NotificationsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            if (items.isEmpty()) {
+            if (filterOptions.size > 1) {
+                MedSegmentedButtons(
+                    options = filterOptions.map { it.first },
+                    selectedIndex = filterOptions.indexOfFirst { it.second == filter }
+                        .coerceAtLeast(0),
+                    onSelect = { filter = filterOptions[it].second },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            if (visible.isEmpty()) {
                 MedEmptyState(
                     icon = Icons.Rounded.Notifications,
                     title = "All caught up",
@@ -121,7 +156,7 @@ fun NotificationsScreen(
                 )
             }
 
-            items.forEach { item ->
+            visible.forEach { item ->
                 val content: @Composable () -> Unit = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         val tint = when (item.type) {

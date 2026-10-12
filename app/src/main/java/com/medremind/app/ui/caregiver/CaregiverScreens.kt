@@ -783,7 +783,7 @@ fun CaregiverDashboardScreen(
         buildList {
             if (canViewConfirmations) add("Today")
             if (canViewMedicines) add("Medicines")
-            add("Activity")
+            add("Progress")
             if (healthTypes.isNotEmpty()) add("Health")
         }
     }
@@ -923,6 +923,15 @@ fun CaregiverDashboardScreen(
                         actor = vm.myName,
                         allowedTypes = healthTypes.toSet(),
                         showHeader = false
+                    )
+                } else if (currentTab == "Progress") {
+                    // Same Progress screen as the patient's, scoped to this patient.
+                    com.medremind.app.ui.HistoryContent(
+                        modifier = Modifier.fillMaxSize(),
+                        vm = medicineVm,
+                        profileId = profileId,
+                        showHeader = false,
+                        onOpenMe = {}
                     )
                 } else {
                     Column(

@@ -82,7 +82,9 @@ fun HistoryContent(
     vm: MedicineViewModel,
     onOpenMe: () -> Unit,
     profilePhoto: String? = null,
-    onOpenNotifications: () -> Unit = {}
+    onOpenNotifications: () -> Unit = {},
+    profileId: Long = 0L,
+    showHeader: Boolean = true
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -94,8 +96,8 @@ fun HistoryContent(
 
     LaunchedEffect(Unit) { vm.markOverdueAsMissed() }
 
-    LaunchedEffect(rangeDays) {
-        val full = vm.doseLogForRange(rangeDays * 2)
+    LaunchedEffect(rangeDays, profileId) {
+        val full = vm.doseLogForRange(rangeDays * 2, profileId)
         val cutoff = System.currentTimeMillis() - rangeDays * 86_400_000L
         // History is for doses already acted on - hide upcoming/pending and future.
         val acted = full.filter {
@@ -178,7 +180,7 @@ fun HistoryContent(
                 val range = if (days == 0) 3650 else days
                 scope.launch {
                     val data = withContext(Dispatchers.IO) {
-                        vm.doseLogForRange(range).filter {
+                        vm.doseLogForRange(range, profileId).filter {
                             it.status == DoseStatus.TAKEN || it.status == DoseStatus.MISSED ||
                                 it.status == DoseStatus.SKIPPED
                         }
@@ -193,15 +195,17 @@ fun HistoryContent(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        ScreenHeader("Progress") {
-            com.medremind.app.ui.caregiver.NotificationBell(onClick = onOpenNotifications)
-            Spacer(Modifier.width(10.dp))
-            SquareIconButton(
-                icon = Icons.Rounded.Person,
-                contentDescription = "Me",
-                onClick = onOpenMe,
-                photoPath = profilePhoto
-            )
+        if (showHeader) {
+            ScreenHeader("Progress") {
+                com.medremind.app.ui.caregiver.NotificationBell(onClick = onOpenNotifications)
+                Spacer(Modifier.width(10.dp))
+                SquareIconButton(
+                    icon = Icons.Rounded.Person,
+                    contentDescription = "Me",
+                    onClick = onOpenMe,
+                    photoPath = profilePhoto
+                )
+            }
         }
         MedSegmentedButtons(
             options = periodLabels,

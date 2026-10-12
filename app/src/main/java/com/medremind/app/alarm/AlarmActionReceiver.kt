@@ -46,6 +46,7 @@ class AlarmActionReceiver : BroadcastReceiver() {
                     }
                 }
                 AlarmNotifier.cancel(context, eventId)
+                com.medremind.app.data.caregiver.DoseDataSync.pushEvent(context, eventId)
             } finally {
                 pending.finish()
             }

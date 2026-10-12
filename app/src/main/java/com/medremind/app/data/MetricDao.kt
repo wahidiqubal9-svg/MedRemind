@@ -11,6 +11,9 @@ interface MetricDao {
     @Insert
     suspend fun insert(metric: Metric): Long
 
+    @androidx.room.Update
+    suspend fun update(metric: Metric)
+
     @Delete
     suspend fun delete(metric: Metric)
 
@@ -25,6 +28,9 @@ interface MetricDao {
 
     @Query("SELECT * FROM metrics WHERE profileId = :profileId ORDER BY recordedAt DESC")
     suspend fun getAllOnce(profileId: Long): List<Metric>
+
+    @Query("SELECT * FROM metrics WHERE cloudId = :cloudId AND cloudId != '' LIMIT 1")
+    suspend fun byCloudId(cloudId: String): Metric?
 
     @Query("DELETE FROM metrics")
     suspend fun clear()
