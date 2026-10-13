@@ -1,0 +1,17 @@
+rules_version = '2';
+// Deploy with:  firebase deploy --only storage
+// (or paste into Firebase Console -> Storage -> Rules)
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Medicine photos live under each patient's folder. Only the patient or a
+    // linked (access-granted) caregiver may read or write them.
+    match /patients/{patientUid}/photos/{file} {
+      allow read, write: if request.auth != null && (
+        request.auth.uid == patientUid ||
+        firestore.exists(
+          /databases/(default)/documents/access/$(patientUid)/caregivers/$(request.auth.uid)
+        )
+      );
+    }
+  }
+}

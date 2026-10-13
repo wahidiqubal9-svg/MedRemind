@@ -91,6 +91,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -104,6 +105,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.medremind.app.data.IntakeInstruction
@@ -170,10 +172,12 @@ fun AddEditMedicineScreen(
     actor: String = ""
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val initialStrength = remember(initial?.id) { splitAmountUnit(initial?.strength ?: "", "mg") }
 
     var step by remember { mutableIntStateOf(0) }
     var saved by remember { mutableStateOf(false) }
+    var pendingDuplicate by remember { mutableStateOf<(() -> Unit)?>(null) }
     var name by rememberSaveable { mutableStateOf(initial?.name ?: "") }
     var doseAmount by rememberSaveable { mutableStateOf(if (initial == null) "" else initialStrength.first) }
     var doseUnit by rememberSaveable { mutableStateOf(if (initial == null) "mg" else initialStrength.second) }
@@ -428,25 +432,31 @@ fun AddEditMedicineScreen(
                             if (step < 3) {
                                 step++
                             } else {
-                                val base = initial ?: Medicine(name = "")
-                                val medicine = base.copy(
-                                    name = name.trim(),
-                                    strength = "$doseAmount $doseUnit".trim(),
-                                    photoPath = photoPath,
-                                    quantity = if (trackRefill) stockAmount.toIntOrNull() ?: 0 else 0,
-                                    refillThreshold = if (trackRefill) {
-                                        refillBelow.toIntOrNull() ?: 0
-                                    } else 0,
-                                    intakeInstruction = intake,
-                                    form = form
-                                )
-                                val sharedTimes = if (allPrn) "" else times.joinToString(",")
-                                val schedule = pattern.toSchedule(
-                                    medicineId = base.id,
-                                    times = sharedTimes,
-                                    doseLabel = "$qtyAmount $qtyUnit".trim()
-                                )
-                                vm.saveMedicine(medicine, listOf(schedule), profileId, actor) { saved = true }
+                                val performSave: () -> Unit = {
+                                    val base = initial ?: Medicine(name = "")
+                                    val medicine = base.copy(
+                                        name = name.trim(),
+                                        strength = "$doseAmount $doseUnit".trim(),
+                                        photoPath = photoPath,
+                                        quantity = if (trackRefill) stockAmount.toIntOrNull() ?: 0 else 0,
+                                        refillThreshold = if (trackRefill) {
+                                            refillBelow.toIntOrNull() ?: 0
+                                        } else 0,
+                                        intakeInstruction = intake,
+                                        form = form
+                                    )
+                                    val sharedTimes = if (allPrn) "" else times.joinToString(",")
+                                    val schedule = pattern.toSchedule(
+                                        medicineId = base.id,
+                                        times = sharedTimes,
+                                        doseLabel = "$qtyAmount $qtyUnit".trim()
+                                    )
+                                    vm.saveMedicine(medicine, listOf(schedule), profileId, actor) { saved = true }
+                                }
+                                scope.launch {
+                                    val dup = vm.findDuplicate(profileId, name.trim(), initial?.id ?: 0L)
+                                    if (dup != null) pendingDuplicate = performSave else performSave()
+                                }
                             }
                         },
                         enabled = when (step) {
@@ -516,6 +526,28 @@ fun AddEditMedicineScreen(
             onSave = { chosen ->
                 pattern = chosen
                 showScheduleSheet = false
+            }
+        )
+    }
+
+    pendingDuplicate?.let { save ->
+        AlertDialog(
+            onDismissRequest = { pendingDuplicate = null },
+            title = { Text("Possible duplicate") },
+            text = {
+                Text(
+                    "You already have a medicine called \u201c${name.trim()}\u201d. " +
+                        "Add another one anyway?"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingDuplicate = null
+                    save()
+                }) { Text("Add anyway") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDuplicate = null }) { Text("Cancel") }
             }
         )
     }

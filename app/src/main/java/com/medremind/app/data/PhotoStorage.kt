@@ -61,6 +61,25 @@ object PhotoStorage {
         }.getOrNull()
     }
 
+    /** Content hash (MD5) of the photo, used to detect changes. */
+    fun hash(path: String?): String? {
+        if (path.isNullOrBlank()) return null
+        return runCatching {
+            val file = File(path)
+            if (!file.exists()) return@runCatching null
+            val md = java.security.MessageDigest.getInstance("MD5")
+            file.inputStream().use { input ->
+                val buf = ByteArray(8192)
+                while (true) {
+                    val n = input.read(buf)
+                    if (n <= 0) break
+                    md.update(buf, 0, n)
+                }
+            }
+            md.digest().joinToString("") { "%02x".format(it) }
+        }.getOrNull()
+    }
+
     /** Writes a base64 JPEG photo to a local file and returns its path. */
     fun saveBase64(context: Context, base64: String): String? {
         return runCatching {

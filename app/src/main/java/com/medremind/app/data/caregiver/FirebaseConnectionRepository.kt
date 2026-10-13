@@ -148,6 +148,13 @@ class FirebaseConnectionRepository(private val context: Context) : ConnectionRep
                         )
                     ).awaitResult()
                 }
+                // Grant the caregiver access to the patient's data + photos
+                // (checked by the security rules).
+                runCatching {
+                    database.collection("access").document(patientUid)
+                        .collection("caregivers").document(myUid)
+                        .set(mapOf("createdAt" to FieldValue.serverTimestamp()))
+                }
                 // Remember the cloud id + patient's uid locally so that
                 // "Remind now" can route to the patient's phone.
                 val dao = AppDatabase.get(context).caregiverDao()

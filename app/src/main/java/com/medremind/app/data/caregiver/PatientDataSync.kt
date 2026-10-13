@@ -1,52 +1,52 @@
 package com.medremind.app.data.caregiver
 
 import android.content.Context
+import android.net.Uri
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
 import com.medremind.app.data.AppDatabase
 import com.medremind.app.data.CaregiverDirection
 import com.medremind.app.data.Medicine
+import com.medremind.app.data.PhotoStorage
 import com.medremind.app.data.remote.awaitResult
+import java.io.File
+import java.util.UUID
 
-/**
- * Pushes a person's medicines to Firestore so the other side of a caregiver link
- * mirrors them. Additive only (never removes other docs) so the two sides can
- * both contribute; deletions are propagated explicitly via [deleteMedicine].
- */
+/** Pushes medicines to Firestore (id = globalId). The photo is uploaded to
+ *  Storage only when it changes, so reminders reuse the cached local image. */
 object PatientDataSync {
 
-    /** Caregiver side: push the medicines of a patient profile. */
     suspend fun pushMedicines(context: Context, profileId: Long) {
         if (profileId == 0L) return
         val app = context.applicationContext
-        val db = runCatching { FirebaseFirestore.getInstance() }.getOrNull() ?: return
         val patientUid = resolvePatientUid(context, profileId) ?: return
-        push(db.collection("patients").document(patientUid).collection("medicines"), app, profileId)
+        push(app, patientUid, profileId)
     }
 
-    /** Patient side: push my own medicines (only when a caregiver is linked). */
     suspend fun pushMyMedicines(context: Context) {
         val app = context.applicationContext
-        val db = runCatching { FirebaseFirestore.getInstance() }.getOrNull() ?: return
         val patientUid = resolvePatientUid(context, 0L) ?: return
-        push(db.collection("patients").document(patientUid).collection("medicines"), app, 0L)
+        push(app, patientUid, 0L)
     }
 
-    /** Remove a medicine's cloud document so the other phone drops it. */
     suspend fun deleteMedicine(context: Context, medicine: Medicine) {
-        val cloudId = medicine.cloudId
-        if (cloudId.isBlank()) return
+        val globalId = medicine.globalId.ifBlank { medicine.cloudId }
+        if (globalId.isBlank()) return
         val db = runCatching { FirebaseFirestore.getInstance() }.getOrNull() ?: return
         val patientUid = resolvePatientUid(context, medicine.profileId) ?: return
         runCatching {
-            db.collection("patients").document(patientUid)
-                .collection("medicines").document(cloudId).delete().awaitResult()
+            db.collection("patients").document(patientUid).collection("medicines")
+                .document(globalId).delete().awaitResult()
+        }
+        runCatching {
+            FirebaseStorage.getInstance()
+                .reference.child("patients/$patientUid/photos/$globalId.jpg").delete().awaitResult()
         }
     }
 
-    /** Which account owns the shared medicine list for this profile. */
     private suspend fun resolvePatientUid(context: Context, profileId: Long): String? {
         val app = context.applicationContext
         val dao = AppDatabase.get(app).caregiverDao()
@@ -61,36 +61,63 @@ object PatientDataSync {
         }
     }
 
-    private suspend fun push(coll: CollectionReference, app: Context, profileId: Long) {
+    private suspend fun push(app: Context, patientUid: String, profileId: Long) {
+        val db = runCatching { FirebaseFirestore.getInstance() }.getOrNull() ?: return
         val medicineDao = AppDatabase.get(app).medicineDao()
         val scheduleDao = AppDatabase.get(app).scheduleDao()
-        for (m in medicineDao.getAllOnce(profileId)) {
-            val cloudId = m.cloudId.ifBlank { coll.document().id }
-            // Persist the cloud id locally BEFORE writing to the cloud, so the
-            // mirror listener (which fires on the write) can match this medicine
-            // instead of inserting a duplicate.
-            if (m.cloudId.isBlank()) {
-                medicineDao.update(m.copy(cloudId = cloudId))
+        val coll = db.collection("patients").document(patientUid).collection("medicines")
+
+        for (m0 in medicineDao.getAllOnce(profileId)) {
+            var m = m0
+            if (m.globalId.isBlank()) {
+                m = m.copy(globalId = UUID.randomUUID().toString().replace("-", "").take(20))
+                medicineDao.update(m)
             }
             val schedule = scheduleDao.forMedicine(m.id).firstOrNull()
-            val photo = com.medremind.app.data.PhotoStorage.toBase64(m.photoPath)
-            runCatching {
-                coll.document(cloudId).set(
-                    mapOf(
-                        "name" to m.name,
-                        "strength" to m.strength,
-                        "form" to m.form,
-                        "intake" to m.intakeInstruction,
-                        "addedBy" to m.addedBy,
-                        "doseLabel" to (schedule?.doseLabel ?: ""),
-                        "times" to (schedule?.times ?: ""),
-                        "scheduleType" to (schedule?.type ?: "DAILY"),
-                        "daysMask" to (schedule?.daysMask ?: 0),
-                        "photoBase64" to photo,
-                        "updatedAt" to FieldValue.serverTimestamp()
-                    )
-                ).awaitResult()
+            val hash = PhotoStorage.hash(m.photoPath)
+            val shouldUpload = !m.photoPath.isNullOrBlank() && hash != null && hash != m.photoHash
+
+            val data = mutableMapOf<String, Any?>(
+                "name" to m.name,
+                "strength" to m.strength,
+                "form" to m.form,
+                "intake" to m.intakeInstruction,
+                "addedBy" to m.addedBy,
+                "doseLabel" to (schedule?.doseLabel ?: ""),
+                "times" to (schedule?.times ?: ""),
+                "scheduleType" to (schedule?.type ?: "DAILY"),
+                "daysMask" to (schedule?.daysMask ?: 0),
+                "version" to m.version,
+                "updatedAt" to FieldValue.serverTimestamp()
+            )
+
+            if (shouldUpload) {
+                val url = uploadPhoto(patientUid, m.globalId, m.photoPath!!)
+                if (url != null) {
+                    data["photoUrl"] = url
+                    data["photoHash"] = hash
+                }
+            }
+            if (m.photoPath.isNullOrBlank()) {
+                // Photo removed.
+                data["photoUrl"] = null
+                data["photoHash"] = null
+            }
+
+            runCatching { coll.document(m.globalId).set(data).awaitResult() }
+
+            val newPhotoHash = if (shouldUpload && hash != null) hash else m.photoHash
+            if (m.photoHash != newPhotoHash || m.cloudId != m.globalId) {
+                medicineDao.update(m.copy(photoHash = newPhotoHash, cloudId = m.globalId))
             }
         }
     }
+
+    private suspend fun uploadPhoto(patientUid: String, globalId: String, path: String): String? =
+        runCatching {
+            val ref = FirebaseStorage.getInstance()
+                .reference.child("patients/$patientUid/photos/$globalId.jpg")
+            ref.putFile(Uri.fromFile(File(path))).awaitResult()
+            ref.downloadUrl.awaitResult().toString()
+        }.getOrNull()
 }

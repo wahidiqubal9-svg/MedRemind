@@ -184,6 +184,24 @@ class AlarmActivity : ComponentActivity() {
                         scheduleSnooze(appContext, doseEventId)
                     }
                 }
+                // Record the confirmation: sync it across devices and, for a
+                // caregiver reminder, log it so the caregiver sees it.
+                if (action == "TAKEN" || action == "SKIPPED") {
+                    com.medremind.app.data.caregiver.DoseDataSync.pushEvent(appContext, doseEventId)
+                    val updated = dao.byId(doseEventId)
+                    val med = updated?.let { db.medicineDao().byId(it.medicineId) }
+                    if (updated?.source == com.medremind.app.data.DoseSource.CAREGIVER && med != null) {
+                        db.caregiverDao().insertActivity(
+                            com.medremind.app.data.CaregiverActivity(
+                                patientProfileId = med.profileId,
+                                actor = com.medremind.app.data.CaregiverActor.PATIENT,
+                                type = com.medremind.app.data.CaregiverActivityType.DOSE_CONFIRMED,
+                                medicineName = med.name,
+                                message = "${med.name} ${if (action == "TAKEN") "taken" else "skipped"}"
+                            )
+                        )
+                    }
+                }
                 // If other medicines were scheduled for the same time, line them up
                 // so the patient is prompted for each one in turn.
                 if (event != null && event.scheduleId != 0L) {

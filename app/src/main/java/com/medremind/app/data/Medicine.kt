@@ -94,5 +94,11 @@ data class Medicine(
      */
     val addedBy: String = "",
     /** Cloud (Firestore) document id when this medicine is synced across devices. */
-    val cloudId: String = ""
+    val cloudId: String = "",
+    /** Stable id used across devices (Firestore doc id + matching). */
+    val globalId: String = "",
+    /** Content hash of the photo, so it's only re-uploaded/re-downloaded on change. */
+    val photoHash: String = "",
+    /** Bumped on each edit, so changes can be detected. */
+    val version: Long = 0
 )

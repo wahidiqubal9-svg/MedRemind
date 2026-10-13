@@ -50,4 +50,15 @@ class MainActivity : FragmentActivity() {
             }
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        // Deliver any caregiver reminder that arrived while the app was closed.
+        lifecycleScope.launch {
+            runCatching {
+                com.medremind.app.data.caregiver.CloudSyncManager
+                    .processPendingReminders(applicationContext)
+            }
+        }
+    }
 }

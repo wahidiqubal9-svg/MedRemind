@@ -17,5 +17,17 @@ class MedRemindApp : Application() {
         }
         // Keep caregiver links + incoming reminders in step with the cloud.
         CloudSyncManager.start(this)
+
+        // Also poll periodically so a reminder still fires if the app was closed.
+        runCatching {
+            val request = androidx.work.PeriodicWorkRequestBuilder<
+                com.medremind.app.alarm.ReminderPollWorker
+                >(15, java.util.concurrent.TimeUnit.MINUTES).build()
+            androidx.work.WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                "reminder_poll",
+                androidx.work.ExistingPeriodicWorkPolicy.KEEP,
+                request
+            )
+        }
     }
 }

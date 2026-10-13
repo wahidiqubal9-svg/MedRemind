@@ -27,5 +27,25 @@ service cloud.firestore {
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
+
+    // A user's shared data (medicines, readings, doses). Readable/writable by
+    // the owner or a caregiver granted access.
+    match /patients/{patientUid}/{document=**} {
+      allow read, write: if request.auth != null && (
+        request.auth.uid == patientUid ||
+        exists(/databases/$(database)/documents/access/$(patientUid)/caregivers/$(request.auth.uid))
+      );
+    }
+
+    // Access records: created when a caregiver connects; readable by both sides.
+    match /access/{patientUid}/caregivers/{caregiverUid} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Reminders sent from a caregiver to a patient.
+    match /reminders/{id} {
+      allow create: if request.auth != null;
+      allow read, update: if request.auth != null;
+    }
   }
 }

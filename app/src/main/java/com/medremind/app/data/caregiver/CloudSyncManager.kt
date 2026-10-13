@@ -14,6 +14,7 @@ import com.medremind.app.data.DoseStatus
 import com.medremind.app.data.Medicine
 import com.medremind.app.data.Metric
 import com.medremind.app.data.Schedule
+import com.medremind.app.data.remote.awaitResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -223,13 +224,12 @@ object CloudSyncManager {
     // ---------------------------------------------------------------- reminders
 
     private suspend fun handleReminder(app: Context, doc: DocumentSnapshot) {
+        // Process each reminder once per app session (avoids double alarms).
+        if (!handledReminders.add(doc.id)) return
         val sentAt = doc.getLong("sentAtMillis") ?: 0L
         val now = System.currentTimeMillis()
-        val key = doc.id
         if (sentAt > 0 && now - sentAt > REMINDER_EXPIRY_MS) {
-            if (handledReminders.add("$key:EXPIRED")) {
-                runCatching { doc.reference.update("status", "EXPIRED") }
-            }
+            runCatching { doc.reference.update("status", "EXPIRED") }
             return
         }
         val medicineName = doc.getString("medicineName") ?: return
@@ -244,10 +244,8 @@ object CloudSyncManager {
             return
         }
         if (recentlyTaken(app, medicineName)) {
-            if (handledReminders.add("$key:ALREADY_TAKEN")) {
-                runCatching {
-                    doc.reference.update(mapOf("status" to "ALREADY_TAKEN", "resolvedAt" to now))
-                }
+            runCatching {
+                doc.reference.update(mapOf("status" to "ALREADY_TAKEN", "resolvedAt" to now))
             }
         } else {
             runCatching {
@@ -258,6 +256,22 @@ object CloudSyncManager {
                 doc.reference.update(mapOf("status" to "DELIVERED", "deliveredAt" to now))
             }
         }
+    }
+
+    /**
+     * Processes pending reminders for the signed-in patient. Called when the app
+     * comes to the foreground and by the periodic worker, so a reminder that
+     * arrived while the app was closed is still delivered.
+     */
+    suspend fun processPendingReminders(context: Context) {
+        val app = context.applicationContext
+        val db = runCatching { FirebaseFirestore.getInstance() }.getOrNull() ?: return
+        val uid = runCatching { FirebaseAuth.getInstance().currentUser?.uid }.getOrNull() ?: return
+        val snap = runCatching {
+            db.collection("reminders").whereEqualTo("patientUid", uid)
+                .whereEqualTo("status", "PENDING").get().awaitResult()
+        }.getOrNull() ?: return
+        for (doc in snap.documents) handleReminder(app, doc)
     }
 
     private suspend fun recentlyTaken(app: Context, medicineName: String): Boolean {
@@ -288,40 +302,38 @@ object CloudSyncManager {
             val daysMask = (doc.getLong("daysMask") ?: 0L).toInt()
             val doseLabel = doc.getString("doseLabel") ?: ""
 
-            val existing = medicineDao.byCloudId(doc.id)
-                ?: medicineDao.getAllOnce(profileId).firstOrNull {
-                    it.cloudId.isBlank() && it.name.equals(name, ignoreCase = true)
-                }
+            // Match strictly by the stable globalId (keeps intentional
+            // same-name medicines as separate entries).
+            val existing = medicineDao.byGlobalId(doc.id) ?: medicineDao.byCloudId(doc.id)
             val medicine = if (existing == null) {
                 val id = medicineDao.insert(
                     Medicine(
                         name = name, strength = strength, form = form,
                         intakeInstruction = intake, addedBy = addedBy,
-                        profileId = profileId, cloudId = doc.id
+                        profileId = profileId, cloudId = doc.id, globalId = doc.id
                     )
                 )
                 medicineDao.byId(id) ?: continue
             } else {
                 val updated = existing.copy(
                     name = name, strength = strength, form = form,
-                    intakeInstruction = intake, addedBy = addedBy, cloudId = doc.id
+                    intakeInstruction = intake, addedBy = addedBy,
+                    cloudId = doc.id, globalId = doc.id
                 )
                 medicineDao.update(updated)
                 updated
             }
 
-            // Safety net: drop leftover duplicates of the same medicine.
-            medicineDao.getAllOnce(profileId)
-                .filter { it.id != medicine.id && it.name.equals(name, ignoreCase = true) }
-                .forEach { dup ->
-                    scheduleDao.forMedicine(dup.id).forEach { ReminderScheduler.cancel(app, it.id) }
-                    medicineDao.delete(dup)
+            // Download the photo (once) only when it changed.
+            val photoUrl = doc.getString("photoUrl")
+            val photoHash = doc.getString("photoHash")
+            if (!photoUrl.isNullOrBlank() &&
+                (medicine.photoHash != photoHash || medicine.photoPath.isNullOrBlank())
+            ) {
+                val newPath = downloadPhoto(app, photoUrl)
+                if (newPath != null) {
+                    medicineDao.update(medicine.copy(photoPath = newPath, photoHash = photoHash ?: ""))
                 }
-
-            val photoBase64 = doc.getString("photoBase64")
-            if (!photoBase64.isNullOrBlank() && medicine.photoPath.isNullOrBlank()) {
-                val newPath = com.medremind.app.data.PhotoStorage.saveBase64(app, photoBase64)
-                if (newPath != null) medicineDao.update(medicine.copy(photoPath = newPath))
             }
 
             if (times.isNotBlank()) {
@@ -348,12 +360,19 @@ object CloudSyncManager {
         }
 
         medicineDao.getAllOnce(profileId)
-            .filter { it.cloudId.isNotBlank() && it.cloudId !in present }
+            .filter { it.globalId.isNotBlank() && it.globalId !in present }
             .forEach { stale ->
                 scheduleDao.forMedicine(stale.id).forEach { ReminderScheduler.cancel(app, it.id) }
                 medicineDao.delete(stale)
             }
     }
+
+    private suspend fun downloadPhoto(app: Context, url: String): String? = runCatching {
+        val ref = com.google.firebase.storage.FirebaseStorage.getInstance().getReferenceFromUrl(url)
+        val file = com.medremind.app.data.PhotoStorage.newPhotoFile(app)
+        ref.getFile(file).awaitResult()
+        file.absolutePath
+    }.getOrNull()
 
     private suspend fun mirrorMetrics(app: Context, profileId: Long, docs: List<DocumentSnapshot>) {
         val metricDao = AppDatabase.get(app).metricDao()

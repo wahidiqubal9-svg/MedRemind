@@ -169,6 +169,15 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
     suspend fun schedulesFor(medicineId: Long): List<Schedule> =
         withContext(Dispatchers.IO) { db.scheduleDao().forMedicine(medicineId) }
 
+    /** An existing medicine with the same name in this profile (for a duplicate hint). */
+    suspend fun findDuplicate(profileId: Long, name: String, excludeId: Long): Medicine? =
+        withContext(Dispatchers.IO) {
+            if (name.isBlank()) return@withContext null
+            db.medicineDao().getAllOnce(profileId).firstOrNull {
+                it.id != excludeId && it.name.equals(name.trim(), ignoreCase = true)
+            }
+        }
+
     suspend fun doseLogForRange(
         days: Int,
         profileId: Long = activeProfile.value
@@ -261,11 +270,17 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                 // A blank actor means the owner is saving it themselves; a named
                 // actor marks a caregiver's change so we can show "Added by ...".
                 val withActor = if (actor.isNotBlank()) medicine.copy(addedBy = actor) else medicine
-                val medicineId = if (withActor.id == 0L) {
-                    db.medicineDao().insert(withActor.copy(profileId = profileId))
+                val ready = withActor.copy(
+                    globalId = withActor.globalId.ifBlank {
+                        java.util.UUID.randomUUID().toString().replace("-", "").take(20)
+                    },
+                    version = if (withActor.id == 0L) 1L else withActor.version + 1L
+                )
+                val medicineId = if (ready.id == 0L) {
+                    db.medicineDao().insert(ready.copy(profileId = profileId))
                 } else {
-                    db.medicineDao().update(withActor)
-                    withActor.id
+                    db.medicineDao().update(ready)
+                    ready.id
                 }
 
                 val existing = db.scheduleDao().forMedicine(medicineId)
