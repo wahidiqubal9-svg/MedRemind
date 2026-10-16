@@ -17,30 +17,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medremind.app.R
 
-// Outfit (Latin UI) and Roboto (numerals), both bundled as variable fonts.
-@OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
+// Outfit (Latin UI), bundled as static weights. Numbers use the system Roboto.
 val MedFontFamily = FontFamily(
-    Font(R.font.outfit_variable, FontWeight.Normal, variationSettings = FontVariation.Settings(FontVariation.weight(400))),
-    Font(R.font.outfit_variable, FontWeight.Medium, variationSettings = FontVariation.Settings(FontVariation.weight(500))),
-    Font(R.font.outfit_variable, FontWeight.SemiBold, variationSettings = FontVariation.Settings(FontVariation.weight(600))),
-    Font(R.font.outfit_variable, FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(700))),
-    Font(R.font.outfit_variable, FontWeight.ExtraBold, variationSettings = FontVariation.Settings(FontVariation.weight(800)))
+    Font(R.font.outfit_regular, FontWeight.Normal),
+    Font(R.font.outfit_medium, FontWeight.Medium),
+    Font(R.font.outfit_semibold, FontWeight.SemiBold),
+    Font(R.font.outfit_bold, FontWeight.Bold),
+    Font(R.font.outfit_extrabold, FontWeight.ExtraBold)
 )
 
-@OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
-val MedNumberFontFamily = FontFamily(
-    Font(R.font.roboto_variable, FontWeight.Normal, variationSettings = FontVariation.Settings(FontVariation.weight(400))),
-    Font(R.font.roboto_variable, FontWeight.Medium, variationSettings = FontVariation.Settings(FontVariation.weight(500))),
-    Font(R.font.roboto_variable, FontWeight.SemiBold, variationSettings = FontVariation.Settings(FontVariation.weight(600))),
-    Font(R.font.roboto_variable, FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(700))),
-    Font(R.font.roboto_variable, FontWeight.ExtraBold, variationSettings = FontVariation.Settings(FontVariation.weight(800)))
-)
+val MedNumberFontFamily = FontFamily.SansSerif
 
 val LightColors = lightColorScheme(
     primary = Color(0xFF6366F1),
@@ -195,7 +186,7 @@ private val MedTypography = Typography(
     headlineLarge = TextStyle(
         fontFamily = MedFontFamily,
         fontFeatureSettings = "tnum",
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = 32.sp,
         lineHeight = 40.sp,
         letterSpacing = 0.sp
@@ -203,7 +194,7 @@ private val MedTypography = Typography(
     headlineMedium = TextStyle(
         fontFamily = MedFontFamily,
         fontFeatureSettings = "tnum",
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = 28.sp,
         lineHeight = 36.sp,
         letterSpacing = 0.sp
@@ -211,7 +202,7 @@ private val MedTypography = Typography(
     headlineSmall = TextStyle(
         fontFamily = MedFontFamily,
         fontFeatureSettings = "tnum",
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = 24.sp,
         lineHeight = 32.sp,
         letterSpacing = 0.sp
@@ -219,7 +210,7 @@ private val MedTypography = Typography(
     titleLarge = TextStyle(
         fontFamily = MedFontFamily,
         fontFeatureSettings = "tnum",
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = 22.sp,
         lineHeight = 28.sp,
         letterSpacing = 0.sp
@@ -227,7 +218,7 @@ private val MedTypography = Typography(
     titleMedium = TextStyle(
         fontFamily = MedFontFamily,
         fontFeatureSettings = "tnum",
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = 18.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.1.sp
@@ -235,7 +226,7 @@ private val MedTypography = Typography(
     titleSmall = TextStyle(
         fontFamily = MedFontFamily,
         fontFeatureSettings = "tnum",
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = 15.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.1.sp
@@ -243,7 +234,7 @@ private val MedTypography = Typography(
     bodyLarge = TextStyle(
         fontFamily = MedFontFamily,
         fontFeatureSettings = "tnum",
-        fontWeight = FontWeight.Normal,
+        fontWeight = FontWeight.Medium,
         fontSize = 16.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.5.sp
@@ -251,7 +242,7 @@ private val MedTypography = Typography(
     bodyMedium = TextStyle(
         fontFamily = MedFontFamily,
         fontFeatureSettings = "tnum",
-        fontWeight = FontWeight.Normal,
+        fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.25.sp
@@ -259,7 +250,7 @@ private val MedTypography = Typography(
     bodySmall = TextStyle(
         fontFamily = MedFontFamily,
         fontFeatureSettings = "tnum",
-        fontWeight = FontWeight.Normal,
+        fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
         lineHeight = 16.sp,
         letterSpacing = 0.4.sp
@@ -267,7 +258,7 @@ private val MedTypography = Typography(
     labelLarge = TextStyle(
         fontFamily = MedFontFamily,
         fontFeatureSettings = "tnum",
-        fontWeight = FontWeight.Medium,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.1.sp
@@ -275,7 +266,7 @@ private val MedTypography = Typography(
     labelMedium = TextStyle(
         fontFamily = MedFontFamily,
         fontFeatureSettings = "tnum",
-        fontWeight = FontWeight.Medium,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 12.sp,
         lineHeight = 16.sp,
         letterSpacing = 0.5.sp
@@ -283,7 +274,7 @@ private val MedTypography = Typography(
     labelSmall = TextStyle(
         fontFamily = MedFontFamily,
         fontFeatureSettings = "tnum",
-        fontWeight = FontWeight.Medium,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 11.sp,
         lineHeight = 16.sp,
         letterSpacing = 0.5.sp
