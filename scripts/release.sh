@@ -32,16 +32,12 @@ NOTES="${2:-Automatic build $TAG}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-# Default to the debug variant: no R8, far less RAM and much faster on this
-# memory-limited device. Set VARIANT=release for the minified build.
-VARIANT="${VARIANT:-debug}"
-if [ "$VARIANT" = "release" ]; then
-  APK="app/build/outputs/apk/release/app-release.apk"
-  BUILD_TASK="assembleRelease"
-else
-  APK="app/build/outputs/apk/debug/app-debug.apk"
-  BUILD_TASK="assembleDebug"
-fi
+# Default to a non-minified *release* APK: installs like the usual builds and is
+# much faster than R8 on this memory-limited device. (Debug APKs are debuggable
+# and some installers reject them.)
+VARIANT="${VARIANT:-release}"
+APK="app/build/outputs/apk/release/app-release.apk"
+BUILD_TASK="assembleRelease"
 AUTH=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json")
 
 api() { echo "https://api.github.com/repos/${OWNER}/$1"; }

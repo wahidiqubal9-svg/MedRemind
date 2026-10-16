@@ -20,8 +20,8 @@ android {
         applicationId = "com.medremind.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 180
-        versionName = "0.179.0"
+        versionCode = 181
+        versionName = "0.180.0"
     }
 
     signingConfigs {
@@ -37,11 +37,12 @@ android {
 
     buildTypes {
         release {
-            // R8 keeps the APK small (~7.5 MB vs ~20 MB) at roughly the same build
-            // time on this device. Compat mode (see gradle.properties) keeps memory
-            // use down so it doesn't OOM.
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // A proper (non-debuggable) release APK, like the ones that installed
+            // fine — but without R8 for much faster builds on this device. Set
+            // VARIANT=release-minify in release.sh (or flip these to true) for the
+            // small Play-ready build.
+            isMinifyEnabled = false
+            isShrinkResources = false
             signingConfig = signingConfigs.getByName("deviceDebug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android.txt"),
