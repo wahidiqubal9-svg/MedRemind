@@ -34,6 +34,9 @@ import androidx.compose.ui.unit.dp
 private fun shimmerBrush(): Brush {
     val base = MaterialTheme.colorScheme.surfaceContainerHigh
     val highlight = MaterialTheme.colorScheme.surfaceContainerHighest
+    if (LocalReduceMotion.current) {
+        return Brush.linearGradient(listOf(base, base))
+    }
     val transition = rememberInfiniteTransition(label = "shimmer")
     val x by transition.animateFloat(
         initialValue = -600f,

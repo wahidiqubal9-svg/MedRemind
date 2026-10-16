@@ -205,7 +205,7 @@ fun VitalsChartCard(
         LaunchedEffect(Unit) { started = true }
         val progress by animateFloatAsState(
             targetValue = if (started) 1f else 0f,
-            animationSpec = tween(MedMotion.Slow, easing = MedMotion.Emphasized),
+            animationSpec = motionTween(MedMotion.Slow, easing = MedMotion.Emphasized),
             label = "vitalsProgress"
         )
 
@@ -553,7 +553,7 @@ fun MetricChartCard(
         LaunchedEffect(Unit) { started = true }
         val progress by animateFloatAsState(
             targetValue = if (started) 1f else 0f,
-            animationSpec = tween(MedMotion.Slow, easing = MedMotion.Emphasized),
+            animationSpec = motionTween(MedMotion.Slow, easing = MedMotion.Emphasized),
             label = "chartProgress"
         )
 

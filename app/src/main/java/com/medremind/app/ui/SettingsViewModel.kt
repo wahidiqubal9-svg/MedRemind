@@ -141,6 +141,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     init {
         HapticPrefs.enabled = hapticsEnabled
+        MedMotion.reduceMotion = resolveReduceMotion(getApplication(), reduceMotion)
     }
 
     fun updateAppLock(value: Boolean) {
@@ -177,6 +178,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun updateReduceMotion(value: Boolean) {
         reduceMotion = value
+        MedMotion.reduceMotion = resolveReduceMotion(getApplication(), value)
         prefs.edit().putBoolean("reduce_motion", value).apply()
     }
 

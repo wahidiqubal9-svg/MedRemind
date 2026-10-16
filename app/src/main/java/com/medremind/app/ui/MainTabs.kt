@@ -261,9 +261,13 @@ private fun MedBottomBar(
     onTabChange: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Flush, background-coloured bar: no floating gap, merges with the app.
+    // Flush, background-coloured bar with a light border so it reads as a bar.
     Surface(
         color = MaterialTheme.colorScheme.background,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant
+        ),
         modifier = modifier.fillMaxWidth()
     ) {
         Row(

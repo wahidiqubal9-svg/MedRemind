@@ -32,7 +32,16 @@ NOTES="${2:-Automatic build $TAG}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-APK="app/build/outputs/apk/release/app-release.apk"
+# Default to the debug variant: no R8, far less RAM and much faster on this
+# memory-limited device. Set VARIANT=release for the minified build.
+VARIANT="${VARIANT:-debug}"
+if [ "$VARIANT" = "release" ]; then
+  APK="app/build/outputs/apk/release/app-release.apk"
+  BUILD_TASK="assembleRelease"
+else
+  APK="app/build/outputs/apk/debug/app-debug.apk"
+  BUILD_TASK="assembleDebug"
+fi
 AUTH=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json")
 
 api() { echo "https://api.github.com/repos/${OWNER}/$1"; }
@@ -48,9 +57,9 @@ if [ "${SKIP_BUILD:-0}" = "1" ]; then
   echo "==> Skipping build (SKIP_BUILD=1); using existing APK"
   [ -f "$ROOT/$APK" ] || { echo "No APK at $APK"; exit 1; }
 else
-  echo "==> Building $TAG (optimized release)"
+  echo "==> Building $TAG ($VARIANT)"
   # Reuse the warm Gradle daemon + configuration cache for speed.
-  "$GRADLE" --console=plain assembleRelease
+  "$GRADLE" --console=plain "$BUILD_TASK"
 fi
 
 echo "==> Staging commit"

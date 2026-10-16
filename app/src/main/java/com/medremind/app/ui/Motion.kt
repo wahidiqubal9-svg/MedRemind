@@ -23,6 +23,14 @@ object MedMotion {
     const val Medium = 260
     const val Slow = 420
 
+    /**
+     * Global reduce-motion flag, updated from settings (user pref or the system
+     * "remove animations" setting). When true, [motionTween] returns instantly.
+     * It's a plain flag (not a CompositionLocal) because motionTween is called
+     * from non-composable lambdas like AnimatedContent's transitionSpec.
+     */
+    @Volatile var reduceMotion: Boolean = false
+
     /** Default easing for entering content. */
     val Standard: Easing = FastOutSlowInEasing
 
@@ -40,7 +48,12 @@ fun <T> motionTween(
     durationMillis: Int = MedMotion.Medium,
     delayMillis: Int = 0,
     easing: Easing = MedMotion.Standard
-): TweenSpec<T> = tween(durationMillis = durationMillis, delayMillis = delayMillis, easing = easing)
+): TweenSpec<T> =
+    if (MedMotion.reduceMotion) {
+        tween(durationMillis = 0, delayMillis = 0, easing = easing)
+    } else {
+        tween(durationMillis = durationMillis, delayMillis = delayMillis, easing = easing)
+    }
 
 /** True when the user (or the system) has asked for reduced motion. */
 val LocalReduceMotion = compositionLocalOf { false }

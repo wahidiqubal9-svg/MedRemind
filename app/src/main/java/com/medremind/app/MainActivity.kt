@@ -31,6 +31,7 @@ class MainActivity : FragmentActivity() {
             val settings: SettingsViewModel = viewModel()
             val context = LocalContext.current
             val reduceMotion = resolveReduceMotion(context, settings.reduceMotion)
+            com.medremind.app.ui.MedMotion.reduceMotion = reduceMotion
             val baseDensity = LocalDensity.current
             val density = if (settings.largeText) {
                 Density(baseDensity.density, baseDensity.fontScale * 1.3f)
