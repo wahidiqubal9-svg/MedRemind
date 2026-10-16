@@ -1099,11 +1099,20 @@ private fun TimeGroupCard(
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "${segmentLabel(hour)} \u00b7 $time",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(
+                            text = "${segmentLabel(hour)} \u00b7 ",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = time,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontFamily = MedNumberFontFamily
+                            ),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                     Text(
                         text = "${doses.size} medicine" + if (doses.size == 1) "" else "s",
                         style = MaterialTheme.typography.bodySmall,

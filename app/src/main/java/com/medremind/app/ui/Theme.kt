@@ -17,17 +17,29 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medremind.app.R
 
+// Outfit (Latin UI) and Roboto (numerals), both bundled as variable fonts.
+@OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
 val MedFontFamily = FontFamily(
-    Font(R.font.inter_regular, FontWeight.Normal),
-    Font(R.font.inter_medium, FontWeight.Medium),
-    Font(R.font.inter_semibold, FontWeight.SemiBold),
-    Font(R.font.inter_bold, FontWeight.Bold),
-    Font(R.font.inter_extrabold, FontWeight.ExtraBold)
+    Font(R.font.outfit_variable, FontWeight.Normal, variationSettings = FontVariation.Settings(FontVariation.weight(400))),
+    Font(R.font.outfit_variable, FontWeight.Medium, variationSettings = FontVariation.Settings(FontVariation.weight(500))),
+    Font(R.font.outfit_variable, FontWeight.SemiBold, variationSettings = FontVariation.Settings(FontVariation.weight(600))),
+    Font(R.font.outfit_variable, FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(700))),
+    Font(R.font.outfit_variable, FontWeight.ExtraBold, variationSettings = FontVariation.Settings(FontVariation.weight(800)))
+)
+
+@OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
+val MedNumberFontFamily = FontFamily(
+    Font(R.font.roboto_variable, FontWeight.Normal, variationSettings = FontVariation.Settings(FontVariation.weight(400))),
+    Font(R.font.roboto_variable, FontWeight.Medium, variationSettings = FontVariation.Settings(FontVariation.weight(500))),
+    Font(R.font.roboto_variable, FontWeight.SemiBold, variationSettings = FontVariation.Settings(FontVariation.weight(600))),
+    Font(R.font.roboto_variable, FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(700))),
+    Font(R.font.roboto_variable, FontWeight.ExtraBold, variationSettings = FontVariation.Settings(FontVariation.weight(800)))
 )
 
 val LightColors = lightColorScheme(
@@ -157,7 +169,7 @@ private val MedShapes = Shapes(
 
 private val MedTypography = Typography(
     displayLarge = TextStyle(
-        fontFamily = MedFontFamily,
+        fontFamily = MedNumberFontFamily,
         fontFeatureSettings = "tnum",
         fontWeight = FontWeight.Bold,
         fontSize = 52.sp,
@@ -165,7 +177,7 @@ private val MedTypography = Typography(
         letterSpacing = (-0.5).sp
     ),
     displayMedium = TextStyle(
-        fontFamily = MedFontFamily,
+        fontFamily = MedNumberFontFamily,
         fontFeatureSettings = "tnum",
         fontWeight = FontWeight.Bold,
         fontSize = 44.sp,
@@ -173,7 +185,7 @@ private val MedTypography = Typography(
         letterSpacing = 0.sp
     ),
     displaySmall = TextStyle(
-        fontFamily = MedFontFamily,
+        fontFamily = MedNumberFontFamily,
         fontFeatureSettings = "tnum",
         fontWeight = FontWeight.Bold,
         fontSize = 36.sp,
