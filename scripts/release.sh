@@ -134,7 +134,7 @@ PUB_TMP="$(mktemp -d)"
   git -c credential.helper= push -f \
     "https://x-access-token:${GH_TOKEN}@github.com/${OWNER}/${PRIMARY_REL_REPO}.git" apk:apk
 )
-rm -rf "$PUB_TMP"
+rm -rf "$PUB_TMP" 2>/dev/null || true
 echo "    https://raw.githubusercontent.com/${OWNER}/${PRIMARY_REL_REPO}/apk/medremind.apk"
 
 echo "==> Done"

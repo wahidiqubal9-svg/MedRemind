@@ -13,5 +13,8 @@ app/build/
 *.aab
 *.log
 
+# Kotlin build session markers (transient)
+.kotlin/
+
 # local dev prototype (not part of the app)
 prototype/

@@ -101,6 +101,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -1990,33 +1991,31 @@ private fun IntakeOptionCard(
     val haptics = rememberMedHaptics()
     val shape = RoundedCornerShape(22.dp)
     val interaction = remember { MutableInteractionSource() }
-    val bg by androidx.compose.animation.animateColorAsState(
-        targetValue = if (selected) accent.copy(alpha = 0.12f)
-        else MaterialTheme.colorScheme.surface,
-        label = "intakeBg"
-    )
-    Surface(
-        modifier = modifier,
-        shape = shape,
-        color = bg,
-        border = androidx.compose.foundation.BorderStroke(
-            if (selected) 1.6.dp else 1.dp,
-            if (selected) accent else MaterialTheme.colorScheme.outlineVariant
-        ),
-        shadowElevation = if (selected) MedElevation.card else 0.dp
+    // Opaque colours (no alpha) so the card renders as one flat, uniform block and
+    // never shows the elevation/translucency artefact seen on some OEM skins.
+    val bg = if (selected) lerp(MaterialTheme.colorScheme.surface, accent, 0.14f)
+    else MaterialTheme.colorScheme.surface
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(bg)
+            .border(
+                width = if (selected) 1.6.dp else 1.dp,
+                color = if (selected) accent else MaterialTheme.colorScheme.outlineVariant,
+                shape = shape
+            )
+            .clickable(
+                interactionSource = interaction,
+                indication = ripple(color = accent),
+                onClick = {
+                    haptics.tap()
+                    onClick()
+                }
+            )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(shape)
-                .clickable(
-                    interactionSource = interaction,
-                    indication = ripple(color = accent),
-                    onClick = {
-                        haptics.tap()
-                        onClick()
-                    }
-                )
                 .padding(vertical = 14.dp, horizontal = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -2038,15 +2037,23 @@ private fun IntakeIconBadge(
     selected: Boolean,
     accent: Color
 ) {
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = if (selected) accent else accent.copy(alpha = 0.12f),
-        contentColor = if (selected) Color.White else accent,
-        modifier = Modifier.size(46.dp)
+    val shape = RoundedCornerShape(16.dp)
+    Box(
+        modifier = Modifier
+            .size(46.dp)
+            .clip(shape)
+            .background(
+                if (selected) accent
+                else lerp(MaterialTheme.colorScheme.surface, accent, 0.14f)
+            ),
+        contentAlignment = Alignment.Center
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
-        }
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = if (selected) Color.White else accent,
+            modifier = Modifier.size(24.dp)
+        )
     }
 }
 
