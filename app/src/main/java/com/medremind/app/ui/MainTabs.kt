@@ -261,54 +261,47 @@ private fun MedBottomBar(
     onTabChange: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+    // Flush, background-coloured bar: no floating gap, merges with the app.
+    Surface(
+        color = MaterialTheme.colorScheme.background,
+        modifier = modifier.fillMaxWidth()
     ) {
-        Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = Color(0xFF0F172A),
-            border = BorderStroke(1.dp, Color(0xFF2A3446)),
-            shadowElevation = 22.dp,
-            modifier = Modifier.fillMaxWidth()
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                navSpecs.forEachIndexed { index, spec ->
-                    val selected = tab == index
-                    BottomNavCell(
-                        selected = selected,
-                        label = spec.label,
-                        tourId = spec.tourId,
-                        onClick = { onTabChange(index) }
-                    ) {
-                        Icon(
-                            imageVector = spec.icon,
-                            contentDescription = spec.label,
-                            tint = if (selected) Color.White else Color(0xFF94A3B8),
-                            modifier = Modifier.size(if (selected) 24.dp else 22.dp)
-                        )
-                    }
-                }
+            navSpecs.forEachIndexed { index, spec ->
+                val selected = tab == index
                 BottomNavCell(
-                    selected = tab == 4,
-                    label = "Settings",
-                    tourId = "nav_settings",
-                    onClick = { onTabChange(4) }
+                    selected = selected,
+                    label = spec.label,
+                    tourId = spec.tourId,
+                    onClick = { onTabChange(index) }
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Settings,
-                        contentDescription = "Settings",
-                        tint = if (tab == 4) Color.White else Color(0xFF94A3B8),
-                        modifier = Modifier.size(23.dp)
+                        imageVector = spec.icon,
+                        contentDescription = spec.label,
+                        tint = if (selected) Color.White else Color(0xFF94A3B8),
+                        modifier = Modifier.size(if (selected) 24.dp else 22.dp)
                     )
                 }
+            }
+            BottomNavCell(
+                selected = tab == 4,
+                label = "Settings",
+                tourId = "nav_settings",
+                onClick = { onTabChange(4) }
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Settings,
+                    contentDescription = "Settings",
+                    tint = if (tab == 4) Color.White else Color(0xFF94A3B8),
+                    modifier = Modifier.size(23.dp)
+                )
             }
         }
     }
@@ -355,7 +348,7 @@ private fun RowScope.BottomNavCell(
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Clip,
-            color = if (selected) Color.White else Color(0xFF94A3B8),
+            color = if (selected) MaterialTheme.colorScheme.primary else Color(0xFF94A3B8),
             fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold
         )
     }
