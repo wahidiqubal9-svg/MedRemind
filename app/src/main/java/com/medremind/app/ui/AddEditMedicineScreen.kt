@@ -18,6 +18,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -84,6 +85,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -1986,18 +1988,16 @@ private fun IntakeOptionCard(
     modifier: Modifier = Modifier
 ) {
     val haptics = rememberMedHaptics()
+    val shape = RoundedCornerShape(22.dp)
+    val interaction = remember { MutableInteractionSource() }
     val bg by androidx.compose.animation.animateColorAsState(
         targetValue = if (selected) accent.copy(alpha = 0.12f)
         else MaterialTheme.colorScheme.surface,
         label = "intakeBg"
     )
     Surface(
-        onClick = {
-            haptics.tap()
-            onClick()
-        },
         modifier = modifier,
-        shape = RoundedCornerShape(22.dp),
+        shape = shape,
         color = bg,
         border = androidx.compose.foundation.BorderStroke(
             if (selected) 1.6.dp else 1.dp,
@@ -2008,6 +2008,15 @@ private fun IntakeOptionCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .clip(shape)
+                .clickable(
+                    interactionSource = interaction,
+                    indication = ripple(color = accent),
+                    onClick = {
+                        haptics.tap()
+                        onClick()
+                    }
+                )
                 .padding(vertical = 14.dp, horizontal = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

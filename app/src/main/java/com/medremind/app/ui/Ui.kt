@@ -189,14 +189,16 @@ fun MedClickableCard(
         shadowElevation = MedElevation.card
     ) {
         Box(
-            modifier = Modifier.clickable(
-                interactionSource = interaction,
-                indication = ripple(),
-                onClick = {
-                    haptics.tap()
-                    onClick()
-                }
-            )
+            modifier = Modifier
+                .clip(MaterialTheme.shapes.large)
+                .clickable(
+                    interactionSource = interaction,
+                    indication = ripple(),
+                    onClick = {
+                        haptics.tap()
+                        onClick()
+                    }
+                )
         ) {
             Column(modifier = Modifier.padding(16.dp), content = content)
         }

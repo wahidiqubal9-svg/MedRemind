@@ -54,8 +54,9 @@ if [ "${SKIP_BUILD:-0}" = "1" ]; then
   [ -f "$ROOT/$APK" ] || { echo "No APK at $APK"; exit 1; }
 else
   echo "==> Building $TAG ($VARIANT)"
-  # Reuse the warm Gradle daemon + configuration cache for speed.
-  "$GRADLE" --console=plain "$BUILD_TASK"
+  # Reuse the warm Gradle daemon + configuration cache for speed. --offline
+  # avoids network round-trips since all dependencies are already cached.
+  "$GRADLE" --console=plain --offline "$BUILD_TASK"
 fi
 
 echo "==> Staging commit"
