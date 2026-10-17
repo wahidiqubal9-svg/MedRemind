@@ -36,6 +36,7 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.LocalPharmacy
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Logout
 import androidx.compose.material.icons.rounded.Person
@@ -88,6 +89,8 @@ fun MeScreen(
     val context = LocalContext.current
     val authVm: AuthViewModel = viewModel()
     val account by authVm.user.collectAsState()
+    val entitlement: EntitlementViewModel = viewModel()
+    val isPro by entitlement.isPro.collectAsState()
     var editing by remember { mutableStateOf(false) }
     var showPharmacyDialog by remember { mutableStateOf(false) }
     // Being helped (connecting a caregiver) is FREE; helping others (caregiving) is Pro.
@@ -190,6 +193,7 @@ fun MeScreen(
                 title = "Caregiving",
                 subtitle = "People I help with their medicines",
                 pro = true,
+                locked = !isPro,
                 onClick = openCaregiving
             )
         }
@@ -671,6 +675,7 @@ private fun CaregiverEntryRow(
     title: String,
     subtitle: String,
     pro: Boolean = false,
+    locked: Boolean = false,
     onClick: () -> Unit
 ) {
     Row(
@@ -706,7 +711,16 @@ private fun CaregiverEntryRow(
             )
         }
         if (pro) {
-            ProBadge()
+            if (locked) {
+                Icon(
+                    imageVector = Icons.Rounded.Lock,
+                    contentDescription = "Pro feature",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+            } else {
+                ProBadge()
+            }
             Spacer(Modifier.width(8.dp))
         }
         Icon(

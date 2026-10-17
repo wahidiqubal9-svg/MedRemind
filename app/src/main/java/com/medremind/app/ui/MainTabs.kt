@@ -154,6 +154,8 @@ fun MainTabs(
     onDismissReminderSetup: () -> Unit = {}
 ) {
     val schedulesByMedicine by vm.schedulesByMedicine.collectAsState()
+    val entitlement: EntitlementViewModel = viewModel()
+    val isPro by entitlement.isPro.collectAsState()
     val reminderCard: (@Composable () -> Unit)? = if (reminderSetupNeeded) {
         {
             ReminderSetupCard(
@@ -279,7 +281,9 @@ fun MainTabs(
                 onConnect = {
                     showPeople = false
                     openConnect()
-                }
+                },
+                locked = !isPro,
+                onLocked = { entitlement.openPaywall(reason = "caregiver") }
             )
         }
         }
@@ -420,6 +424,8 @@ fun HealthScreen(
     var showAddWeight by remember { mutableStateOf(false) }
     var pendingDeleteMetric by remember { mutableStateOf<Metric?>(null) }
     var exportFormat by remember { mutableStateOf<String?>(null) }
+    val entitlement: EntitlementViewModel = viewModel()
+    val isPro by entitlement.isPro.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -649,11 +655,17 @@ fun HealthScreen(
                 }
             }
 
-            HealthExportCard(
-                enabled = metrics.isNotEmpty(),
-                onCsv = rememberProAction { exportFormat = "csv" },
-                onPdf = rememberProAction { exportFormat = "pdf" }
-            )
+            ProLockOverlay(
+                locked = !isPro,
+                onUnlock = { entitlement.openPaywall(reason = "export") },
+                shape = RoundedCornerShape(24.dp)
+            ) {
+                HealthExportCard(
+                    enabled = metrics.isNotEmpty(),
+                    onCsv = rememberProAction { exportFormat = "csv" },
+                    onPdf = rememberProAction { exportFormat = "pdf" }
+                )
+            }
         }
     }
 

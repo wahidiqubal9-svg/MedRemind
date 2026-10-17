@@ -44,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -91,6 +92,8 @@ fun HistoryContent(
     onOpenHistory: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val entitlement: EntitlementViewModel = viewModel()
+    val isPro by entitlement.isPro.collectAsState()
     val scope = rememberCoroutineScope()
     var rangeDays by remember { mutableIntStateOf(7) }
     var log by remember { mutableStateOf<List<DoseLogEntry>>(emptyList()) }
@@ -260,11 +263,17 @@ fun HistoryContent(
         }
 
         item(key = "export") {
-            ExportCard(
-                enabled = log.isNotEmpty(),
-                onCsv = rememberProAction { exportFormat = "csv" },
-                onPdf = rememberProAction { exportFormat = "pdf" }
-            )
+            ProLockOverlay(
+                locked = !isPro,
+                onUnlock = { entitlement.openPaywall(reason = "export") },
+                shape = RoundedCornerShape(24.dp)
+            ) {
+                ExportCard(
+                    enabled = log.isNotEmpty(),
+                    onCsv = rememberProAction { exportFormat = "csv" },
+                    onPdf = rememberProAction { exportFormat = "pdf" }
+                )
+            }
         }
 
         item(key = "history") {

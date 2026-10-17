@@ -36,6 +36,7 @@ import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.QrCode
 import androidx.compose.material.icons.rounded.QrCodeScanner
@@ -104,6 +105,7 @@ import com.medremind.app.ui.ExportRangeSheet
 import com.medremind.app.ui.MedicineViewModel
 import com.medremind.app.ui.ProgressRing
 import com.medremind.app.ui.ReportExporter
+import com.medremind.app.ui.ProLockOverlay
 import com.medremind.app.ui.rememberProAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -1352,7 +1354,9 @@ fun PeopleSheet(
     onDismiss: () -> Unit,
     onOpenPatient: (Long) -> Unit,
     onConnect: () -> Unit,
-    maxPatients: Int = 2
+    maxPatients: Int = 2,
+    locked: Boolean = false,
+    onLocked: () -> Unit = {}
 ) {
     val vm: CaregiverViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     var statuses by remember { mutableStateOf<Map<Long, String>>(emptyMap()) }
@@ -1396,37 +1400,43 @@ fun PeopleSheet(
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     patients.forEach { p ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .clickable { onOpenPatient(p.id) }
-                                .padding(vertical = 8.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        ProLockOverlay(
+                            locked = locked,
+                            onUnlock = onLocked,
+                            shape = RoundedCornerShape(16.dp)
                         ) {
-                            MedIconSquare(
-                                label = p.name,
-                                seed = p.id,
-                                photoPath = p.avatarPath
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    if (p.relation.isNotBlank()) "${p.name} (${p.relation})" else p.name,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .clickable { onOpenPatient(p.id) }
+                                    .padding(vertical = 8.dp, horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                MedIconSquare(
+                                    label = p.name,
+                                    seed = p.id,
+                                    photoPath = p.avatarPath
                                 )
-                                Text(
-                                    statuses[p.id] ?: "\u2026",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        if (p.relation.isNotBlank()) "${p.name} (${p.relation})" else p.name,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        statuses[p.id] ?: "\u2026",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Icon(
+                                    Icons.Rounded.ChevronRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Icon(
-                                Icons.Rounded.ChevronRight,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
                     }
                 }
@@ -1447,7 +1457,7 @@ fun PeopleSheet(
                 }
             } else {
                 Surface(
-                    onClick = onConnect,
+                    onClick = { if (locked) onLocked() else onConnect() },
                     shape = RoundedCornerShape(50),
                     color = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -1458,9 +1468,16 @@ fun PeopleSheet(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Rounded.Person, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(
+                            if (locked) Icons.Rounded.Lock else Icons.Rounded.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
                         Spacer(Modifier.width(8.dp))
-                        Text("Connect someone", fontWeight = FontWeight.Bold)
+                        Text(
+                            if (locked) "Connect someone \u00b7 Pro" else "Connect someone",
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }

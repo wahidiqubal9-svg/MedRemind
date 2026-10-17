@@ -36,6 +36,7 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ColorLens
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.HelpOutline
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Person
@@ -380,6 +381,7 @@ fun SettingsContent(
                 tint = Color(0xFF0EA5E9),
                 title = "Back up data",
                 subtitle = "Save a copy of all medicines and history to a file.",
+                locked = !isPro,
                 onClick = backupAction
             )
             SettingsDivider()
@@ -388,6 +390,7 @@ fun SettingsContent(
                 tint = Color(0xFF10B981),
                 title = "Restore data",
                 subtitle = "Replace everything with a backup file.",
+                locked = !isPro,
                 onClick = restoreAction
             )
             SettingsDivider()
@@ -507,6 +510,7 @@ private fun SettingRow(
     title: String,
     tint: Color,
     subtitle: String? = null,
+    locked: Boolean = false,
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null
 ) {
@@ -534,6 +538,15 @@ private fun SettingRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+        if (locked) {
+            Icon(
+                Icons.Rounded.Lock,
+                contentDescription = "Pro feature",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(6.dp))
         }
         when {
             trailing != null -> trailing()
