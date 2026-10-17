@@ -103,5 +103,5 @@ jobs:
           set -euo pipefail
           gh release delete latest --yes --cleanup-tag 2>/dev/null || true
           gh release create latest app/build/outputs/apk/release/app-release.apk \
-            --prerelease --title "Latest build" \
+            --title "Latest build" \
             --notes "Auto-built from ${GITHUB_SHA::7} · v${{ env.VN }} (versionCode ${{ env.VC }})"
