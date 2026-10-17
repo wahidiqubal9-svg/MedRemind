@@ -5,6 +5,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +35,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.LocalPharmacy
 import androidx.compose.material.icons.rounded.Group
 import androidx.compose.material.icons.rounded.Logout
 import androidx.compose.material.icons.rounded.Person
@@ -43,7 +46,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -84,6 +89,7 @@ fun MeScreen(
     val authVm: AuthViewModel = viewModel()
     val account by authVm.user.collectAsState()
     var editing by remember { mutableStateOf(false) }
+    var showPharmacyDialog by remember { mutableStateOf(false) }
     // Being helped (connecting a caregiver) is FREE; helping others (caregiving) is Pro.
     val openCaregiver = onOpenCaregiver
     val openCaregiving = rememberProAction(reason = "caregiver", onAllowed = onOpenCaregiving)
@@ -189,6 +195,24 @@ fun MeScreen(
         }
 
         Spacer(Modifier.height(22.dp))
+        SectionHeader("Pharmacy", modifier = Modifier.padding(start = 4.dp))
+        Spacer(Modifier.height(10.dp))
+        PharmacyCard(
+            settings = settings,
+            onEdit = { showPharmacyDialog = true },
+            onCall = {
+                val phone = settings.pharmacyPhone
+                if (phone.isNotBlank()) {
+                    runCatching {
+                        context.startActivity(
+                            Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+                        )
+                    }
+                }
+            }
+        )
+
+        Spacer(Modifier.height(22.dp))
         SectionHeader("Account", modifier = Modifier.padding(start = 4.dp))
         Spacer(Modifier.height(10.dp))
         MedCard(modifier = Modifier.fillMaxWidth()) {
@@ -251,6 +275,13 @@ fun MeScreen(
             }
         }
         Spacer(Modifier.height(20.dp))
+    }
+
+    if (showPharmacyDialog) {
+        PharmacyDialog(
+            settings = settings,
+            onDismiss = { showPharmacyDialog = false }
+        )
     }
 }
 
@@ -710,3 +741,143 @@ private fun ProfileField(
     )
 }
 
+@Composable
+private fun PharmacyCard(
+    settings: SettingsViewModel,
+    onEdit: () -> Unit,
+    onCall: () -> Unit
+) {
+    val hasPharmacy = settings.pharmacyName.isNotBlank()
+    MedCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        RoundedCornerShape(11.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Rounded.LocalPharmacy,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "PRIMARY PHARMACY",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Text(
+                    text = if (hasPharmacy) settings.pharmacyName else "No pharmacy added",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+            if (hasPharmacy) {
+                TextButton(onClick = onCall) { Text("Call") }
+            }
+        }
+        if (hasPharmacy && settings.pharmacyAddress.isNotBlank()) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = listOf(settings.pharmacyAddress, settings.pharmacyHours)
+                    .filter { it.isNotBlank() }.joinToString(" \u00b7 "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Surface(
+            onClick = onEdit,
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (hasPharmacy) "Edit pharmacy details" else "Add your pharmacy",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    Icons.Rounded.ChevronRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PharmacyDialog(
+    settings: SettingsViewModel,
+    onDismiss: () -> Unit
+) {
+    var name by remember { mutableStateOf(settings.pharmacyName) }
+    var phone by remember { mutableStateOf(settings.pharmacyPhone) }
+    var address by remember { mutableStateOf(settings.pharmacyAddress) }
+    var hours by remember { mutableStateOf(settings.pharmacyHours) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Primary pharmacy") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = { Text("WhatsApp number") },
+                    placeholder = { Text("e.g. +1 555 123 4567") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = address,
+                    onValueChange = { address = it },
+                    label = { Text("Address") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = hours,
+                    onValueChange = { hours = it },
+                    label = { Text("Hours") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                settings.updatePharmacy(name.trim(), phone.trim(), address.trim(), hours.trim())
+                onDismiss()
+            }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
