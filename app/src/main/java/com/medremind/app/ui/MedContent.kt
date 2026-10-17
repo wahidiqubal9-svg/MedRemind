@@ -1,5 +1,7 @@
 package com.medremind.app.ui
 
+import android.widget.Toast
+
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
@@ -142,6 +144,7 @@ fun MedContent(
     var lowStockOnly by remember { mutableStateOf(false) }
     var bannerDismissed by remember { mutableStateOf(false) }
     var refillMedicine by remember { mutableStateOf<Medicine?>(null) }
+    var pharmacyForRefill by remember { mutableStateOf<Medicine?>(null) }
     var stockMedicine by remember { mutableStateOf<Medicine?>(null) }
     val filterOptions = listOf("All", "Daily", "Weekly", "Course")
 
@@ -213,8 +216,11 @@ fun MedContent(
                             schedules = schedulesByMedicine[low.id].orEmpty(),
                             moreCount = lowMedicines.size - 1,
                             onRefill = {
-                                val phone = settings.pharmacyPhone
-                                if (phone.isNotBlank()) refillMedicine = low else onEdit(low)
+                                if (settings.pharmacyPhone.isNotBlank()) {
+                                    refillMedicine = low
+                                } else {
+                                    pharmacyForRefill = low
+                                }
                             },
                             onLater = { bannerDismissed = true },
                             onNext = {
@@ -311,6 +317,37 @@ fun MedContent(
                     days = days
                 )
                 refillMedicine = null
+            }
+        )
+    }
+
+    pharmacyForRefill?.let { med ->
+        PharmacyDialog(
+            settings = settings,
+            onDismiss = { pharmacyForRefill = null },
+            onSaved = { phone ->
+                val target = med
+                pharmacyForRefill = null
+                if (phone.isNotBlank()) {
+                    val schedules = schedulesByMedicine[target.id].orEmpty()
+                    val daily = dailyDose(schedules)
+                    val days = if (daily > 0f) {
+                        (target.quantity / daily).toInt().coerceIn(1, 365)
+                    } else 30
+                    openWhatsAppRefill(
+                        context = context,
+                        phone = phone,
+                        medicine = target,
+                        schedules = schedules,
+                        days = days
+                    )
+                } else {
+                    Toast.makeText(
+                        context,
+                        "Add your pharmacy\u2019s WhatsApp number to request refills",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             }
         )
     }

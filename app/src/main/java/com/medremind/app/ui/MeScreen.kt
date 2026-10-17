@@ -835,9 +835,10 @@ private fun PharmacyCard(
 }
 
 @Composable
-private fun PharmacyDialog(
+internal fun PharmacyDialog(
     settings: SettingsViewModel,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onSaved: ((String) -> Unit)? = null
 ) {
     var name by remember { mutableStateOf(settings.pharmacyName) }
     var phone by remember { mutableStateOf(settings.pharmacyPhone) }
@@ -885,6 +886,7 @@ private fun PharmacyDialog(
         confirmButton = {
             TextButton(onClick = {
                 settings.updatePharmacy(name.trim(), phone.trim(), address.trim(), hours.trim())
+                onSaved?.invoke(phone.trim())
                 onDismiss()
             }) {
                 Text("Save")
