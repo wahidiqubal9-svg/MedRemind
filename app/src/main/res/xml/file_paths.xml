@@ -2,4 +2,5 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <files-path name="med_photos" path="med_photos/" />
     <cache-path name="exports" path="exports/" />
+    <files-path name="updates" path="updates/" />
 </paths>

@@ -38,6 +38,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -55,7 +56,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.medremind.app.data.Medicine
+import com.medremind.app.update.AppUpdate
+import com.medremind.app.update.UpdateManager
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun AppRoot(
@@ -98,8 +102,17 @@ fun AppRoot(
     var editing by remember { mutableStateOf<Medicine?>(null) }
     var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var promptAlarmOnAdd by remember { mutableStateOf(false) }
+    var launchUpdate by remember { mutableStateOf<AppUpdate?>(null) }
+    var launchUpdateDownloading by remember { mutableStateOf(false) }
     var unlocked by remember { mutableStateOf(!settings.appLock) }
     val context = LocalContext.current
+    val updateScope = rememberCoroutineScope()
+    LaunchedEffect(Unit) {
+        if (UpdateManager.shouldAutoCheck(context)) {
+            UpdateManager.markChecked(context)
+            launchUpdate = UpdateManager.check()
+        }
+    }
 
     val notificationsOk = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         ContextCompat.checkSelfPermission(
@@ -434,6 +447,43 @@ fun AppRoot(
                     showEditor = true
                 }) { Text("Add anyway") }
             }
+        )
+    }
+
+    launchUpdate?.let { update ->
+        AlertDialog(
+            onDismissRequest = { launchUpdate = null },
+            title = { Text("Update available") },
+            text = { Text("MedRemind ${update.versionName} is ready. Install now?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (UpdateManager.needsInstallPermission(context)) {
+                        UpdateManager.openInstallPermissionSettings(context)
+                    } else {
+                        launchUpdateDownloading = true
+                        updateScope.launch {
+                            val file = runCatching {
+                                UpdateManager.download(context, update)
+                            }.getOrNull()
+                            launchUpdateDownloading = false
+                            launchUpdate = null
+                            if (file != null) UpdateManager.install(context, file)
+                        }
+                    }
+                }) { Text("Install now") }
+            },
+            dismissButton = {
+                TextButton(onClick = { launchUpdate = null }) { Text("Later") }
+            }
+        )
+    }
+
+    if (launchUpdateDownloading) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Downloading update\u2026") },
+            text = { Text("Please keep the app open.") },
+            confirmButton = {}
         )
     }
 

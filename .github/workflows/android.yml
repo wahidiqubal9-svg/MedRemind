@@ -88,6 +88,8 @@ jobs:
           git init -q
           git checkout -q -b apk
           cp "$APK" medremind.apk
+          printf '{"versionCode":%s,"versionName":"%s","apkUrl":"https://raw.githubusercontent.com/%s/apk/medremind.apk","notes":"Build %s"}\n' \
+            "$VC" "$VN" "$GITHUB_REPOSITORY" "$RUN_NUMBER" > version.json
           printf 'MedRemind direct APK\n' > index.html
           git add -A
           git -c user.name="github-actions[bot]" \

@@ -40,15 +40,18 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Restore
+import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -68,8 +71,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.medremind.app.BuildConfig
 import com.medremind.app.alarm.ReminderScheduler
 import com.medremind.app.data.BackupManager
+import com.medremind.app.update.AppUpdate
+import com.medremind.app.update.UpdateManager
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -130,6 +136,45 @@ fun SettingsContent(
     val restoreAction = rememberProAction { importLauncher.launch(arrayOf("*/*")) }
 
     var confirmWipe by remember { mutableStateOf(false) }
+    var updateChecking by remember { mutableStateOf(false) }
+    var pendingUpdate by remember { mutableStateOf<AppUpdate?>(null) }
+    var updateDownloading by remember { mutableStateOf(false) }
+
+    fun startUpdateCheck() {
+        scope.launch {
+            updateChecking = true
+            val found = UpdateManager.check()
+            updateChecking = false
+            if (found == null) {
+                Toast.makeText(context, "You're on the latest version", Toast.LENGTH_SHORT).show()
+            } else {
+                pendingUpdate = found
+            }
+        }
+    }
+
+    fun installUpdate(update: AppUpdate) {
+        if (UpdateManager.needsInstallPermission(context)) {
+            UpdateManager.openInstallPermissionSettings(context)
+            Toast.makeText(
+                context,
+                "Allow installs for MedRemind, then check again",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+        scope.launch {
+            updateDownloading = true
+            val file = runCatching { UpdateManager.download(context, update) }.getOrNull()
+            updateDownloading = false
+            pendingUpdate = null
+            if (file == null) {
+                Toast.makeText(context, "Download failed", Toast.LENGTH_LONG).show()
+            } else if (!UpdateManager.install(context, file)) {
+                Toast.makeText(context, "Could not open the installer", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     val alarmIssues = alarmIssueCount(context)
     val alarmSubtitle = when {
@@ -355,6 +400,16 @@ fun SettingsContent(
             )
         }
 
+        SettingsGroup("Updates") {
+            SettingRow(
+                icon = Icons.Rounded.SystemUpdate,
+                tint = Color(0xFF4E75F4),
+                title = if (updateChecking) "Checking for updates\u2026" else "Check for updates",
+                subtitle = "Version ${BuildConfig.VERSION_NAME}",
+                onClick = { if (!updateChecking) startUpdateCheck() }
+            )
+        }
+
         SettingsGroup("Help") {
             SettingRow(
                 icon = Icons.Rounded.HelpOutline,
@@ -377,6 +432,31 @@ fun SettingsContent(
                 confirmWipe = false
             },
             onDismiss = { confirmWipe = false }
+        )
+    }
+
+    pendingUpdate?.let { update ->
+        AlertDialog(
+            onDismissRequest = { pendingUpdate = null },
+            title = { Text("Update available") },
+            text = { Text("MedRemind ${update.versionName} is ready to install.") },
+            confirmButton = {
+                TextButton(onClick = { installUpdate(update) }) {
+                    Text("Install now", fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingUpdate = null }) { Text("Later") }
+            }
+        )
+    }
+
+    if (updateDownloading) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Downloading update\u2026") },
+            text = { Text("Please keep the app open.") },
+            confirmButton = {}
         )
     }
 }
