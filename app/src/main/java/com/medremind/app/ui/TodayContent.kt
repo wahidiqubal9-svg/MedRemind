@@ -52,8 +52,12 @@ import androidx.compose.material.icons.rounded.ThumbUp
 import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material.icons.rounded.WbTwilight
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
@@ -117,6 +121,7 @@ fun TodayContent(
     var dosesLoaded by remember { mutableStateOf(false) }
     var reloadTick by remember { mutableIntStateOf(0) }
     var markedDates by remember { mutableStateOf<Set<LocalDate>>(emptySet()) }
+    var actionDose by remember { mutableStateOf<TodayDose?>(null) }
     val scope = rememberCoroutineScope()
     val haptics = rememberMedHaptics()
     val prnMeds by vm.prnMedicines.collectAsState()
@@ -385,7 +390,11 @@ fun TodayContent(
                         time = time,
                         doses = list,
                         onTake = { dose -> record(dose, DoseStatus.TAKEN) },
-                        onSkip = { dose -> record(dose, DoseStatus.SKIPPED) }
+                        onSkip = { dose -> record(dose, DoseStatus.SKIPPED) },
+                        onDoseClick = { dose ->
+                            haptics.tap()
+                            actionDose = dose
+                        }
                     )
                 }
 
@@ -435,6 +444,20 @@ fun TodayContent(
             }
         }
     }
+    }
+    actionDose?.let { dose ->
+        DoseActionSheet(
+            dose = dose,
+            onDismiss = { actionDose = null },
+            onTaken = {
+                record(dose, DoseStatus.TAKEN)
+                actionDose = null
+            },
+            onSkip = {
+                record(dose, DoseStatus.SKIPPED)
+                actionDose = null
+            }
+        )
     }
 }
 
@@ -1057,6 +1080,7 @@ private fun TimeGroupCard(
     doses: List<TodayDose>,
     onTake: (TodayDose) -> Unit,
     onSkip: (TodayDose) -> Unit,
+    onDoseClick: ((TodayDose) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -1126,7 +1150,12 @@ private fun TimeGroupCard(
 
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
                 doses.forEachIndexed { index, dose ->
-                    DoseRow(dose = dose, onTake = onTake, onSkip = onSkip)
+                    DoseRow(
+                        dose = dose,
+                        onClick = if (dose.status == DoseStatus.PENDING) {
+                            onDoseClick?.let { click -> { click(dose) } }
+                        } else null
+                    )
                     if (index != doses.lastIndex) {
                         HorizontalDivider(
                             modifier = Modifier.padding(start = 74.dp),
@@ -1203,8 +1232,7 @@ private fun StrengthPill(text: String) {
 @Composable
 private fun DoseRow(
     dose: TodayDose,
-    onTake: (TodayDose) -> Unit,
-    onSkip: (TodayDose) -> Unit
+    onClick: (() -> Unit)? = null
 ) {
     val completed = dose.status != DoseStatus.PENDING
     val detail = listOf(dose.medicine.strength, dose.schedule.doseLabel)
@@ -1214,6 +1242,13 @@ private fun DoseRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (onClick != null) {
+                    Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { onClick() }
+                } else Modifier
+            )
             .padding(horizontal = 4.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1254,6 +1289,126 @@ private fun DoseRow(
         }
         Spacer(Modifier.width(8.dp))
         RoundStatusIcon(status = dose.status)
+    }
+}
+
+/**
+ * Bottom sheet shown when an upcoming (pending) dose is tapped: logs it as
+ * taken or skipped.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DoseActionSheet(
+    dose: TodayDose,
+    onDismiss: () -> Unit,
+    onTaken: () -> Unit,
+    onSkip: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    fun choose(action: () -> Unit) {
+        scope.launch { sheetState.hide() }.invokeOnCompletion {
+            action()
+            onDismiss()
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 28.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MedAvatar(
+                    name = dose.medicine.name,
+                    photoPath = dose.medicine.photoPath,
+                    size = 52.dp,
+                    accent = medicineAccent(dose.medicine.id)
+                )
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = dose.medicine.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = listOf(
+                            SimpleDateFormat("h:mm a", Locale.getDefault())
+                                .format(Date(dose.timeMillis)),
+                            dose.medicine.strength
+                        ).filter { it.isNotBlank() }.joinToString(" \u00b7 "),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Surface(
+                    onClick = { choose(onTaken) },
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 16.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Taken",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                Surface(
+                    onClick = { choose(onSkip) },
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 16.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Skip",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
