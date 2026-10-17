@@ -467,7 +467,7 @@ fun statusTint(status: String): Color {
         DoseStatus.TAKEN -> if (dark) Color(0xFF7EF0B2) else Color(0xFF0A7F4F)
         DoseStatus.SKIPPED -> if (dark) Color(0xFFB9C0CC) else Color(0xFF5B6472)
         DoseStatus.MISSED -> if (dark) Color(0xFFFDA4AF) else Color(0xFFD53862)
-        else -> if (dark) Color(0xFF93C5FD) else Color(0xFF2563EB)
+        else -> if (dark) Color(0xFFAFC0FF) else Color(0xFF4E75F4)
     }
 }
 
@@ -647,6 +647,49 @@ fun MedConfirmDialog(
                     color = MaterialTheme.colorScheme.error,
                     fontWeight = FontWeight.SemiBold
                 )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+fun DeleteMedicineDialog(
+    medicineName: String,
+    onDeleteOnly: () -> Unit,
+    onDeleteWithLog: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete medicine?") },
+        text = {
+            Column {
+                Text("Choose what happens to \u201c$medicineName\u201d.")
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Keep the history to leave its past doses in Progress, or remove the log too.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(10.dp))
+                TextButton(
+                    onClick = onDeleteWithLog,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        "Delete medicine + log",
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDeleteOnly) {
+                Text("Delete medicine only", fontWeight = FontWeight.SemiBold)
             }
         },
         dismissButton = {

@@ -253,7 +253,7 @@ fun SettingsContent(
                 icon = Icons.Rounded.Notifications,
                 title = "Alarm setup",
                 subtitle = alarmSubtitle,
-                tint = Color(0xFF2563EB),
+                tint = Color(0xFF4E75F4),
                 onClick = onOpenPermissions
             )
             SettingsDivider()
@@ -320,7 +320,7 @@ fun SettingsContent(
             SettingsDivider()
             SettingsSwitchRow(
                 icon = Icons.Rounded.Animation,
-                tint = Color(0xFF6366F1),
+                tint = Color(0xFF4E75F4),
                 title = "Reduce motion",
                 subtitle = "Fewer animations for calmer feedback.",
                 checked = settings.reduceMotion,
@@ -358,7 +358,7 @@ fun SettingsContent(
         SettingsGroup("Help") {
             SettingRow(
                 icon = Icons.Rounded.HelpOutline,
-                tint = Color(0xFF6366F1),
+                tint = Color(0xFF4E75F4),
                 title = "Show the app tour",
                 subtitle = "Walk through the main features again.",
                 onClick = { settings.replayTour() }

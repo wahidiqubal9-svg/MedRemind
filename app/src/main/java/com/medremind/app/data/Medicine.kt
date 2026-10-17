@@ -100,5 +100,10 @@ data class Medicine(
     /** Content hash of the photo, so it's only re-uploaded/re-downloaded on change. */
     val photoHash: String = "",
     /** Bumped on each edit, so changes can be detected. */
-    val version: Long = 0
+    val version: Long = 0,
+    /**
+     * When non-null the medicine is paused: no new doses or reminders fire until
+     * it is resumed. Doses before this timestamp remain in the history.
+     */
+    val pausedAt: Long? = null
 )

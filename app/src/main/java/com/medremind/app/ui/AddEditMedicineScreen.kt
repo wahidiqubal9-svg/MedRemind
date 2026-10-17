@@ -155,7 +155,7 @@ private fun timeOfDayColor(hour: Int): Color = when {
     hour in 5..11 -> Color(0xFFFB923C)
     hour in 12..16 -> Color(0xFFF59E0B)
     hour in 17..20 -> Color(0xFF8B5CF6)
-    else -> Color(0xFF3B82F6)
+    else -> Color(0xFF4E75F4)
 }
 
 private fun timeOfDayLabel(hour: Int): String = when {
@@ -181,6 +181,7 @@ fun AddEditMedicineScreen(
     var step by remember { mutableIntStateOf(0) }
     var saved by remember { mutableStateOf(false) }
     var pendingDuplicate by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
     var name by rememberSaveable { mutableStateOf(initial?.name ?: "") }
     var doseAmount by rememberSaveable { mutableStateOf(if (initial == null) "" else initialStrength.first) }
     var doseUnit by rememberSaveable { mutableStateOf(if (initial == null) "mg" else initialStrength.second) }
@@ -407,7 +408,7 @@ fun AddEditMedicineScreen(
                 ) {
                     if (step == 3 && initial != null && initial.id != 0L) {
                         OutlinedButton(
-                            onClick = { vm.deleteMedicine(initial) { onDone() } },
+                            onClick = { showDeleteDialog = true },
                             shape = RoundedCornerShape(50),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.error
@@ -530,6 +531,21 @@ fun AddEditMedicineScreen(
                 pattern = chosen
                 showScheduleSheet = false
             }
+        )
+    }
+
+    if (showDeleteDialog && initial != null) {
+        DeleteMedicineDialog(
+            medicineName = initial.name,
+            onDeleteOnly = {
+                showDeleteDialog = false
+                vm.deleteMedicine(initial, keepLog = true) { onDone() }
+            },
+            onDeleteWithLog = {
+                showDeleteDialog = false
+                vm.deleteMedicine(initial, keepLog = false) { onDone() }
+            },
+            onDismiss = { showDeleteDialog = false }
         )
     }
 
@@ -1832,7 +1848,7 @@ private fun IntakeInventoryStep(
     val intakeOptions = listOf(
         Triple(IntakeInstruction.BEFORE_MEAL, "Before meal", Icons.Rounded.Schedule) to Color(0xFFEA7C1F),
         Triple(IntakeInstruction.WITH_MEAL, "With food", Icons.Rounded.Restaurant) to Color(0xFF12B76A),
-        Triple(IntakeInstruction.AFTER_MEAL, "After meal", Icons.Rounded.RestaurantMenu) to Color(0xFF2563EB),
+        Triple(IntakeInstruction.AFTER_MEAL, "After meal", Icons.Rounded.RestaurantMenu) to Color(0xFF4E75F4),
         Triple(IntakeInstruction.EMPTY_STOMACH, "Empty stomach", Icons.Rounded.LocalDrink) to Color(0xFF0E9F9F)
     )
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

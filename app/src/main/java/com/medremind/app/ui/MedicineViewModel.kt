@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.medremind.app.alarm.AlarmNotifier
 import com.medremind.app.alarm.ReminderScheduler
 import com.medremind.app.data.AppDatabase
+import com.medremind.app.data.ArchivedDose
 import com.medremind.app.data.Medicine
 import com.medremind.app.data.Metric
 import com.medremind.app.data.DoseEvent
@@ -78,7 +79,7 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
     ) { medicines, schedules ->
         val ids = schedules.filter { it.type == ScheduleType.AS_NEEDED }
             .map { it.medicineId }.toSet()
-        medicines.filter { it.id in ids }
+        medicines.filter { it.id in ids && it.pausedAt == null }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -200,7 +201,9 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                 val createdDate = Instant.ofEpochMilli(medicine.createdAt).atZone(zone).toLocalDate()
                 if (date.isBefore(createdDate)) return@forEach
                 val startRef = doseStartRef(medicine.createdAt, schedule.startDate)
+                val pausedAt = medicine.pausedAt
                 ReminderScheduler.occurrencesOn(schedule, date).forEach { trigger ->
+                    if (pausedAt != null && trigger >= pausedAt) return@forEach
                     val future = date.isAfter(today)
                     val event = if (future) null else events.firstOrNull {
                         it.medicineId == schedule.medicineId && abs(it.scheduledAt - trigger) < 90_000L
@@ -217,6 +220,7 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                     }
                     result.add(
                         DoseLogEntry(
+                            medicineId = medicine.id,
                             medicineName = medicine.name,
                             photoPath = medicine.photoPath,
                             scheduledAt = trigger,
@@ -226,8 +230,28 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                 }
             }
         }
+        // Doses kept from medicines that were deleted with "keep history".
+        db.archivedDoseDao().between(profileId, startMillis, endMillis).forEach { a ->
+            result.add(
+                DoseLogEntry(
+                    medicineId = 0L,
+                    medicineName = a.medicineName,
+                    photoPath = a.photoPath,
+                    scheduledAt = a.scheduledAt,
+                    status = a.status
+                )
+            )
+        }
         result.sortedByDescending { it.scheduledAt }
     }
+
+    /** History for one specific medicine (used by the per-medicine page). */
+    suspend fun doseLogForMedicine(
+        medicineId: Long,
+        days: Int,
+        profileId: Long = activeProfile.value
+    ): List<DoseLogEntry> = doseLogForRange(days, profileId)
+        .filter { it.medicineId == medicineId }
 
     suspend fun datesWithDoses(from: LocalDate, to: LocalDate): Set<LocalDate> =
         withContext(Dispatchers.IO) {
@@ -249,8 +273,10 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
                     val createdDate = Instant.ofEpochMilli(medicine.createdAt).atZone(zone).toLocalDate()
                     if (day.isBefore(createdDate)) return@any false
                     val startRef = doseStartRef(medicine.createdAt, schedule.startDate)
-                    ReminderScheduler.occurrencesOn(schedule, day).any { it >= startRef } ||
-                        (schedule.medicineId to day) in eventsOnDay
+                    val pausedAt = medicine.pausedAt
+                    ReminderScheduler.occurrencesOn(schedule, day).any {
+                        it >= startRef && (pausedAt == null || it < pausedAt)
+                    } || (schedule.medicineId to day) in eventsOnDay
                 }
                 if (hasDose) result.add(day)
                 day = day.plusDays(1)
@@ -341,14 +367,68 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun deleteMedicine(medicine: Medicine, onDone: () -> Unit) {
+    /** Pauses/resumes reminders and future doses without losing past history. */
+    fun pauseMedicine(medicine: Medicine, paused: Boolean, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                db.medicineDao().update(
+                    medicine.copy(
+                        pausedAt = if (paused) System.currentTimeMillis() else null
+                    )
+                )
+                val schedules = db.scheduleDao().forMedicine(medicine.id)
+                if (paused || medicine.profileId != 0L) {
+                    schedules.forEach { ReminderScheduler.cancel(app, it.id) }
+                } else {
+                    schedules.forEach { ReminderScheduler.schedule(app, it) }
+                }
+                if (paused) {
+                    // Never leave a pending dose for a time after the pause.
+                    db.doseEventDao().deletePendingAfter(medicine.id, System.currentTimeMillis())
+                }
+            }
+            refreshWidget()
+            onDone()
+        }
+    }
+
+    fun deleteMedicine(
+        medicine: Medicine,
+        keepLog: Boolean = false,
+        onDone: () -> Unit
+    ) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 db.scheduleDao().forMedicine(medicine.id).forEach {
                     ReminderScheduler.cancel(app, it.id)
                 }
+                if (keepLog) {
+                    // Snapshot the past doses so Progress/exports keep this medicine's
+                    // adherence history even though the medicine itself is removed.
+                    val now = System.currentTimeMillis()
+                    val days = (((now - medicine.createdAt) / 86_400_000L).toInt() + 1)
+                        .coerceIn(1, 3650)
+                    val kept = doseLogForRange(days, medicine.profileId)
+                        .filter {
+                            it.medicineId == medicine.id &&
+                                (it.status == DoseStatus.TAKEN ||
+                                    it.status == DoseStatus.SKIPPED ||
+                                    it.status == DoseStatus.MISSED)
+                        }
+                        .map {
+                            ArchivedDose(
+                                profileId = medicine.profileId,
+                                medicineName = it.medicineName,
+                                photoPath = it.photoPath,
+                                scheduledAt = it.scheduledAt,
+                                status = it.status
+                            )
+                        }
+                    if (kept.isNotEmpty()) db.archivedDoseDao().insertAll(kept)
+                }
+                db.doseEventDao().deleteForMedicine(medicine.id)
                 db.medicineDao().delete(medicine)
-                PhotoStorage.delete(medicine.photoPath)
+                if (!keepLog) PhotoStorage.delete(medicine.photoPath)
                 // Propagate the deletion so the other phone drops it too.
                 com.medremind.app.data.caregiver.PatientDataSync.deleteMedicine(app, medicine)
             }
@@ -384,6 +464,7 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
             .mapNotNull { schedule ->
                 val trigger = ReminderScheduler.nextTrigger(schedule, now) ?: return@mapNotNull null
                 val medicine = db.medicineDao().byId(schedule.medicineId)
+                if (medicine?.pausedAt != null) return@mapNotNull null
                 UpcomingAlarm(medicine?.name ?: "Medicine", trigger)
             }
             .sortedBy { it.triggerAt }
@@ -405,7 +486,9 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
             // A dose time that already passed before the medicine/schedule was set up
             // never existed, so it must not be counted (e.g. added 11am with an 8am time).
             val startRef = doseStartRef(medicine.createdAt, schedule.startDate)
+            val pausedAt = medicine.pausedAt
             ReminderScheduler.occurrencesOn(schedule, date).forEach { trigger ->
+                if (pausedAt != null && trigger >= pausedAt) return@forEach
                 val event = events.firstOrNull {
                     it.medicineId == schedule.medicineId && abs(it.scheduledAt - trigger) < 90_000L
                 }
@@ -574,6 +657,7 @@ data class DoseHistoryItem(
 )
 
 data class DoseLogEntry(
+    val medicineId: Long = 0L,
     val medicineName: String,
     val photoPath: String?,
     val scheduledAt: Long,

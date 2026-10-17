@@ -40,6 +40,8 @@ import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.LocalPharmacy
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.MoreVert
@@ -109,7 +111,7 @@ fun MedContent(
     settings: SettingsViewModel,
     vm: MedicineViewModel,
     onEdit: (Medicine) -> Unit,
-    onDelete: (Medicine) -> Unit,
+    onDelete: (Medicine, Boolean) -> Unit,
     onAdd: () -> Unit,
     onOpenMe: () -> Unit,
     profilePhoto: String? = null,
@@ -265,6 +267,9 @@ fun MedContent(
                     onDuplicate = { vm.duplicateMedicine(medicine, schedules) },
                     onShare = { shareMedicine(medicine, schedules) },
                     onRefill = { stockMedicine = medicine },
+                    onPauseToggle = {
+                        vm.pauseMedicine(medicine, medicine.pausedAt == null)
+                    },
                     onDelete = { pendingDelete = medicine },
                     modifier = Modifier.animateItem()
                 )
@@ -292,12 +297,15 @@ fun MedContent(
 
     val toDelete = pendingDelete
     if (toDelete != null) {
-        MedConfirmDialog(
-            title = "Delete medicine?",
-            message = "\"${toDelete.name}\" and all of its schedules will be permanently removed. This cannot be undone.",
-            onConfirm = {
+        DeleteMedicineDialog(
+            medicineName = toDelete.name,
+            onDeleteOnly = {
                 pendingDelete = null
-                onDelete(toDelete)
+                onDelete(toDelete, true)
+            },
+            onDeleteWithLog = {
+                pendingDelete = null
+                onDelete(toDelete, false)
             },
             onDismiss = { pendingDelete = null }
         )
@@ -521,6 +529,7 @@ private fun MedHeader(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MedicineCard(
     medicine: Medicine,
@@ -529,6 +538,7 @@ private fun MedicineCard(
     onDuplicate: () -> Unit,
     onShare: () -> Unit,
     onRefill: () -> Unit,
+    onPauseToggle: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -559,12 +569,30 @@ private fun MedicineCard(
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = medicine.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        maxLines = 1
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = medicine.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        if (medicine.pausedAt != null) {
+                            Spacer(Modifier.width(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            ) {
+                                Text(
+                                    "Paused",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
                     if (sub.isNotBlank()) {
                         Spacer(Modifier.height(2.dp))
                         Text(
@@ -577,84 +605,21 @@ private fun MedicineCard(
                     }
                 }
                 Spacer(Modifier.width(10.dp))
-                Box {
-                    Surface(
-                        onClick = {
-                            haptics.tap()
-                            menuExpanded = true
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        color = soft,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, line)
-                    ) {
-                        Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Rounded.MoreVert,
-                                contentDescription = "More options",
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-                    DropdownMenu(
-                        expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Edit medicine") },
-                            leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
-                            onClick = {
-                                menuExpanded = false
-                                onEdit()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Duplicate") },
-                            leadingIcon = {
-                                Icon(Icons.Rounded.ContentCopy, contentDescription = null)
-                            },
-                            onClick = {
-                                menuExpanded = false
-                                onDuplicate()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Share") },
-                            leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null) },
-                            onClick = {
-                                menuExpanded = false
-                                onShare()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Refill stock") },
-                            leadingIcon = {
-                                Icon(Icons.Rounded.Inventory2, contentDescription = null)
-                            },
-                            onClick = {
-                                menuExpanded = false
-                                onRefill()
-                            }
-                        )
-                        HorizontalDivider(color = line)
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    "Delete medicine",
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Rounded.DeleteOutline,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            },
-                            onClick = {
-                                menuExpanded = false
-                                onDelete()
-                            }
+                Surface(
+                    onClick = {
+                        haptics.tap()
+                        menuExpanded = true
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    color = soft,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, line)
+                ) {
+                    Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.MoreVert,
+                            contentDescription = "More options",
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
@@ -729,6 +694,108 @@ private fun MedicineCard(
                     )
                 }
             }
+        }
+    }
+
+    if (menuExpanded) {
+        ModalBottomSheet(
+            onDismissRequest = { menuExpanded = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 24.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    MedIconSquare(
+                        label = medicine.name,
+                        seed = medicine.id,
+                        size = 46.dp,
+                        photoPath = medicine.photoPath
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            medicine.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                        Text(
+                            sub.ifBlank { "Medicine" },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                MedicineSheetAction(Icons.Rounded.Edit, "Edit medicine") {
+                    menuExpanded = false
+                    onEdit()
+                }
+                MedicineSheetAction(Icons.Rounded.ContentCopy, "Duplicate") {
+                    menuExpanded = false
+                    onDuplicate()
+                }
+                MedicineSheetAction(Icons.Rounded.Share, "Share") {
+                    menuExpanded = false
+                    onShare()
+                }
+                MedicineSheetAction(Icons.Rounded.Inventory2, "Refill stock") {
+                    menuExpanded = false
+                    onRefill()
+                }
+                MedicineSheetAction(
+                    if (medicine.pausedAt != null) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+                    if (medicine.pausedAt != null) "Resume medicine" else "Pause medicine"
+                ) {
+                    menuExpanded = false
+                    onPauseToggle()
+                }
+                HorizontalDivider(color = line)
+                MedicineSheetAction(
+                    Icons.Rounded.DeleteOutline,
+                    "Delete medicine",
+                    danger = true
+                ) {
+                    menuExpanded = false
+                    onDelete()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MedicineSheetAction(
+    icon: ImageVector,
+    label: String,
+    danger: Boolean = false,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        color = Color.Transparent,
+        contentColor = if (danger) MaterialTheme.colorScheme.error
+        else MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(14.dp))
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }
@@ -1108,7 +1175,7 @@ private fun LowSupplyBanner(
     val daysLeft = if (daily > 0f) (medicine.quantity / daily).toInt() else 0
     val unit = unitLabel(medicine.form, medicine.quantity != 1)
     val rose = Color(0xFFE8466B)
-    val ink = Color(0xFF101828)
+    val ink = Color(0xFF1F2937)
     val bodyColor = Color(0xFF7A4453)
     val body = androidx.compose.ui.text.buildAnnotatedString {
         withStyle(

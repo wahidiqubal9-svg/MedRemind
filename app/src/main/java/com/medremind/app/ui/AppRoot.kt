@@ -73,6 +73,9 @@ fun AppRoot(
         }
     }
     var tab by remember { mutableIntStateOf(0) }
+    var showMedicineHistory by remember { mutableStateOf(false) }
+    var historyMedicineId by remember { mutableStateOf(0L) }
+    var historyProfileId by remember { mutableStateOf(0L) }
     var startTabDecided by remember { mutableStateOf(false) }
     LaunchedEffect(loaded, medicines) {
         if (loaded && !startTabDecided) {
@@ -133,6 +136,7 @@ fun AppRoot(
         // Account takes precedence over Me so "Sign in" from Me actually opens it.
         showAccount -> "account"
         showMe -> "me"
+        showMedicineHistory -> "medicineHistory"
         else -> "main"
     }
 
@@ -145,7 +149,7 @@ fun AppRoot(
             drawRect(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Color(0xFF6366F1).copy(alpha = 0.16f),
+                        Color(0xFF4E75F4).copy(alpha = 0.16f),
                         Color.Transparent
                     ),
                     center = Offset(size.width * 0.9f, -size.height * 0.05f),
@@ -155,7 +159,7 @@ fun AppRoot(
             drawRect(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Color(0xFF6366F1).copy(alpha = 0.10f),
+                        Color(0xFF4E75F4).copy(alpha = 0.10f),
                         Color.Transparent
                     ),
                     center = Offset(0f, size.height * 0.35f),
@@ -305,6 +309,13 @@ fun AppRoot(
                 vm = vm
             )
 
+            "medicineHistory" -> com.medremind.app.ui.MedicineHistoryScreen(
+                vm = vm,
+                medicineId = historyMedicineId,
+                profileId = historyProfileId,
+                onBack = { showMedicineHistory = false }
+            )
+
             else -> MainTabs(
                 tab = tab,
                 onTabChange = { tab = it },
@@ -331,9 +342,9 @@ fun AppRoot(
                         showEditor = true
                     }
                 },
-                onDelete = { medicine ->
+                onDelete = { medicine, keepLog ->
                     guarded {
-                        vm.deleteMedicine(medicine) {}
+                        vm.deleteMedicine(medicine, keepLog) {}
                     }
                 },
                 onOpenPermissions = { showPermissions = true },
@@ -344,6 +355,11 @@ fun AppRoot(
                     showCaregiverDashboard = true
                 },
                 onOpenCaregiving = { showCaregiving = true; openConnectOnCaregiving = true },
+                onOpenMedicineHistory = { medicineId ->
+                    historyMedicineId = medicineId
+                    historyProfileId = 0L
+                    showMedicineHistory = true
+                },
                 reminderSetupNeeded = needsAlarmSetup &&
                     settings.onboardingDone && settings.tourDone &&
                     System.currentTimeMillis() >= settings.reminderHiddenUntil,

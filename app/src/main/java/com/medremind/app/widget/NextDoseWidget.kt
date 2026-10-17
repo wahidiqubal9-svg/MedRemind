@@ -48,10 +48,12 @@ class NextDoseWidget : GlanceAppWidget() {
         var name: String? = null
         var trigger = Long.MAX_VALUE
         db.scheduleDao().getAllOnce().filter { it.enabled }.forEach { schedule ->
+            val medicine = db.medicineDao().byId(schedule.medicineId) ?: return@forEach
+            if (medicine.pausedAt != null) return@forEach
             val next = ReminderScheduler.nextTrigger(schedule, now) ?: return@forEach
             if (next < trigger) {
                 trigger = next
-                name = db.medicineDao().byId(schedule.medicineId)?.name
+                name = medicine.name
             }
         }
         val medicine = name ?: return WidgetState("", "", empty = true)
@@ -65,14 +67,14 @@ private fun WidgetContent(state: WidgetState) {
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(ColorProvider(Color(0xFF4F46E5)))
+            .background(ColorProvider(Color(0xFF4E75F4)))
             .padding(14.dp),
         verticalAlignment = Alignment.Vertical.CenterVertically
     ) {
         Text(
             text = "NEXT DOSE",
             style = TextStyle(
-                color = ColorProvider(Color(0xFFE0E7FF)),
+                color = ColorProvider(Color(0xFFE6ECFF)),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium
             )
@@ -100,7 +102,7 @@ private fun WidgetContent(state: WidgetState) {
             Text(
                 text = state.time,
                 style = TextStyle(
-                    color = ColorProvider(Color(0xFFE0E7FF)),
+                    color = ColorProvider(Color(0xFFE6ECFF)),
                     fontSize = 13.sp
                 )
             )

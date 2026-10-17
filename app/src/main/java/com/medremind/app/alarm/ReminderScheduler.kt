@@ -305,7 +305,8 @@ object ReminderScheduler {
         db.scheduleDao().getAllOnce().forEach { schedule ->
             // Alarms ring only for the device owner's own medicines. A patient's
             // medicines must ring on the patient's phone, never the caregiver's.
-            if (medicines[schedule.medicineId]?.profileId == 0L) {
+            val med = medicines[schedule.medicineId]
+            if (med?.profileId == 0L && med.pausedAt == null) {
                 schedule(context, schedule)
             } else {
                 cancel(context, schedule.id)

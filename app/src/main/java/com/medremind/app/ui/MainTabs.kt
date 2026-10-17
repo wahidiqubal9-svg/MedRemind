@@ -138,12 +138,13 @@ fun MainTabs(
     settings: SettingsViewModel,
     onAdd: () -> Unit,
     onEdit: (Medicine) -> Unit,
-    onDelete: (Medicine) -> Unit,
+    onDelete: (Medicine, Boolean) -> Unit,
     onOpenPermissions: () -> Unit = {},
     onOpenMe: () -> Unit,
     onOpenNotifications: () -> Unit = {},
     onOpenPatient: (Long) -> Unit = {},
     onOpenCaregiving: () -> Unit = {},
+    onOpenMedicineHistory: (Long) -> Unit = {},
     reminderSetupNeeded: Boolean = false,
     onOpenReminderSetup: () -> Unit = {},
     onDismissReminderSetup: () -> Unit = {}
@@ -237,7 +238,8 @@ fun MainTabs(
                     vm = vm,
                     onOpenMe = onOpenMe,
                     profilePhoto = settings.profilePhoto,
-                    onOpenNotifications = onOpenNotifications
+                    onOpenNotifications = onOpenNotifications,
+                    onOpenMedicine = onOpenMedicineHistory
                 )
                 3 -> HealthScreen(
                     modifier = Modifier.padding(padding),

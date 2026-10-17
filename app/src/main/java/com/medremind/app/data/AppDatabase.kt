@@ -16,9 +16,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         Patient::class,
         CaregiverLink::class,
         PairingRequest::class,
-        CaregiverActivity::class
+        CaregiverActivity::class,
+        ArchivedDose::class
     ],
-    version = 17,
+    version = 18,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -27,6 +28,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun doseEventDao(): DoseEventDao
     abstract fun metricDao(): MetricDao
     abstract fun caregiverDao(): CaregiverDao
+    abstract fun archivedDoseDao(): ArchivedDoseDao
 
     companion object {
         @Volatile
@@ -36,6 +38,32 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE medicines ADD COLUMN quantity INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE medicines ADD COLUMN refillThreshold INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Pause support: a paused medicine keeps its past history but
+                // stops producing new doses/reminders.
+                db.execSQL("ALTER TABLE medicines ADD COLUMN pausedAt INTEGER")
+                // Snapshot of doses kept when a medicine is deleted with history.
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS archived_doses (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "profileId INTEGER NOT NULL DEFAULT 0, " +
+                        "medicineName TEXT NOT NULL, " +
+                        "photoPath TEXT, " +
+                        "scheduledAt INTEGER NOT NULL, " +
+                        "status TEXT NOT NULL)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_archived_doses_profileId " +
+                        "ON archived_doses(profileId)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_archived_doses_scheduledAt " +
+                        "ON archived_doses(scheduledAt)"
+                )
             }
         }
 
@@ -224,7 +252,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_13_14,
                         MIGRATION_14_15,
                         MIGRATION_15_16,
-                        MIGRATION_16_17
+                        MIGRATION_16_17,
+                        MIGRATION_17_18
                     )
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .build()

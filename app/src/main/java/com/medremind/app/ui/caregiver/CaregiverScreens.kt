@@ -1571,7 +1571,7 @@ private fun CaregiverPatientCard(
                 QuickAction(
                     label = "Refill",
                     icon = Icons.Rounded.Inventory2,
-                    tint = Color(0xFF2563EB),
+                    tint = Color(0xFF4E75F4),
                     enabled = canRefill,
                     onClick = onRefill,
                     modifier = Modifier.weight(1f)
@@ -1693,7 +1693,7 @@ private fun TodaySection(
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             LegendDot(Color(0xFF0A7F4F), "Taken ${progress.confirmed}")
-            LegendDot(Color(0xFF2563EB), "Upcoming ${progress.upcoming}")
+            LegendDot(Color(0xFF4E75F4), "Upcoming ${progress.upcoming}")
             LegendDot(Color(0xFFD53862), "Missed ${progress.missed}")
         }
         if (progress.total == 0) {

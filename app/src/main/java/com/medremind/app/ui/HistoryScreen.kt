@@ -84,7 +84,8 @@ fun HistoryContent(
     profilePhoto: String? = null,
     onOpenNotifications: () -> Unit = {},
     profileId: Long = 0L,
-    showHeader: Boolean = true
+    showHeader: Boolean = true,
+    onOpenMedicine: (Long) -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -306,7 +307,13 @@ fun HistoryContent(
                     items = entries,
                     key = { index, entry -> "$day-${entry.scheduledAt}-$index" }
                 ) { _, entry ->
-                    DoseLogRow(entry = entry, timeFormat = timeFormat)
+                    DoseLogRow(
+                        entry = entry,
+                        timeFormat = timeFormat,
+                        onClick = if (entry.medicineId != 0L) {
+                            { onOpenMedicine(entry.medicineId) }
+                        } else null
+                    )
                 }
             }
         }
@@ -559,49 +566,61 @@ internal fun ExportCard(
 }
 
 @Composable
-private fun DoseLogRow(
+internal fun DoseLogRow(
     entry: DoseLogEntry,
     timeFormat: SimpleDateFormat,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    MedCard(modifier = modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            val photo = entry.photoPath
-            if (photo != null) {
-                AsyncImage(
-                    model = File(photo),
-                    contentDescription = entry.medicineName,
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = entry.medicineName.take(1).uppercase(),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(entry.medicineName, style = MaterialTheme.typography.titleSmall)
+    if (onClick != null) {
+        MedClickableCard(onClick = onClick, modifier = modifier.fillMaxWidth()) {
+            DoseLogRowContent(entry, timeFormat)
+        }
+    } else {
+        MedCard(modifier = modifier.fillMaxWidth()) {
+            DoseLogRowContent(entry, timeFormat)
+        }
+    }
+}
+
+@Composable
+private fun DoseLogRowContent(entry: DoseLogEntry, timeFormat: SimpleDateFormat) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        val photo = entry.photoPath
+        if (photo != null) {
+            AsyncImage(
+                model = File(photo),
+                contentDescription = entry.medicineName,
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    timeFormat.format(Date(entry.scheduledAt)),
-                    style = MaterialTheme.typography.bodySmall,
+                    text = entry.medicineName.take(1).uppercase(),
+                    style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            StatusChip(status = entry.status)
         }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(entry.medicineName, style = MaterialTheme.typography.titleSmall)
+            Text(
+                timeFormat.format(Date(entry.scheduledAt)),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        StatusChip(status = entry.status)
     }
 }
 

@@ -35,6 +35,12 @@ interface DoseEventDao {
     @Query("SELECT * FROM dose_events ORDER BY scheduledAt ASC")
     suspend fun getAllOnce(): List<DoseEvent>
 
+    @Query("DELETE FROM dose_events WHERE medicineId = :medicineId")
+    suspend fun deleteForMedicine(medicineId: Long)
+
+    @Query("DELETE FROM dose_events WHERE medicineId = :medicineId AND status = 'PENDING' AND scheduledAt >= :after")
+    suspend fun deletePendingAfter(medicineId: Long, after: Long)
+
     @Query("DELETE FROM dose_events")
     suspend fun clear()
 

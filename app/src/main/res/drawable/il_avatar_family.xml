@@ -7,7 +7,7 @@
     android:viewportHeight="100">
     <!-- back person (caregiver) -->
     <path
-        android:fillColor="#6366F1"
+        android:fillColor="#4E75F4"
         android:pathData="M56,100 C56,77 66,64 80,64 C94,64 104,77 104,100 Z" />
     <path
         android:fillColor="#EFC3A0"
