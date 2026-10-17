@@ -20,8 +20,9 @@ android {
         applicationId = "com.medremind.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 183
-        versionName = "0.182.0"
+        // CI passes -PversionCode/-PversionName so every cloud build increments.
+        versionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 183
+        versionName = (project.findProperty("versionName") as String?)?.toString() ?: "0.182.0"
     }
 
     signingConfigs {

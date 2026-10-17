@@ -78,6 +78,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -99,9 +103,28 @@ private data class NavSpec(
     val tourId: String
 )
 
+// Monochrome capsule (💊) icon drawn as a vector so it tints like the other
+// bottom-bar icons.
+private val PillIcon: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "Pill",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f
+    ).addPath(
+        pathData = addPathNodes(
+            "M9 2h6a4 4 0 0 1 4 4v12a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4z" +
+                "M6 11.2h12v1.6H6z"
+        ),
+        pathFillType = PathFillType.EvenOdd,
+        fill = SolidColor(Color.Black)
+    ).build()
+}
+
 private val navSpecs = listOf(
     NavSpec("Today", Icons.Rounded.Today, "nav_today"),
-    NavSpec("Med", Icons.Rounded.Medication, "nav_med"),
+    NavSpec("Med", PillIcon, "nav_med"),
     NavSpec("Progress", Icons.Rounded.Insights, "nav_progress"),
     NavSpec("Health", Icons.Rounded.MonitorHeart, "nav_health")
 )

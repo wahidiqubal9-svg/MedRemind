@@ -350,7 +350,7 @@ private fun AdherenceHeroCard(
         color = Color.Transparent,
         shadowElevation = MedElevation.raised
     ) {
-        Box(modifier = Modifier.background(MedGradients.hero())) {
+        Box(modifier = Modifier.background(MedGradients.adherence())) {
             Row(
                 modifier = Modifier.padding(22.dp),
                 verticalAlignment = Alignment.CenterVertically

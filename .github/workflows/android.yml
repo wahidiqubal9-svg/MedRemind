@@ -1,0 +1,96 @@
+name: Build & publish APK
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'prototype/**'
+  workflow_dispatch:
+
+# Needed so the workflow can push the apk branch and create the rolling release.
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-publish
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform 35
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" > /dev/null
+
+      - name: Restore signing key
+        run: |
+          mkdir -p "$HOME/.android"
+          cp ci/debug.keystore "$HOME/.android/debug.keystore"
+
+      - name: Build release APK
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          VC=$((1000 + RUN_NUMBER))
+          VN="0.183.${RUN_NUMBER}"
+          echo "Building versionCode=$VC versionName=$VN"
+          ./gradlew --no-daemon --stacktrace assembleRelease \
+            -PversionCode="$VC" -PversionName="$VN"
+          echo "VC=$VC" >> "$GITHUB_ENV"
+          echo "VN=$VN" >> "$GITHUB_ENV"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: medremind-apk-${{ github.run_number }}
+          path: app/build/outputs/apk/release/app-release.apk
+          retention-days: 30
+
+      - name: Publish direct APK link (apk branch)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          APK="$GITHUB_WORKSPACE/app/build/outputs/apk/release/app-release.apk"
+          TMP="$(mktemp -d)"
+          cd "$TMP"
+          git init -q
+          git checkout -q -b apk
+          cp "$APK" medremind.apk
+          printf 'MedRemind direct APK\n' > index.html
+          git add -A
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "CI build ${RUN_NUMBER} (v${VN:-})"
+          git -c credential.helper= push -f \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" apk:apk
+
+      - name: Refresh rolling "latest" release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create latest app/build/outputs/apk/release/app-release.apk \
+            --prerelease --title "Latest build" \
+            --notes "Auto-built from ${GITHUB_SHA::7} · v${{ env.VN }} (versionCode ${{ env.VC }})"

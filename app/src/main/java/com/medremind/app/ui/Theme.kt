@@ -13,6 +13,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -282,16 +283,17 @@ private val MedTypography = Typography(
 )
 
 object MedGradients {
+    // Default brand colour is a solid blue — no colour transitions anywhere.
     @Composable
-    fun hero(): Brush = Brush.linearGradient(
-        colors = listOf(
-            MaterialTheme.colorScheme.primary,
-            MaterialTheme.colorScheme.tertiary
-        )
-    )
+    fun hero(): Brush = SolidColor(MaterialTheme.colorScheme.primary)
 
     @Composable
-    fun heroHorizontal(): Brush = Brush.horizontalGradient(
+    fun heroHorizontal(): Brush = SolidColor(MaterialTheme.colorScheme.primary)
+
+    // The overall-adherence card is the one place that keeps its colour
+    // transition (blue → purple).
+    @Composable
+    fun adherence(): Brush = Brush.linearGradient(
         colors = listOf(
             MaterialTheme.colorScheme.primary,
             MaterialTheme.colorScheme.tertiary

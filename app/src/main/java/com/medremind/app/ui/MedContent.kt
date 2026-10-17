@@ -1129,9 +1129,7 @@ private fun LowSupplyBanner(
         shadowElevation = MedElevation.card
     ) {
         Box(
-            modifier = Modifier.background(
-                Brush.linearGradient(listOf(Color(0xFFFFF4F7), Color(0xFFFDEAEF)))
-            )
+            modifier = Modifier.background(SolidColor(Color(0xFFFDEAEF)))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row {
@@ -1139,11 +1137,7 @@ private fun LowSupplyBanner(
                         modifier = Modifier
                             .size(44.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(Color(0xFFF0567A), rose)
-                                )
-                            ),
+                            .background(SolidColor(rose)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -1201,11 +1195,7 @@ private fun LowSupplyBanner(
                     ) {
                         Row(
                             modifier = Modifier
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(Color(0xFFF0567A), rose)
-                                    )
-                                )
+                                .background(SolidColor(rose))
                                 .padding(horizontal = 18.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {

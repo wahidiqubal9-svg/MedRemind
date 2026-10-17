@@ -527,8 +527,8 @@ private fun SummaryCard(
             Column(modifier = Modifier.weight(1f)) {
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.tertiaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
@@ -1148,8 +1148,8 @@ private fun SegmentStatusChip(allDone: Boolean, anyDone: Boolean) {
     when {
         allDone -> {
             label = "All completed"
-            container = MaterialTheme.colorScheme.tertiaryContainer
-            content = MaterialTheme.colorScheme.onTertiaryContainer
+            container = MaterialTheme.colorScheme.primaryContainer
+            content = MaterialTheme.colorScheme.onPrimaryContainer
         }
         anyDone -> {
             label = "In progress"

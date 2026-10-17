@@ -56,7 +56,10 @@ else
   echo "==> Building $TAG ($VARIANT)"
   # Reuse the warm Gradle daemon + configuration cache for speed. --offline
   # avoids network round-trips since all dependencies are already cached.
-  "$GRADLE" --console=plain --offline "$BUILD_TASK"
+  # The aapt2 override is device-only (CI uses the default aapt2).
+  "$GRADLE" --console=plain --offline \
+    -Pandroid.aapt2FromMavenOverride=/workspace/toolchain/bin/aapt2 \
+    "$BUILD_TASK"
 fi
 
 echo "==> Staging commit"

@@ -234,12 +234,7 @@ fun GradientPillButton(
     icon: ImageVector? = null,
     enabled: Boolean = true
 ) {
-    val disabledBrush = Brush.linearGradient(
-        listOf(
-            MaterialTheme.colorScheme.surfaceContainerHigh,
-            MaterialTheme.colorScheme.surfaceContainerHigh
-        )
-    )
+    val disabledBrush = SolidColor(MaterialTheme.colorScheme.surfaceContainerHigh)
     val interaction = remember { MutableInteractionSource() }
     val haptics = rememberMedHaptics()
     val pressed by interaction.collectIsPressedAsState()
@@ -524,18 +519,7 @@ fun statusIcon(status: String): ImageVector = when (status) {
 }
 
 @Composable
-fun medicineAccent(seed: Long): Color {
-    val options = listOf(
-        MaterialTheme.colorScheme.primary,
-        MaterialTheme.colorScheme.tertiary,
-        MaterialTheme.colorScheme.secondary,
-        MaterialTheme.colorScheme.primary,
-        MaterialTheme.colorScheme.tertiary,
-        MaterialTheme.colorScheme.secondary
-    )
-    val index = (seed % options.size).toInt().let { if (it < 0) it + options.size else it }
-    return options[index]
-}
+fun medicineAccent(seed: Long): Color = MaterialTheme.colorScheme.primary
 
 @Composable
 fun SquareIconButton(
@@ -753,16 +737,6 @@ fun GlassIconButton(
     }
 }
 
-private val medIconBg = listOf(
-    listOf(Color(0xFFE0E7FF), Color(0xFFF3E8FF)),
-    listOf(Color(0xFFDCFCE7), Color(0xFFD1FAE5)),
-    listOf(Color(0xFFFFE4E6), Color(0xFFFEE2E2)),
-    listOf(Color(0xFFFEF3C7), Color(0xFFFDE68A))
-)
-private val medIconFg = listOf(
-    Color(0xFF6366F1), Color(0xFF059669), Color(0xFFE11D48), Color(0xFFB45309)
-)
-
 @Composable
 fun MedIconSquare(
     label: String,
@@ -781,17 +755,16 @@ fun MedIconSquare(
             contentScale = ContentScale.Crop
         )
     } else {
-        val i = (seed % 4).toInt().let { if (it < 0) it + 4 else it }
         Box(
             modifier = modifier
                 .size(size)
                 .clip(RoundedCornerShape(size * 0.3f))
-                .background(Brush.linearGradient(medIconBg[i])),
+                .background(MaterialTheme.colorScheme.primary),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = label.take(1).uppercase(),
-                color = medIconFg[i],
+                color = MaterialTheme.colorScheme.onPrimary,
                 fontWeight = FontWeight.Bold,
                 fontSize = (size.value * 0.42f).sp
             )

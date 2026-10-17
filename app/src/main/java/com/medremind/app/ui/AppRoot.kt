@@ -155,7 +155,7 @@ fun AppRoot(
             drawRect(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Color(0xFFA855F7).copy(alpha = 0.10f),
+                        Color(0xFF6366F1).copy(alpha = 0.10f),
                         Color.Transparent
                     ),
                     center = Offset(0f, size.height * 0.35f),
