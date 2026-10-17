@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -221,7 +221,7 @@ fun MedicineHistoryScreen(
                             modifier = Modifier.padding(top = 4.dp)
                         )
                     }
-                    items(entries, key = { "$day-${it.scheduledAt}" }) { entry ->
+                    itemsIndexed(entries, key = { index, entry -> "$day-$index-${entry.scheduledAt}" }) { _, entry ->
                         DoseLogRow(entry = entry, timeFormat = timeFormat)
                     }
                 }
