@@ -31,11 +31,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.FileDownload
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material.icons.rounded.Medication
 import androidx.compose.material.icons.rounded.MonitorHeart
@@ -145,6 +147,8 @@ fun MainTabs(
     onOpenPatient: (Long) -> Unit = {},
     onOpenCaregiving: () -> Unit = {},
     onOpenMedicineHistory: (Long) -> Unit = {},
+    onOpenHistory: () -> Unit = {},
+    onOpenHealthHistory: () -> Unit = {},
     reminderSetupNeeded: Boolean = false,
     onOpenReminderSetup: () -> Unit = {},
     onDismissReminderSetup: () -> Unit = {}
@@ -239,14 +243,16 @@ fun MainTabs(
                     onOpenMe = onOpenMe,
                     profilePhoto = settings.profilePhoto,
                     onOpenNotifications = onOpenNotifications,
-                    onOpenMedicine = onOpenMedicineHistory
+                    onOpenMedicine = onOpenMedicineHistory,
+                    onOpenHistory = onOpenHistory
                 )
                 3 -> HealthScreen(
                     modifier = Modifier.padding(padding),
                     settings = settings,
                     vm = vm,
                     onOpenMe = onOpenMe,
-                    onOpenNotifications = onOpenNotifications
+                    onOpenNotifications = onOpenNotifications,
+                    onOpenHealthHistory = onOpenHealthHistory
                 )
                 else -> SettingsContent(
                     modifier = Modifier.padding(padding),
@@ -402,7 +408,8 @@ fun HealthScreen(
     profileId: Long = 0L,
     actor: String = "",
     allowedTypes: Set<String>? = null,
-    showHeader: Boolean = true
+    showHeader: Boolean = true,
+    onOpenHealthHistory: () -> Unit = {}
 ) {
     val collected by vm.metrics.collectAsState()
     val metrics = (metricsOverride ?: collected).let { all ->
@@ -590,6 +597,38 @@ fun HealthScreen(
                         )
                     )
                 )
+            }
+
+            MedClickableCard(
+                onClick = onOpenHealthHistory,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Rounded.History,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "History",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "All blood pressure, glucose and weight readings.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Icon(
+                        Icons.Rounded.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             MedCard(modifier = Modifier.fillMaxWidth()) {
@@ -905,7 +944,7 @@ private fun HealthExportCard(
 }
 
 @Composable
-private fun MetricRow(metric: Metric, onDelete: () -> Unit) {
+internal fun MetricRow(metric: Metric, onDelete: () -> Unit) {
     val format = remember { SimpleDateFormat("d MMM, h:mm a", Locale.getDefault()) }
     Row(
         modifier = Modifier.fillMaxWidth(),

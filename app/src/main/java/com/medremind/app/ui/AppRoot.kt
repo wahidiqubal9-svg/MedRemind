@@ -78,6 +78,8 @@ fun AppRoot(
     }
     var tab by remember { mutableIntStateOf(0) }
     var showMedicineHistory by remember { mutableStateOf(false) }
+    var showDoseHistory by remember { mutableStateOf(false) }
+    var showHealthHistory by remember { mutableStateOf(false) }
     var historyMedicineId by remember { mutableStateOf(0L) }
     var historyProfileId by remember { mutableStateOf(0L) }
     var startTabDecided by remember { mutableStateOf(false) }
@@ -150,6 +152,8 @@ fun AppRoot(
         showAccount -> "account"
         showMe -> "me"
         showMedicineHistory -> "medicineHistory"
+        showDoseHistory -> "doseHistory"
+        showHealthHistory -> "healthHistory"
         else -> "main"
     }
 
@@ -329,6 +333,22 @@ fun AppRoot(
                 onBack = { showMedicineHistory = false }
             )
 
+            "doseHistory" -> com.medremind.app.ui.DoseHistoryScreen(
+                vm = vm,
+                profileId = 0L,
+                onBack = { showDoseHistory = false },
+                onOpenMedicine = { medicineId ->
+                    historyMedicineId = medicineId
+                    historyProfileId = 0L
+                    showMedicineHistory = true
+                }
+            )
+
+            "healthHistory" -> com.medremind.app.ui.HealthHistoryScreen(
+                vm = vm,
+                onBack = { showHealthHistory = false }
+            )
+
             else -> MainTabs(
                 tab = tab,
                 onTabChange = { tab = it },
@@ -373,6 +393,8 @@ fun AppRoot(
                     historyProfileId = 0L
                     showMedicineHistory = true
                 },
+                onOpenHistory = { showDoseHistory = true },
+                onOpenHealthHistory = { showHealthHistory = true },
                 reminderSetupNeeded = needsAlarmSetup &&
                     settings.onboardingDone && settings.tourDone &&
                     System.currentTimeMillis() >= settings.reminderHiddenUntil,

@@ -23,6 +23,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.FileDownload
@@ -85,7 +87,8 @@ fun HistoryContent(
     onOpenNotifications: () -> Unit = {},
     profileId: Long = 0L,
     showHeader: Boolean = true,
-    onOpenMedicine: (Long) -> Unit = {}
+    onOpenMedicine: (Long) -> Unit = {},
+    onOpenHistory: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -145,14 +148,6 @@ fun HistoryContent(
     }
 
     val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
-    val grouped = remember(log) {
-        val map = linkedMapOf<String, MutableList<DoseLogEntry>>()
-        log.forEach { entry ->
-            map.getOrPut(dateKey(entry.scheduledAt)) { mutableListOf() }.add(entry)
-        }
-        map
-    }
-
     fun shareReport(mime: String, chooserTitle: String, build: () -> File) {
         scope.launch {
             val file = withContext(Dispatchers.IO) { build() }
@@ -272,47 +267,35 @@ fun HistoryContent(
             )
         }
 
-        if (log.isEmpty()) {
-            item(key = "empty") {
-                if (!logLoaded) {
-                    ListSkeleton(modifier = Modifier.padding(top = 4.dp))
-                } else {
-                    MedEmptyState(
-                        icon = Icons.Rounded.CalendarMonth,
-                        title = "No doses in this period",
-                        message = "Add a medicine and its scheduled doses will appear here.",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 16.dp)
+        item(key = "history") {
+            MedClickableCard(
+                onClick = onOpenHistory,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Rounded.History,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
                     )
-                }
-            }
-        } else {
-            item(key = "log_header") {
-                SectionHeader(
-                    "History",
-                    modifier = Modifier.padding(top = 6.dp)
-                )
-            }
-            grouped.forEach { (day, entries) ->
-                item(key = "day-$day") {
-                    Text(
-                        day,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-                itemsIndexed(
-                    items = entries,
-                    key = { index, entry -> "$day-${entry.scheduledAt}-$index" }
-                ) { _, entry ->
-                    DoseLogRow(
-                        entry = entry,
-                        timeFormat = timeFormat,
-                        onClick = if (entry.medicineId != 0L) {
-                            { onOpenMedicine(entry.medicineId) }
-                        } else null
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "History",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "All doses \u2014 tap a medicine to see its adherence history.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Icon(
+                        Icons.Rounded.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
