@@ -96,12 +96,20 @@ jobs:
           git -c credential.helper= push -f \
             "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" apk:apk
 
-      - name: Refresh rolling "latest" release
+      - name: Publish versioned release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create latest app/build/outputs/apk/release/app-release.apk \
-            --title "Latest build" \
-            --notes "Auto-built from ${GITHUB_SHA::7} · v${{ env.VN }} (versionCode ${{ env.VC }})"
+          # Keep the release list tidy: drop the old rolling "latest" release and
+          # previous CI builds, then publish this one with a real semver tag so
+          # Obtainium can read the version (avoids the "unknown" error).
+          tags="$(gh release list --limit 100 --json tagName --jq '.[].tagName' || true)"
+          for t in $tags; do
+            case "$t" in
+              latest|v0.183.*) gh release delete "$t" --yes --cleanup-tag 2>/dev/null || true ;;
+            esac
+          done
+          gh release create "v${VN}" app/build/outputs/apk/release/app-release.apk \
+            --title "v${VN}" \
+            --notes "Auto-built from ${GITHUB_SHA::7} (versionCode ${VC})"
